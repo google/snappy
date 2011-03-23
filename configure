@@ -743,7 +743,7 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
-EXTRA_LIBSNAPPY_LDFLAGS
+SNAPPY_LTVERSION
 SNAPPY_PATCHLEVEL
 SNAPPY_MINOR
 SNAPPY_MAJOR
@@ -15352,10 +15352,7 @@ SNAPPY_PATCHLEVEL="0"
 
 
 
-
-# Set the libtool version for the library.
-# (Note: snappy_version is an m4 macro, defined above.)
-EXTRA_LIBSNAPPY_LDFLAGS="$EXTRA_LIBSNAPPY_LDFLAGS -version-info 1:0:0"
+SNAPPY_LTVERSION=1:0:0
 
 
 ac_config_headers="$ac_config_headers config.h"

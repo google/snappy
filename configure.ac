@@ -5,7 +5,7 @@ m4_define([snappy_patchlevel], [0])
 # Libtool shared library interface versions (current:revision:age)
 # Update this value for every release!  (A:B:C will map to foo.so.(A-C).C.B)
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-m4_define([snappy_version], [1:0:0])
+m4_define([snappy_ltversion], [1:0:0])
 
 AC_INIT([snappy], [snappy_major.snappy_minor.snappy_patchlevel])
 AC_CONFIG_MACRO_DIR([m4])
@@ -88,11 +88,7 @@ SNAPPY_PATCHLEVEL="snappy_patchlevel"
 AC_SUBST([SNAPPY_MAJOR])
 AC_SUBST([SNAPPY_MINOR])
 AC_SUBST([SNAPPY_PATCHLEVEL])
-
-# Set the libtool version for the library.
-# (Note: snappy_version is an m4 macro, defined above.)
-EXTRA_LIBSNAPPY_LDFLAGS="$EXTRA_LIBSNAPPY_LDFLAGS -version-info snappy_version"
-AC_SUBST([EXTRA_LIBSNAPPY_LDFLAGS])
+AC_SUBST([SNAPPY_LTVERSION], snappy_ltversion)
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile snappy-stubs-public.h])
