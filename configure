@@ -15034,19 +15034,19 @@ main ()
 _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"; then :
 
-    ac_have_builtin_expect=yes
+    snappy_have_builtin_expect=yes
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 
 else
 
-    ac_have_builtin_expect=no
+    snappy_have_builtin_expect=no
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-if test x$ac_have_builtin_expect = xyes ; then
+if test x$snappy_have_builtin_expect = xyes ; then
 
 $as_echo "#define HAVE_BUILTIN_EXPECT 1" >>confdefs.h
 
@@ -15072,19 +15072,19 @@ main ()
 _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"; then :
 
-    ac_have_builtin_ctz=yes
+    snappy_have_builtin_ctz=yes
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
 
 else
 
-    ac_have_builtin_ctz=no
+    snappy_have_builtin_ctz=no
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-if test x$ac_have_builtin_ctz = xyes ; then
+if test x$snappy_have_builtin_ctz = xyes ; then
 
 $as_echo "#define HAVE_BUILTIN_CTZ 1" >>confdefs.h
 

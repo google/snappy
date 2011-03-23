@@ -33,13 +33,13 @@ AC_MSG_CHECKING([if the compiler supports __builtin_expect])
 AC_TRY_COMPILE(, [
     return __builtin_expect(1, 1) ? 1 : 0
 ], [
-    ac_have_builtin_expect=yes
+    snappy_have_builtin_expect=yes
     AC_MSG_RESULT([yes])
 ], [
-    ac_have_builtin_expect=no
+    snappy_have_builtin_expect=no
     AC_MSG_RESULT([no])
 ])
-if test x$ac_have_builtin_expect = xyes ; then
+if test x$snappy_have_builtin_expect = xyes ; then
     AC_DEFINE(HAVE_BUILTIN_EXPECT, 1, [Define to 1 if the compiler supports __builtin_expect.])
 fi
 
@@ -50,13 +50,13 @@ AC_MSG_CHECKING([if the compiler supports __builtin_ctzll])
 AC_TRY_COMPILE(, [
     return (__builtin_ctzll(0x100000000LL) == 32) ? 1 : 0
 ], [
-    ac_have_builtin_ctz=yes
+    snappy_have_builtin_ctz=yes
     AC_MSG_RESULT([yes])
 ], [
-    ac_have_builtin_ctz=no
+    snappy_have_builtin_ctz=no
     AC_MSG_RESULT([no])
 ])
-if test x$ac_have_builtin_ctz = xyes ; then
+if test x$snappy_have_builtin_ctz = xyes ; then
     AC_DEFINE(HAVE_BUILTIN_CTZ, 1, [Define to 1 if the compiler supports __builtin_ctz and friends.])
 fi
 
