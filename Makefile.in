@@ -98,9 +98,8 @@ am__DEPENDENCIES_1 =
 snappy_unittest_DEPENDENCIES = libsnappy.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 snappy_unittest_LINK = $(LIBTOOL) --tag=CXX $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CXXLD) \
-	$(snappy_unittest_CXXFLAGS) $(CXXFLAGS) \
-	$(snappy_unittest_LDFLAGS) $(LDFLAGS) -o $@
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+	$(CXXFLAGS) $(snappy_unittest_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -276,7 +275,6 @@ noinst_HEADERS = snappy-internal.h snappy-stubs-internal.h snappy-test.h
 
 # Unit tests and benchmarks.
 snappy_unittest_CPPFLAGS = $(gflags_CFLAGS) $(GTEST_CPPFLAGS)
-snappy_unittest_CXXFLAGS = $(GTEST_CPPFLAGS)
 snappy_unittest_SOURCES = snappy_unittest.cc snappy-test.cc
 snappy_unittest_LDFLAGS = $(GTEST_LDFLAGS)
 snappy_unittest_LDADD = libsnappy.la $(gflags_LIBS) $(GTEST_LIBS)
@@ -420,32 +418,32 @@ distclean-compile:
 @am__fastdepCXX_FALSE@	$(LTCXXCOMPILE) -c -o $@ $<
 
 snappy_unittest-snappy_unittest.o: snappy_unittest.cc
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(snappy_unittest_CXXFLAGS) $(CXXFLAGS) -MT snappy_unittest-snappy_unittest.o -MD -MP -MF $(DEPDIR)/snappy_unittest-snappy_unittest.Tpo -c -o snappy_unittest-snappy_unittest.o `test -f 'snappy_unittest.cc' || echo '$(srcdir)/'`snappy_unittest.cc
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT snappy_unittest-snappy_unittest.o -MD -MP -MF $(DEPDIR)/snappy_unittest-snappy_unittest.Tpo -c -o snappy_unittest-snappy_unittest.o `test -f 'snappy_unittest.cc' || echo '$(srcdir)/'`snappy_unittest.cc
 @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/snappy_unittest-snappy_unittest.Tpo $(DEPDIR)/snappy_unittest-snappy_unittest.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='snappy_unittest.cc' object='snappy_unittest-snappy_unittest.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(snappy_unittest_CXXFLAGS) $(CXXFLAGS) -c -o snappy_unittest-snappy_unittest.o `test -f 'snappy_unittest.cc' || echo '$(srcdir)/'`snappy_unittest.cc
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o snappy_unittest-snappy_unittest.o `test -f 'snappy_unittest.cc' || echo '$(srcdir)/'`snappy_unittest.cc
 
 snappy_unittest-snappy_unittest.obj: snappy_unittest.cc
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(snappy_unittest_CXXFLAGS) $(CXXFLAGS) -MT snappy_unittest-snappy_unittest.obj -MD -MP -MF $(DEPDIR)/snappy_unittest-snappy_unittest.Tpo -c -o snappy_unittest-snappy_unittest.obj `if test -f 'snappy_unittest.cc'; then $(CYGPATH_W) 'snappy_unittest.cc'; else $(CYGPATH_W) '$(srcdir)/snappy_unittest.cc'; fi`
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT snappy_unittest-snappy_unittest.obj -MD -MP -MF $(DEPDIR)/snappy_unittest-snappy_unittest.Tpo -c -o snappy_unittest-snappy_unittest.obj `if test -f 'snappy_unittest.cc'; then $(CYGPATH_W) 'snappy_unittest.cc'; else $(CYGPATH_W) '$(srcdir)/snappy_unittest.cc'; fi`
 @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/snappy_unittest-snappy_unittest.Tpo $(DEPDIR)/snappy_unittest-snappy_unittest.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='snappy_unittest.cc' object='snappy_unittest-snappy_unittest.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(snappy_unittest_CXXFLAGS) $(CXXFLAGS) -c -o snappy_unittest-snappy_unittest.obj `if test -f 'snappy_unittest.cc'; then $(CYGPATH_W) 'snappy_unittest.cc'; else $(CYGPATH_W) '$(srcdir)/snappy_unittest.cc'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o snappy_unittest-snappy_unittest.obj `if test -f 'snappy_unittest.cc'; then $(CYGPATH_W) 'snappy_unittest.cc'; else $(CYGPATH_W) '$(srcdir)/snappy_unittest.cc'; fi`
 
 snappy_unittest-snappy-test.o: snappy-test.cc
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(snappy_unittest_CXXFLAGS) $(CXXFLAGS) -MT snappy_unittest-snappy-test.o -MD -MP -MF $(DEPDIR)/snappy_unittest-snappy-test.Tpo -c -o snappy_unittest-snappy-test.o `test -f 'snappy-test.cc' || echo '$(srcdir)/'`snappy-test.cc
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT snappy_unittest-snappy-test.o -MD -MP -MF $(DEPDIR)/snappy_unittest-snappy-test.Tpo -c -o snappy_unittest-snappy-test.o `test -f 'snappy-test.cc' || echo '$(srcdir)/'`snappy-test.cc
 @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/snappy_unittest-snappy-test.Tpo $(DEPDIR)/snappy_unittest-snappy-test.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='snappy-test.cc' object='snappy_unittest-snappy-test.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(snappy_unittest_CXXFLAGS) $(CXXFLAGS) -c -o snappy_unittest-snappy-test.o `test -f 'snappy-test.cc' || echo '$(srcdir)/'`snappy-test.cc
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o snappy_unittest-snappy-test.o `test -f 'snappy-test.cc' || echo '$(srcdir)/'`snappy-test.cc
 
 snappy_unittest-snappy-test.obj: snappy-test.cc
-@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(snappy_unittest_CXXFLAGS) $(CXXFLAGS) -MT snappy_unittest-snappy-test.obj -MD -MP -MF $(DEPDIR)/snappy_unittest-snappy-test.Tpo -c -o snappy_unittest-snappy-test.obj `if test -f 'snappy-test.cc'; then $(CYGPATH_W) 'snappy-test.cc'; else $(CYGPATH_W) '$(srcdir)/snappy-test.cc'; fi`
+@am__fastdepCXX_TRUE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT snappy_unittest-snappy-test.obj -MD -MP -MF $(DEPDIR)/snappy_unittest-snappy-test.Tpo -c -o snappy_unittest-snappy-test.obj `if test -f 'snappy-test.cc'; then $(CYGPATH_W) 'snappy-test.cc'; else $(CYGPATH_W) '$(srcdir)/snappy-test.cc'; fi`
 @am__fastdepCXX_TRUE@	$(am__mv) $(DEPDIR)/snappy_unittest-snappy-test.Tpo $(DEPDIR)/snappy_unittest-snappy-test.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	source='snappy-test.cc' object='snappy_unittest-snappy-test.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(snappy_unittest_CXXFLAGS) $(CXXFLAGS) -c -o snappy_unittest-snappy-test.obj `if test -f 'snappy-test.cc'; then $(CYGPATH_W) 'snappy-test.cc'; else $(CYGPATH_W) '$(srcdir)/snappy-test.cc'; fi`
+@am__fastdepCXX_FALSE@	$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(snappy_unittest_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o snappy_unittest-snappy-test.obj `if test -f 'snappy-test.cc'; then $(CYGPATH_W) 'snappy-test.cc'; else $(CYGPATH_W) '$(srcdir)/snappy-test.cc'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

@@ -10,7 +10,6 @@ noinst_HEADERS = snappy-internal.h snappy-stubs-internal.h snappy-test.h
 
 # Unit tests and benchmarks.
 snappy_unittest_CPPFLAGS = $(gflags_CFLAGS) $(GTEST_CPPFLAGS)
-snappy_unittest_CXXFLAGS = $(GTEST_CPPFLAGS)
 snappy_unittest_SOURCES = snappy_unittest.cc snappy-test.cc
 snappy_unittest_LDFLAGS = $(GTEST_LDFLAGS)
 snappy_unittest_LDADD = libsnappy.la $(gflags_LIBS) $(GTEST_LIBS)
