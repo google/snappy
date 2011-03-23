@@ -884,6 +884,7 @@ enable_dependency_tracking
 with_gnu_ld
 enable_libtool_lock
 enable_gtest
+with_gflags
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1542,6 +1543,8 @@ Optional Packages:
   --with-pic              try to use only PIC/non-PIC objects @<:@default=use
                           both@:>@
   --with-gnu-ld           assume the C compiler uses GNU ld @<:@default=no@:>@
+  --with-gflags           use Google Flags package to enhance the unit test
+                          @<:@default=check@:>@
 
 Some influential environment variables:
   CC          C compiler command
@@ -14828,6 +14831,17 @@ fi
 
 
 
+@%:@ Check whether --with-gflags was given.
+if test "${with_gflags+set}" = set; then :
+  withval=$with_gflags; 
+else
+  with_gflags=check
+fi
+
+
+if test "x$with_gflags" != "xno"; then
+  
+
 if test "x$ac_cv_env_PKG_CONFIG_set" != "xset"; then
 	if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}pkg-config", so it can be a program name with args.
@@ -15003,11 +15017,19 @@ fi
 
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-                true # Ignore; we can live without it.
-
+                if test "x$with_gflags" != "xcheck"; then
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "--with-gflags was given, but test for gflags failed
+See \`config.log' for more details." "$LINENO" 5; }
+    fi
 elif test $pkg_failed = untried; then
-	true # Ignore; we can live without it.
-
+	if test "x$with_gflags" != "xcheck"; then
+      { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error "--with-gflags was given, but test for gflags failed
+See \`config.log' for more details." "$LINENO" 5; }
+    fi
 else
 	gflags_CFLAGS=$pkg_cv_gflags_CFLAGS
 	gflags_LIBS=$pkg_cv_gflags_LIBS
@@ -15016,6 +15038,7 @@ $as_echo "yes" >&6; }
 	
 $as_echo "@%:@define HAVE_GFLAGS 1" >>confdefs.h
 
+fi
 fi
 
 # See if we have __builtin_expect.
