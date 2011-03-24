@@ -23,7 +23,10 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef HAVE_SYS_MMAN
 #include <sys/mman.h>
+#endif
 
 #include "config.h"
 #include "snappy-stubs-public.h"

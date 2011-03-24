@@ -21,6 +21,11 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+
+#ifdef HAVE_SYS_MMAN_H
+#include <sys/mman.h>
+#endif
+
 #include <sys/resource.h>
 #include <sys/time.h>
 
