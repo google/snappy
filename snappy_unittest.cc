@@ -14,7 +14,6 @@
 
 #include <math.h>
 #include <stdlib.h>
-#include <sys/mman.h>
 
 #include <algorithm>
 #include <string>
@@ -54,15 +53,14 @@ DEFINE_bool(write_uncompressed, false,
 namespace snappy {
 
 
+#ifdef HAVE_FUNC_MMAP
+
 // To test against code that reads beyond its input, this class copies a
 // string to a newly allocated group of pages, the last of which
 // is made unreadable via mprotect. Note that we need to allocate the
 // memory with mmap(), as POSIX allows mprotect() only on memory allocated
 // with mmap(), and some malloc/posix_memalign implementations expect to
 // be able to read previously allocated memory while doing heap allocations.
-//
-// TODO(user): Add support for running the unittest without the protection
-// checks if the target system doesn't have mmap.
 class DataEndingAtUnreadablePage {
  public:
   explicit DataEndingAtUnreadablePage(const string& s) {
@@ -99,6 +97,13 @@ class DataEndingAtUnreadablePage {
   const char* data_;
   size_t size_;
 };
+
+#else  // HAVE_FUNC_MMAP
+
+// Fallback for systems without mmap.
+typedef string DataEndingAtUnreadablePage;
+
+#endif
 
 enum CompressorType {
   ZLIB, LZO, LIBLZF, QUICKLZ, FASTLZ, SNAPPY,
