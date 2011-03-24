@@ -71,7 +71,8 @@
 #define DEFINE_int32(flag_name, default_value, description) \
   static int FLAGS_ ## flag_name = default_value;
 
-#define InitGoogle(argv0, argc, argv, remove_flags)
+#define InitGoogle(argv0, argc, argv, remove_flags) \
+  INIT_GTEST(argc, argv)
 
 #endif
 
