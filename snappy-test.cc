@@ -159,7 +159,12 @@ void Benchmark::Run() {
           "%.1fGB/s", bytes_per_second / (1024.0f * 1024.0f * 1024.0f));
     }
 
-    fprintf(stderr, "%-18s %10lld %10lld %10d %s  %s\n",
+    fprintf(stderr,
+#ifdef WIN32
+            "%-18s %10I64d %10I64d %10d %s  %s\n",
+#else
+            "%-18s %10lld %10lld %10d %s  %s\n",
+#endif
             heading.c_str(),
             static_cast<long long>(real_time_us * 1000 / num_iterations),
             static_cast<long long>(cpu_time_us * 1000 / num_iterations),
