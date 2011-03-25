@@ -1,3 +1,17 @@
+Snappy v1.0.1, March 25th 2011:
+
+This is a maintenance release, mostly containing minor fixes.
+There is no new functionality. The most important fixes include:
+
+  * The COPYING file and all licensing headers now correctly state that
+    Snappy is licensed under the Apache 2.0 license.
+
+  * snappy_unittest should now compile natively under Windows,
+    as well as on embedded systems with no mmap().
+
+  * Various autotools nits have been fixed.
+
+
 Snappy v1.0, March 17th 2011:
 
   * Initial version.
