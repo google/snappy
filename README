@@ -20,8 +20,8 @@ Snappy has the following properties:
    format is stable and will not change between versions.
  * Robust: The Snappy decompressor is designed not to crash in the face of
    corrupted or malicious input.
- * Free and open source software: Snappy is licensed under the Apache license,
-   version 2.0. For more information, see the included COPYING file.
+ * Free and open source software: Snappy is licensed under a BSD-type license.
+   For more information, see the included COPYING file.
 
 Snappy has previously been called "Zippy" in some Google presentations
 and the like.
