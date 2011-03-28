@@ -25,7 +25,9 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+//
+// A light-weight compression algorithm.  It is designed for speed of
+// compression and decompression, rather than for the utmost in space
 // savings.
 //
 // For getting better compression ratios when you are compressing data
