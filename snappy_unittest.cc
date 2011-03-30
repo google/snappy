@@ -128,13 +128,58 @@ const char* names[] = {
   "ZLIB", "LZO", "LIBLZF", "QUICKLZ", "FASTLZ", "SNAPPY",
 };
 
-// Returns true if we successfully compressed, false otherwise
+static size_t MinimumRequiredOutputSpace(size_t input_size,
+                                         CompressorType comp) {
+  switch (comp) {
+#ifdef ZLIB_VERSION
+    case ZLIB:
+      return ZLib::MinCompressbufSize(input_size);
+#endif  // ZLIB_VERSION
+
+#ifdef LZO_VERSION
+    case LZO:
+      return input_size + input_size/64 + 16 + 3;
+#endif  // LZO_VERSION
+
+#ifdef LZF_VERSION
+    case LIBLZF:
+      return input_size;
+#endif  // LZF_VERSION
+
+#ifdef QLZ_VERSION_MAJOR
+    case QUICKLZ:
+      return input_size + 36000;  // 36000 is used for scratch.
+#endif  // QLZ_VERSION_MAJOR
+
+#ifdef FASTLZ_VERSION
+    case FASTLZ:
+      return max(static_cast<int>(ceil(input_size * 1.05)), 66);
+#endif  // FASTLZ_VERSION
+
+    case SNAPPY:
+      return snappy::MaxCompressedLength(input_size);
+
+    default:
+      LOG(FATAL) << "Unknown compression type number " << comp;
+  }
+}
+
+// Returns true if we successfully compressed, false otherwise.
+//
+// If compressed_is_preallocated is set, do not resize the compressed buffer.
+// This is typically what you want for a benchmark, in order to not spend
+// time in the memory allocator. If you do set this flag, however,
+// "compressed" must be preinitialized to at least MinCompressbufSize(comp)
+// number of bytes, and may contain junk bytes at the end after return.
 static bool Compress(const char* input, size_t input_size, CompressorType comp,
-                     string* compressed) {
+                     string* compressed, bool compressed_is_preallocated) {
+  if (!compressed_is_preallocated) {
+    compressed->resize(MinimumRequiredOutputSpace(input_size, comp));
+  }
+
   switch (comp) {
 #ifdef ZLIB_VERSION
     case ZLIB: {
-      compressed->resize(ZLib::MinCompressbufSize(input_size));
       ZLib zlib;
       uLongf destlen = compressed->size();
       int ret = zlib.Compress(
@@ -143,14 +188,15 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
           reinterpret_cast<const Bytef*>(input),
           input_size);
       CHECK_EQ(Z_OK, ret);
-      compressed->resize(destlen);
+      if (!compressed_is_preallocated) {
+        compressed->resize(destlen);
+      }
       return true;
     }
 #endif  // ZLIB_VERSION
 
 #ifdef LZO_VERSION
     case LZO: {
-      compressed->resize(input_size + input_size/64 + 16 + 3);
       unsigned char* mem = new unsigned char[LZO1X_1_15_MEM_COMPRESS];
       lzo_uint destlen;
       int ret = lzo1x_1_15_compress(
@@ -161,18 +207,19 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
           mem);
       CHECK_EQ(LZO_E_OK, ret);
       delete[] mem;
-      compressed->resize(destlen);
+      if (!compressed_is_preallocated) {
+        compressed->resize(destlen);
+      }
       break;
     }
 #endif  // LZO_VERSION
 
 #ifdef LZF_VERSION
     case LIBLZF: {
-      compressed->resize(input_size - 1);
       int destlen = lzf_compress(input,
                                  input_size,
                                  string_as_array(compressed),
-                                 input_size - 1);
+                                 input_size);
       if (destlen == 0) {
         // lzf *can* cause lots of blowup when compressing, so they
         // recommend to limit outsize to insize, and just not compress
@@ -180,14 +227,15 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
         compressed->assign(input, input_size);
         destlen = input_size;
       }
-      compressed->resize(destlen);
+      if (!compressed_is_preallocated) {
+        compressed->resize(destlen);
+      }
       break;
     }
 #endif  // LZF_VERSION
 
 #ifdef QLZ_VERSION_MAJOR
     case QUICKLZ: {
-      compressed->resize(input_size + 36000);  // 36000 is used for scratch
       qlz_state_compress *state_compress = new qlz_state_compress;
       int destlen = qlz_compress(input,
                                  string_as_array(compressed),
@@ -195,23 +243,24 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
                                  state_compress);
       delete state_compress;
       CHECK_NE(0, destlen);
-      compressed->resize(destlen);
+      if (!compressed_is_preallocated) {
+        compressed->resize(destlen);
+      }
       break;
     }
 #endif  // QLZ_VERSION_MAJOR
 
 #ifdef FASTLZ_VERSION
     case FASTLZ: {
-      int compressed_size = max(static_cast<int>(ceil(input_size * 1.05)),
-                                66);
-      compressed->resize(compressed_size);
       // Use level 1 compression since we mostly care about speed.
       int destlen = fastlz_compress_level(
           1,
           input,
           input_size,
           string_as_array(compressed));
-      compressed->resize(destlen);
+      if (!compressed_is_preallocated) {
+        compressed->resize(destlen);
+      }
       CHECK_NE(destlen, 0);
       break;
     }
@@ -223,7 +272,9 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
                           string_as_array(compressed),
                           &destlen);
       CHECK_LE(destlen, snappy::MaxCompressedLength(input_size));
-      compressed->resize(destlen);
+      if (!compressed_is_preallocated) {
+        compressed->resize(destlen);
+      }
       break;
     }
 
@@ -351,13 +402,12 @@ static void Measure(const char* data,
       input[b] = data+input_start;
       input_length[b] = input_limit-input_start;
 
-      // Pre-grow the output buffer so we don't measure stupid string
-      // append time
-      compressed[b].resize(block_size * 2);
+      // Pre-grow the output buffer so we don't measure string append time.
+      compressed[b].resize(MinimumRequiredOutputSpace(block_size, comp));
     }
 
     // First, try one trial compression to make sure the code is compiled in
-    if (!Compress(input[0], input_length[0], comp, &compressed[0])) {
+    if (!Compress(input[0], input_length[0], comp, &compressed[0], true)) {
       LOG(WARNING) << "Skipping " << names[comp] << ": "
                    << "library not compiled in";
       return;
@@ -366,11 +416,22 @@ static void Measure(const char* data,
     for (int run = 0; run < kRuns; run++) {
       CycleTimer ctimer, utimer;
 
+      for (int b = 0; b < num_blocks; b++) {
+        // Pre-grow the output buffer so we don't measure string append time.
+        compressed[b].resize(MinimumRequiredOutputSpace(block_size, comp));
+      }
+
       ctimer.Start();
       for (int b = 0; b < num_blocks; b++)
         for (int i = 0; i < repeats; i++)
-          Compress(input[b], input_length[b], comp, &compressed[b]);
+          Compress(input[b], input_length[b], comp, &compressed[b], true);
       ctimer.Stop();
+
+      // Compress once more, with resizing, so we don't leave junk
+      // at the end that will confuse the decompressor.
+      for (int b = 0; b < num_blocks; b++) {
+        Compress(input[b], input_length[b], comp, &compressed[b], false);
+      }
 
       for (int b = 0; b < num_blocks; b++) {
         output[b].resize(input_length[b]);
@@ -911,8 +972,7 @@ static void CompressFile(const char* fname) {
   File::ReadFileToStringOrDie(fname, &fullinput);
 
   string compressed;
-  compressed.resize(fullinput.size() * 2);
-  Compress(fullinput.data(), fullinput.size(), SNAPPY, &compressed);
+  Compress(fullinput.data(), fullinput.size(), SNAPPY, &compressed, false);
 
   File::WriteStringToFileOrDie(compressed,
                                string(fname).append(".comp").c_str());
