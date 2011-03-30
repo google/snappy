@@ -220,8 +220,8 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
     case SNAPPY: {
       size_t destlen;
       snappy::RawCompress(input, input_size,
-                         string_as_array(compressed),
-                         &destlen);
+                          string_as_array(compressed),
+                          &destlen);
       CHECK_LE(destlen, snappy::MaxCompressedLength(input_size));
       compressed->resize(destlen);
       break;
@@ -315,7 +315,7 @@ static bool Uncompress(const string& compressed, CompressorType comp,
 
     case SNAPPY: {
       snappy::RawUncompress(compressed.data(), compressed.size(),
-                           string_as_array(output));
+                            string_as_array(output));
       break;
     }
 
@@ -713,8 +713,8 @@ TEST(Snappy, FourByteOffset) {
 static bool CheckUncompressedLength(const string& compressed,
                                     size_t* ulength) {
   const bool result1 = snappy::GetUncompressedLength(compressed.data(),
-                                                    compressed.size(),
-                                                    ulength);
+                                                     compressed.size(),
+                                                     ulength);
 
   snappy::ByteArraySource source(compressed.data(), compressed.size());
   uint32 length;
@@ -730,7 +730,7 @@ TEST(SnappyCorruption, TruncatedVarint) {
   CHECK(!CheckUncompressedLength(compressed, &ulength));
   CHECK(!snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
   CHECK(!snappy::Uncompress(compressed.data(), compressed.size(),
-                           &uncompressed));
+                            &uncompressed));
 }
 
 TEST(SnappyCorruption, UnterminatedVarint) {
@@ -745,7 +745,7 @@ TEST(SnappyCorruption, UnterminatedVarint) {
   CHECK(!CheckUncompressedLength(compressed, &ulength));
   CHECK(!snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
   CHECK(!snappy::Uncompress(compressed.data(), compressed.size(),
-                           &uncompressed));
+                            &uncompressed));
 }
 
 TEST(Snappy, ReadPastEndOfBuffer) {
