@@ -31,6 +31,10 @@
 #ifndef UTIL_SNAPPY_OPENSOURCE_SNAPPY_STUBS_INTERNAL_H_
 #define UTIL_SNAPPY_OPENSOURCE_SNAPPY_STUBS_INTERNAL_H_
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <iostream>
 #include <string>
 
@@ -42,7 +46,6 @@
 #include <sys/mman.h>
 #endif
 
-#include "config.h"
 #include "snappy-stubs-public.h"
 
 #if defined(__x86_64__)
