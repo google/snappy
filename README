@@ -65,10 +65,13 @@ are of course most welcome; see "Contact", below.
 Usage
 =====
 
-Note that Snappy, both the implementation and the interface,
-is written in C++.
+Note that Snappy, both the implementation and the main interface,
+is written in C++. However, several third-party bindings to other languages
+are available; see the Google Code page at http://code.google.com/p/snappy/
+for more information. Also, if you want to use Snappy from C code, you can
+use the included C bindings in snappy-c.h.
 
-To use Snappy from your own program, include the file "snappy.h" from
+To use Snappy from your own C++ program, include the file "snappy.h" from
 your calling file, and link against the compiled library.
 
 There are many ways to call Snappy, but the simplest possible is
