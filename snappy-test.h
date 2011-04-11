@@ -40,7 +40,10 @@
 #include <sys/mman.h>
 #endif
 
+#ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
+#endif
+
 #include <sys/time.h>
 
 #include <string>

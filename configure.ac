@@ -18,7 +18,7 @@ AC_SUBST([LIBTOOL_DEPS])
 AC_PROG_CXX
 AC_LANG([C++])
 AC_C_BIGENDIAN
-AC_CHECK_HEADERS([stdint.h stddef.h sys/mman.h])
+AC_CHECK_HEADERS([stdint.h stddef.h sys/mman.h sys/resource.h windows.h])
 
 # Don't use AC_FUNC_MMAP, as it checks for mappings of already-mapped memory,
 # which we don't need (and does not exist on Windows).
