@@ -46,6 +46,11 @@
 
 #include <sys/time.h>
 
+#ifdef HAVE_WINDOWS_H
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 #include <string>
 
 #ifdef HAVE_GTEST
@@ -241,15 +246,30 @@ class CycleTimer {
   CycleTimer() : real_time_us_(0) {}
 
   void Start() {
+#ifdef WIN32
+    QueryPerformanceCounter(&start_);
+#else
     gettimeofday(&start_, NULL);
+#endif
   }
 
   void Stop() {
+#ifdef WIN32
+    LARGE_INTEGER stop;
+    LARGE_INTEGER frequency;
+    QueryPerformanceCounter(&stop);
+    QueryPerformanceFrequency(&frequency);
+
+    double elapsed = static_cast<double>(stop.QuadPart - start_.QuadPart) /
+        frequency.QuadPart;
+    real_time_us_ += elapsed * 1e6 + 0.5;
+#else
     struct timeval stop;
     gettimeofday(&stop, NULL);
 
     real_time_us_ += 1000000 * (stop.tv_sec - start_.tv_sec);
     real_time_us_ += (stop.tv_usec - start_.tv_usec);
+#endif
   }
 
   double Get() {
@@ -258,7 +278,11 @@ class CycleTimer {
 
  private:
   int64 real_time_us_;
+#ifdef WIN32
+  LARGE_INTEGER start_;
+#else
   struct timeval start_;
+#endif
 };
 
 // Minimalistic microbenchmark framework.

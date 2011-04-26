@@ -74,21 +74,22 @@ void ResetBenchmarkTiming() {
   benchmark_cpu_time_us = 0;
 }
 
-struct timeval benchmark_start_real;
-
 #ifdef WIN32
+LARGE_INTEGER benchmark_start_real;
 FILETIME benchmark_start_cpu;
 #else  // WIN32
+struct timeval benchmark_start_real;
 struct rusage benchmark_start_cpu;
 #endif  // WIN32
 
 void StartBenchmarkTiming() {
-  gettimeofday(&benchmark_start_real, NULL);
 #ifdef WIN32
+  QueryPerformanceCounter(&benchmark_start_real);
   FILETIME dummy;
   CHECK(GetProcessTimes(
       GetCurrentProcess(), &dummy, &dummy, &dummy, &benchmark_start_cpu));
 #else
+  gettimeofday(&benchmark_start_real, NULL);
   if (getrusage(RUSAGE_SELF, &benchmark_start_cpu) == -1) {
     perror("getrusage(RUSAGE_SELF)");
     exit(1);
@@ -101,14 +102,18 @@ void StopBenchmarkTiming() {
   if (!benchmark_running) {
     return;
   }
-  struct timeval benchmark_stop_real;
-  gettimeofday(&benchmark_stop_real, NULL);
-  benchmark_real_time_us +=
-      1000000 * (benchmark_stop_real.tv_sec - benchmark_start_real.tv_sec);
-  benchmark_real_time_us +=
-      (benchmark_stop_real.tv_usec - benchmark_start_real.tv_usec);
 
 #ifdef WIN32
+  LARGE_INTEGER benchmark_stop_real;
+  LARGE_INTEGER benchmark_frequency;
+  QueryPerformanceCounter(&benchmark_stop_real);
+  QueryPerformanceFrequency(&benchmark_frequency);
+
+  double elapsed_real = static_cast<double>(
+      benchmark_stop_real.QuadPart - benchmark_start_real.QuadPart) /
+      benchmark_frequency.QuadPart;
+  benchmark_real_time_us += elapsed_real * 1e6 + 0.5;
+
   FILETIME benchmark_stop_cpu, dummy;
   CHECK(GetProcessTimes(
       GetCurrentProcess(), &dummy, &dummy, &dummy, &benchmark_stop_cpu));
@@ -124,6 +129,13 @@ void StopBenchmarkTiming() {
   benchmark_cpu_time_us +=
       (stop_ulargeint.QuadPart - start_ulargeint.QuadPart + 5) / 10;
 #else  // WIN32
+  struct timeval benchmark_stop_real;
+  gettimeofday(&benchmark_stop_real, NULL);
+  benchmark_real_time_us +=
+      1000000 * (benchmark_stop_real.tv_sec - benchmark_start_real.tv_sec);
+  benchmark_real_time_us +=
+      (benchmark_stop_real.tv_usec - benchmark_start_real.tv_usec);
+
   struct rusage benchmark_stop_cpu;
   if (getrusage(RUSAGE_SELF, &benchmark_stop_cpu) == -1) {
     perror("getrusage(RUSAGE_SELF)");
