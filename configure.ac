@@ -79,11 +79,25 @@ fi
 
 # Other compression libraries; the unit test can use these for comparison
 # if they are available. If they are not found, just ignore.
-AC_CHECK_LIB([z], [zlibVersion],, [true])
-AC_CHECK_LIB([lzo2], [lzo1x_1_15_compress],, [true])
-AC_CHECK_LIB([lzf], [lzf_compress],, [true])
-AC_CHECK_LIB([fastlz], [fastlz_compress],, [true])
-AC_CHECK_LIB([quicklz], [qlz_compress],, [true])
+UNITTEST_LIBS=""
+AC_DEFUN([CHECK_EXT_COMPRESSION_LIB], [
+  AH_CHECK_LIB([$1])
+  AC_CHECK_LIB(
+    [$1],
+    [$2],
+    [
+      AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_LIB$1))
+      UNITTEST_LIBS="-l$1 $UNITTEST_LIBS"
+    ],
+    [true]
+  )
+])
+CHECK_EXT_COMPRESSION_LIB([z], [zlibVersion])
+CHECK_EXT_COMPRESSION_LIB([lzo2], [lzo1x_1_15_compress])
+CHECK_EXT_COMPRESSION_LIB([lzf], [lzf_compress])
+CHECK_EXT_COMPRESSION_LIB([fastlz], [fastlz_compress])
+CHECK_EXT_COMPRESSION_LIB([quicklz], [qlz_compress])
+AC_SUBST([UNITTEST_LIBS])
 
 # These are used by snappy-stubs-public.h.in.
 if test "$ac_cv_header_stdint_h" = "yes"; then
