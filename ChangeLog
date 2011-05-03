@@ -1,4 +1,226 @@
 ------------------------------------------------------------------------
+r31 | snappy.mirrorbot@gmail.com | 2011-04-26 14:34:55 +0200 (Tue, 26 Apr 2011) | 15 lines
+
+
+Fix public issue #30: Stop using gettimeofday() altogether on Win32,
+as MSVC doesn't include it. Replace with QueryPerformanceCounter(),
+which is monotonic and probably reasonably high-resolution.
+(Some machines have traditionally had bugs in QPC, but they should
+be relatively rare these days, and there's really no much better
+alternative that I know of.)
+
+R=csilvers
+DELTA=74  (55 added, 19 deleted, 0 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1556
+
+------------------------------------------------------------------------
+r30 | snappy.mirrorbot@gmail.com | 2011-04-26 14:34:37 +0200 (Tue, 26 Apr 2011) | 11 lines
+
+
+Fix public issue #31: Don't reset PATH in autogen.sh; instead, do the trickery
+we need for our own build system internally.
+
+R=csilvers
+DELTA=16  (13 added, 1 deleted, 2 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1555
+
+------------------------------------------------------------------------
+r29 | snappy.mirrorbot@gmail.com | 2011-04-16 00:55:56 +0200 (Sat, 16 Apr 2011) | 12 lines
+
+
+When including <windows.h>, define WIN32_LEAN_AND_MEAN first,
+so we won't pull in macro definitions of things like min() and max(),
+which can conflict with <algorithm>.
+
+R=csilvers
+DELTA=1  (1 added, 0 deleted, 0 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1485
+
+------------------------------------------------------------------------
+r28 | snappy.mirrorbot@gmail.com | 2011-04-11 11:07:01 +0200 (Mon, 11 Apr 2011) | 15 lines
+
+
+Fix public issue #29: Write CPU timing code for Windows, based on GetProcessTimes()
+instead of getursage().
+
+I thought I'd already committed this patch, so that the 1.0.1 release already
+would have a Windows-compatible snappy_unittest, but I'd seemingly deleted it
+instead, so this is a reconstruction.
+
+R=csilvers
+DELTA=43  (39 added, 3 deleted, 1 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1295
+
+------------------------------------------------------------------------
+r27 | snappy.mirrorbot@gmail.com | 2011-04-08 11:51:53 +0200 (Fri, 08 Apr 2011) | 22 lines
+
+
+Include C bindings of Snappy, contributed by Martin Gieseking.
+
+I've made a few changes since Martin's version; mostly style nits, but also
+a semantic change -- most functions that return bool in the C++ version now
+return an enum, to better match typical C (and zlib) semantics.
+
+I've kept the copyright notice, since Martin is obviously the author here;
+he has signed the contributor license agreement, though, so this should not
+hinder Google's use in the future.
+
+We'll need to update the libtool version number to match the added interface,
+but as of http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+I'm going to wait until public release.
+
+R=csilvers
+DELTA=238  (233 added, 0 deleted, 5 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1294
+
+------------------------------------------------------------------------
+r26 | snappy.mirrorbot@gmail.com | 2011-04-07 18:36:43 +0200 (Thu, 07 Apr 2011) | 13 lines
+
+
+Replace geo.protodata with a newer version.
+
+The data compresses/decompresses slightly faster than the old data, and has
+similar density.
+
+R=lookingbill
+DELTA=1  (0 added, 0 deleted, 1 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1288
+
+------------------------------------------------------------------------
+r25 | snappy.mirrorbot@gmail.com | 2011-03-30 22:27:53 +0200 (Wed, 30 Mar 2011) | 12 lines
+
+
+Fix public issue #27: Add HAVE_CONFIG_H tests around the config.h
+inclusion in snappy-stubs-internal.h, which eases compiling outside the
+automake/autoconf framework.
+
+R=csilvers
+DELTA=5  (4 added, 1 deleted, 0 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1152
+
+------------------------------------------------------------------------
+r24 | snappy.mirrorbot@gmail.com | 2011-03-30 22:27:39 +0200 (Wed, 30 Mar 2011) | 13 lines
+
+
+Fix public issue #26: Take memory allocation and reallocation entirely out of the
+Measure() loop. This gives all algorithms a small speed boost, except Snappy which
+already didn't do reallocation (so the measurements were slightly biased in its
+favor).
+
+R=csilvers
+DELTA=92  (69 added, 9 deleted, 14 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1151
+
+------------------------------------------------------------------------
+r23 | snappy.mirrorbot@gmail.com | 2011-03-30 22:25:09 +0200 (Wed, 30 Mar 2011) | 18 lines
+
+
+Renamed "namespace zippy" to "namespace snappy" to reduce
+the differences from the opensource code.  Will make it easier
+in the future to mix-and-match third-party code that uses
+snappy with google code.
+
+Currently, csearch shows that the only external user of
+"namespace zippy" is some bigtable code that accesses
+a TEST variable, which is temporarily kept in the zippy
+namespace.
+
+R=sesse
+DELTA=123  (18 added, 3 deleted, 102 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1150
+
+------------------------------------------------------------------------
+r22 | snappy.mirrorbot@gmail.com | 2011-03-29 00:17:04 +0200 (Tue, 29 Mar 2011) | 11 lines
+
+
+Put back the final few lines of what was truncated during the
+license header change.
+
+R=csilvers
+DELTA=5  (4 added, 0 deleted, 1 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1094
+
+------------------------------------------------------------------------
+r21 | snappy.mirrorbot@gmail.com | 2011-03-26 03:34:34 +0100 (Sat, 26 Mar 2011) | 20 lines
+
+
+Change on 2011-03-25 19:18:00-07:00 by sesse
+
+	Replace the Apache 2.0 license header by the BSD-type license header;
+	somehow a lot of the files were missed in the last round.
+
+	R=dannyb,csilvers
+	DELTA=147  (74 added, 2 deleted, 71 changed)
+
+Change on 2011-03-25 19:25:07-07:00 by sesse
+
+	Unbreak the build; the relicensing removed a bit too much (only comments
+	were intended, but I also accidentially removed some of the top lines of
+	the actual source).
+
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1072
+
+------------------------------------------------------------------------
+r20 | snappy.mirrorbot@gmail.com | 2011-03-25 17:14:41 +0100 (Fri, 25 Mar 2011) | 10 lines
+
+
+Change Snappy from the Apache 2.0 to a BSD-type license.
+
+R=dannyb
+DELTA=328  (80 added, 184 deleted, 64 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1061
+
+------------------------------------------------------------------------
+r19 | snappy.mirrorbot@gmail.com | 2011-03-25 01:39:01 +0100 (Fri, 25 Mar 2011) | 11 lines
+
+
+Release Snappy 1.0.1, to soup up all the various small changes
+that have been made since release.
+
+R=csilvers
+DELTA=266  (260 added, 0 deleted, 6 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1057
+
+------------------------------------------------------------------------
 r18 | snappy.mirrorbot@gmail.com | 2011-03-24 20:15:54 +0100 (Thu, 24 Mar 2011) | 11 lines
 
 

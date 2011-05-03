@@ -1,3 +1,17 @@
+Snappy v1.0.2, April 29th 2011:
+
+  * Relicense to a BSD-type license.
+
+  * Added C bindings, contributed by Martin Gieseking.
+
+  * More Win32 fixes, in particular for MSVC.
+
+  * Replace geo.protodata with a newer version.
+
+  * Fix timing inaccuracies in the unit test when comparing Snappy
+    to other algorithms.
+
+
 Snappy v1.0.1, March 25th 2011:
 
 This is a maintenance release, mostly containing minor fixes.
