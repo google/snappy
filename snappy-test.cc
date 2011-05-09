@@ -168,7 +168,7 @@ struct BenchmarkRun {
 
 struct BenchmarkCompareCPUTime {
   bool operator() (const BenchmarkRun& a, const BenchmarkRun& b) const {
-    return a.real_time_us < b.real_time_us;
+    return a.cpu_time_us < b.cpu_time_us;
   }
 };
 
@@ -204,7 +204,10 @@ void Benchmark::Run() {
       benchmark_runs[run].cpu_time_us = benchmark_cpu_time_us;
     }
 
-    sort(benchmark_runs, benchmark_runs + kNumRuns, BenchmarkCompareCPUTime());
+    nth_element(benchmark_runs,
+                benchmark_runs + kMedianPos,
+                benchmark_runs + kNumRuns,
+                BenchmarkCompareCPUTime());
     int64 real_time_us = benchmark_runs[kMedianPos].real_time_us;
     int64 cpu_time_us = benchmark_runs[kMedianPos].cpu_time_us;
     int64 bytes_per_second = benchmark_bytes_processed * 1000000 / cpu_time_us;
