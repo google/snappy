@@ -182,11 +182,16 @@ void Benchmark::Run() {
     (*function_)(kCalibrateIterations, test_case_num);
     StopBenchmarkTiming();
 
-    // Let each test case run for about 200ms.
+    // Let each test case run for about 200ms, but at least as many
+    // as we used to calibrate.
     // Run five times and pick the median.
     const int kNumRuns = 5;
     const int kMedianPos = kNumRuns / 2;
-    int num_iterations = 200000 * kCalibrateIterations / benchmark_real_time_us;
+    int num_iterations = 0;
+    if (benchmark_real_time_us > 0) {
+      num_iterations = 200000 * kCalibrateIterations / benchmark_real_time_us;
+    }
+    num_iterations = max(num_iterations, kCalibrateIterations);
     BenchmarkRun benchmark_runs[kNumRuns];
 
     for (int run = 0; run < kNumRuns; ++run) {
