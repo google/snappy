@@ -1,5 +1,5 @@
 Snappy compressed format description
-Last revised: 2011-05-13
+Last revised: 2011-05-16
 
 
 This is not a formal specification, but should suffice to explain most
@@ -86,7 +86,7 @@ the amount of bytes to be copied (length), and how far back the
 data to be copied is (offset).
 
 
-2.2. Copy with 1-byte offset (01)
+2.2.1. Copy with 1-byte offset (01)
 
 These elements can encode lengths between [4..11] bytes and offsets
 between [0..2047] bytes. (len-4) occupies three bits and is stored
@@ -95,7 +95,7 @@ upper three are stored in the upper three bits ([5..7]) of the tag byte,
 and the lower eight are stored in a byte following the tag byte.
 
 
-2.3. Copy with 2-byte offset (10)
+2.2.2. Copy with 2-byte offset (10)
 
 These elements can encode lengths between [1..64] and offsets from
 [0..65535]. (len-1) occupies six bits and is stored in the upper
@@ -103,7 +103,7 @@ six bits ([2..7]) of the tag byte. The offset is stored as a
 little-endian 16-bit integer in the two bytes following the tag byte.
 
 
-2.4. Copy with 4-byte offsets (11)
+2.2.3. Copy with 4-byte offsets (11)
 
 These are like the copies with 2-byte offsets (see previous subsection),
 except that the offset is stored as a 32-bit integer instead of a
