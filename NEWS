@@ -1,3 +1,18 @@
+Snappy v1.0.3, June 2nd 2011:
+
+  * Speeded up the decompressor somewhat; about 3-6% for Core 2,
+    6-13% for Core i7, and 5-12% for Opteron (all in 64-bit mode).
+
+  * Added compressed format documentation. This text is new,
+    but an earlier version from Zeev Tarantov was used as reference.
+
+  * Only link snappy_unittest against -lz and other autodetected
+    libraries, not libsnappy.so (which doesn't need any such dependency).
+
+  * Fixed some display issues in the microbenchmarks, one of which would
+    frequently make the test crash on GNU/Hurd.
+
+
 Snappy v1.0.2, April 29th 2011:
 
   * Relicense to a BSD-type license.

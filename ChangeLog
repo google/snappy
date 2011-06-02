@@ -1,4 +1,166 @@
 ------------------------------------------------------------------------
+r39 | snappy.mirrorbot@gmail.com | 2011-06-02 20:06:54 +0200 (Thu, 02 Jun 2011) | 11 lines
+
+Remove an unneeded goto in the decompressor; it turns out that the
+state of ip_ after decompression (or attempted decompresion) is
+completely irrelevant, so we don't need the trailer.
+
+Performance is, as expected, mostly flat -- there's a curious ~3–5%
+loss in the “lsp” test, but that test case is so short it is hard to say
+anything definitive about why (most likely, it's some sort of
+unrelated effect).
+
+R=jeff
+
+------------------------------------------------------------------------
+r38 | snappy.mirrorbot@gmail.com | 2011-06-02 19:59:40 +0200 (Thu, 02 Jun 2011) | 52 lines
+
+Speed up decompression by caching ip_.
+
+It is seemingly hard for the compiler to understand that ip_, the current input
+pointer into the compressed data stream, can not alias on anything else, and
+thus using it directly will incur memory traffic as it cannot be kept in a
+register. The code already knew about this and cached it into a local
+variable, but since Step() only decoded one tag, it had to move ip_ back into
+place between every tag. This seems to have cost us a significant amount of
+performance, so changing Step() into a function that decodes as much as it can
+before it saves ip_ back and returns. (Note that Step() was already inlined,
+so it is not the manual inlining that buys the performance here.)
+
+The wins are about 3–6% for Core 2, 6–13% on Core i7 and 5–12% on Opteron
+(for plain array-to-array decompression, in 64-bit opt mode).
+
+There is a tiny difference in the behavior here; if an invalid literal is
+encountered (ie., the writer refuses the Append() operation), ip_ will now
+point to the byte past the tag byte, instead of where the literal was
+originally thought to end. However, we don't use ip_ for anything after
+DecompressAllTags() has returned, so this should not change external behavior
+in any way.
+
+Microbenchmark results for Core i7, 64-bit (Opteron results are similar):
+
+Benchmark            Time(ns)    CPU(ns) Iterations
+---------------------------------------------------
+BM_UFlat/0              79134      79110       8835 1.2GB/s  html      [ +6.2%]
+BM_UFlat/1             786126     786096        891 851.8MB/s  urls    [+10.0%]
+BM_UFlat/2               9948       9948      69125 11.9GB/s  jpg      [ -1.3%]
+BM_UFlat/3              31999      31998      21898 2.7GB/s  pdf       [ +6.5%]
+BM_UFlat/4             318909     318829       2204 1.2GB/s  html4     [ +6.5%]
+BM_UFlat/5              31384      31390      22363 747.5MB/s  cp      [ +9.2%]
+BM_UFlat/6              14037      14034      49858 757.7MB/s  c       [+10.6%]
+BM_UFlat/7               4612       4612     151395 769.5MB/s  lsp     [ +9.5%]
+BM_UFlat/8            1203174    1203007        582 816.3MB/s  xls     [+19.3%]
+BM_UFlat/9             253869     253955       2757 571.1MB/s  txt1    [+11.4%]
+BM_UFlat/10            219292     219290       3194 544.4MB/s  txt2    [+12.1%]
+BM_UFlat/11            672135     672131       1000 605.5MB/s  txt3    [+11.2%]
+BM_UFlat/12            902512     902492        776 509.2MB/s  txt4    [+12.5%]
+BM_UFlat/13            372110     371998       1881 1.3GB/s  bin       [ +5.8%]
+BM_UFlat/14             50407      50407      10000 723.5MB/s  sum     [+13.5%]
+BM_UFlat/15              5699       5701     100000 707.2MB/s  man     [+12.4%]
+BM_UFlat/16             83448      83424       8383 1.3GB/s  pb        [ +5.7%]
+BM_UFlat/17            256958     256963       2723 684.1MB/s  gaviota [ +7.9%]
+BM_UValidate/0          42795      42796      16351 2.2GB/s  html      [+25.8%]
+BM_UValidate/1         490672     490622       1427 1.3GB/s  urls      [+22.7%]
+BM_UValidate/2            237        237    2950297 499.0GB/s  jpg     [+24.9%]
+BM_UValidate/3          14610      14611      47901 6.0GB/s  pdf       [+26.8%]
+BM_UValidate/4         171973     171990       4071 2.2GB/s  html4     [+25.7%]
+
+
+
+------------------------------------------------------------------------
+r37 | snappy.mirrorbot@gmail.com | 2011-05-17 10:48:25 +0200 (Tue, 17 May 2011) | 10 lines
+
+
+Fix the numbering of the headlines in the Snappy format description.
+
+R=csilvers
+DELTA=4  (0 added, 0 deleted, 4 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1906
+
+------------------------------------------------------------------------
+r36 | snappy.mirrorbot@gmail.com | 2011-05-16 10:59:18 +0200 (Mon, 16 May 2011) | 12 lines
+
+
+Fix public issue #32: Add compressed format documentation for Snappy.
+This text is new, but an earlier version from Zeev Tarantov was used
+as reference.
+
+R=csilvers
+DELTA=112  (111 added, 0 deleted, 1 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1867
+
+------------------------------------------------------------------------
+r35 | snappy.mirrorbot@gmail.com | 2011-05-09 23:29:02 +0200 (Mon, 09 May 2011) | 12 lines
+
+
+Fix public issue #39: Pick out the median runs based on CPU time,
+not real time. Also, use nth_element instead of sort, since we
+only need one element.
+
+R=csilvers
+DELTA=5  (3 added, 0 deleted, 2 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1799
+
+------------------------------------------------------------------------
+r34 | snappy.mirrorbot@gmail.com | 2011-05-09 23:28:45 +0200 (Mon, 09 May 2011) | 19 lines
+
+
+Fix public issue #38: Make the microbenchmark framework handle
+properly cases where gettimeofday() can stand return the same
+result twice (as sometimes on GNU/Hurd) or go backwards
+(as when the user adjusts the clock). We avoid a division-by-zero,
+and put a lower bound on the number of iterations -- the same
+amount as we use to calibrate.
+
+We should probably use CLOCK_MONOTONIC for platforms that support
+it, to be robust against clock adjustments; we already use Windows'
+monotonic timers. However, that's for a later changelist.
+
+R=csilvers
+DELTA=7  (5 added, 0 deleted, 2 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1798
+
+------------------------------------------------------------------------
+r33 | snappy.mirrorbot@gmail.com | 2011-05-04 01:22:52 +0200 (Wed, 04 May 2011) | 11 lines
+
+
+Fix public issue #37: Only link snappy_unittest against -lz and other autodetected
+libraries, not libsnappy.so (which doesn't need any such dependency).
+
+R=csilvers
+DELTA=20  (14 added, 0 deleted, 6 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1710
+
+------------------------------------------------------------------------
+r32 | snappy.mirrorbot@gmail.com | 2011-05-04 01:22:33 +0200 (Wed, 04 May 2011) | 11 lines
+
+
+Release Snappy 1.0.2, to get the license change and various other fixes into
+a release.
+
+R=csilvers
+DELTA=239  (236 added, 0 deleted, 3 changed)
+
+
+Revision created by MOE tool push_codebase.
+MOE_MIGRATION=1709
+
+------------------------------------------------------------------------
 r31 | snappy.mirrorbot@gmail.com | 2011-04-26 14:34:55 +0200 (Tue, 26 Apr 2011) | 15 lines
 
 
