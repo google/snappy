@@ -673,19 +673,19 @@ class SnappyDecompressor {
         uint32 avail = ip_limit_ - ip;
         while (avail < literal_length) {
           bool allow_fast_path = (avail >= 16);
-          if (!writer->Append(ip, avail, allow_fast_path)) goto end;
+          if (!writer->Append(ip, avail, allow_fast_path)) return;
           literal_length -= avail;
           reader_->Skip(peeked_);
           size_t n;
           ip = reader_->Peek(&n);
           avail = n;
           peeked_ = avail;
-          if (avail == 0) goto end;  // Premature end of input
+          if (avail == 0) return;  // Premature end of input
           ip_limit_ = ip + avail;
         }
         bool allow_fast_path = (avail >= 16);
         if (!writer->Append(ip, literal_length, allow_fast_path)) {
-          goto end;
+          return;
         }
         ip += literal_length;
       } else {
@@ -694,13 +694,10 @@ class SnappyDecompressor {
         // bit 8).
         const uint32 copy_offset = entry & 0x700;
         if (!writer->AppendFromSelf(copy_offset + trailer, length)) {
-          goto end;
+          return;
         }
       }
     }
-
-end:
-    ip_ = ip;
   }
 };
 
