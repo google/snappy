@@ -663,13 +663,18 @@ class SnappyDecompressor {
       }
 
       const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip++));
-      const uint32 entry = char_table[c];
-      const uint32 trailer = LittleEndian::Load32(ip) & wordmask[entry >> 11];
-      ip += entry >> 11;
-      const uint32 length = entry & 0xff;
 
       if ((c & 0x3) == LITERAL) {
-        uint32 literal_length = length + trailer;
+        uint32 literal_length = c >> 2;
+        if (PREDICT_FALSE(literal_length >= 60)) {
+          // Long literal.
+          const uint32 literal_length_length = literal_length - 59;
+          literal_length =
+              LittleEndian::Load32(ip) & wordmask[literal_length_length];
+          ip += literal_length_length;
+        }
+        ++literal_length;
+
         uint32 avail = ip_limit_ - ip;
         while (avail < literal_length) {
           bool allow_fast_path = (avail >= 16);
@@ -689,6 +694,11 @@ class SnappyDecompressor {
         }
         ip += literal_length;
       } else {
+        const uint32 entry = char_table[c];
+        const uint32 trailer = LittleEndian::Load32(ip) & wordmask[entry >> 11];
+        const uint32 length = entry & 0xff;
+        ip += entry >> 11;
+
         // copy_offset/256 is encoded in bits 8..10.  By just fetching
         // those bits, we get copy_offset (since the bit-field starts at
         // bit 8).
