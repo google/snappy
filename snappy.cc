@@ -677,8 +677,7 @@ class SnappyDecompressor {
 
         uint32 avail = ip_limit_ - ip;
         while (avail < literal_length) {
-          bool allow_fast_path = (avail >= 16);
-          if (!writer->Append(ip, avail, allow_fast_path)) return;
+          if (!writer->Append(ip, avail, false)) return;
           literal_length -= avail;
           reader_->Skip(peeked_);
           size_t n;
