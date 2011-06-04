@@ -52,7 +52,7 @@ of the literal:
  - For literals up to and including 60 bytes in length, the upper
    six bits of the tag byte contain (len-1). The literal follows
    immediately thereafter in the bytestream.
- - For longer literals, the length is stored after the tag byte,
+ - For longer literals, the (len-1) value is stored after the tag byte,
    little-endian. The upper six bits of the tag byte describe how
    many bytes are used for the length; 60, 61, 62 or 63 for
    1-4 bytes, respectively. The literal itself follows after the
