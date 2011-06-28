@@ -294,8 +294,8 @@ static inline uint32 GetUint32AtOffset(uint64 v, int offset) {
 // Returns an "end" pointer into "op" buffer.
 // "end - op" is the compressed size of "input".
 namespace internal {
-char* CompressFragment(const char* const input,
-                       const size_t input_size,
+char* CompressFragment(const char* input,
+                       size_t input_size,
                        char* op,
                        uint16* table,
                        const int table_size) {
