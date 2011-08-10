@@ -42,7 +42,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef HAVE_SYS_MMAN
+#ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>
 #endif
 
