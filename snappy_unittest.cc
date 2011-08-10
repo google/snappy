@@ -121,11 +121,11 @@ typedef string DataEndingAtUnreadablePage;
 #endif
 
 enum CompressorType {
-  ZLIB, LZO, LIBLZF, QUICKLZ, FASTLZ, SNAPPY,
+  ZLIB, LZO, LIBLZF, QUICKLZ, FASTLZ, SNAPPY
 };
 
 const char* names[] = {
-  "ZLIB", "LZO", "LIBLZF", "QUICKLZ", "FASTLZ", "SNAPPY",
+  "ZLIB", "LZO", "LIBLZF", "QUICKLZ", "FASTLZ", "SNAPPY"
 };
 
 static size_t MinimumRequiredOutputSpace(size_t input_size,
