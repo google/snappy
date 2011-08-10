@@ -742,11 +742,11 @@ TEST(Snappy, FourByteOffset) {
   // it chops up the input into 32KB pieces.  So we hand-emit the
   // copy manually.
 
-  // The two fragments that make up the input string
+  // The two fragments that make up the input string.
   string fragment1 = "012345689abcdefghijklmnopqrstuvwxyz";
   string fragment2 = "some other string";
 
-  // How many times is each fragment emittedn
+  // How many times each fragment is emitted.
   const int n1 = 2;
   const int n2 = 100000 / fragment2.size();
   const int length = n1 * fragment1.size() + n2 * fragment2.size();
