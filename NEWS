@@ -1,3 +1,15 @@
+Snappy v1.0.4, September 15th 2011:
+
+  * Speeded up the decompressor somewhat; typically about 2–8%
+    for Core i7, in 64-bit mode (comparable for Opteron).
+    Somewhat more for some tests, almost no gain for others.
+  
+  * Make Snappy compile on certain platforms it didn't before
+    (Solaris with SunPro C++, HP-UX, AIX).
+
+  * Correct some minor errors in the format description.
+
+
 Snappy v1.0.3, June 2nd 2011:
 
   * Speeded up the decompressor somewhat; about 3-6% for Core 2,

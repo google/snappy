@@ -1,4 +1,172 @@
 ------------------------------------------------------------------------
+r49 | snappy.mirrorbot@gmail.com | 2011-09-15 11:50:05 +0200 (Thu, 15 Sep 2011) | 5 lines
+
+Fix public issue #50: Include generic byteswap macros.
+Also include Solaris 10 and FreeBSD versions.
+
+R=csilvers
+
+------------------------------------------------------------------------
+r48 | snappy.mirrorbot@gmail.com | 2011-08-10 20:57:27 +0200 (Wed, 10 Aug 2011) | 5 lines
+
+Partially fix public issue 50: Remove an extra comma from the end of some
+enum declarations, as it seems the Sun compiler does not like it.
+
+Based on patch by Travis Vitek.
+
+------------------------------------------------------------------------
+r47 | snappy.mirrorbot@gmail.com | 2011-08-10 20:44:16 +0200 (Wed, 10 Aug 2011) | 4 lines
+
+Use the right #ifdef test for sys/mman.h.
+
+Based on patch by Travis Vitek.
+
+------------------------------------------------------------------------
+r46 | snappy.mirrorbot@gmail.com | 2011-08-10 03:22:09 +0200 (Wed, 10 Aug 2011) | 6 lines
+
+Fix public issue #47: Small comment cleanups in the unit test.
+
+Originally based on a patch by Patrick Pelletier.
+
+R=sanjay
+
+------------------------------------------------------------------------
+r45 | snappy.mirrorbot@gmail.com | 2011-08-10 03:14:43 +0200 (Wed, 10 Aug 2011) | 8 lines
+
+Fix public issue #46: Format description said "3-byte offset"
+instead of "4-byte offset" for the longest copies.
+
+Also fix an inconsistency in the heading for section 2.2.3.
+Both patches by Patrick Pelletier.
+
+R=csilvers
+
+------------------------------------------------------------------------
+r44 | snappy.mirrorbot@gmail.com | 2011-06-28 13:40:25 +0200 (Tue, 28 Jun 2011) | 8 lines
+
+Fix public issue #44: Make the definition and declaration of CompressFragment
+identical, even regarding cv-qualifiers.
+
+This is required to work around a bug in the Solaris Studio C++ compiler
+(it does not properly disregard cv-qualifiers when doing name mangling).
+
+R=sanjay
+
+------------------------------------------------------------------------
+r43 | snappy.mirrorbot@gmail.com | 2011-06-04 12:19:05 +0200 (Sat, 04 Jun 2011) | 7 lines
+
+Correct an inaccuracy in the Snappy format description. 
+(I stumbled into this when changing the way we decompress literals.) 
+
+R=csilvers
+
+Revision created by MOE tool push_codebase.
+
+------------------------------------------------------------------------
+r42 | snappy.mirrorbot@gmail.com | 2011-06-03 22:53:06 +0200 (Fri, 03 Jun 2011) | 50 lines
+
+Speed up decompression by removing a fast-path attempt.
+
+Whenever we try to enter a copy fast-path, there is a certain cost in checking
+that all the preconditions are in place, but it's normally offset by the fact
+that we can usually take the cheaper path. However, in a certain path we've
+already established that "avail < literal_length", which usually means that
+either the available space is small, or the literal is big. Both will disqualify
+us from taking the fast path, and thus we take the hit from the precondition
+checking without gaining much from having a fast path. Thus, simply don't try
+the fast path in this situation -- we're already on a slow path anyway
+(one where we need to refill more data from the reader).
+
+I'm a bit surprised at how much this gained; it could be that this path is
+more common than I thought, or that the simpler structure somehow makes the
+compiler happier. I haven't looked at the assembler, but it's a win across
+the board on both Core 2, Core i7 and Opteron, at least for the cases we
+typically care about. The gains seem to be the largest on Core i7, though.
+Results from my Core i7 workstation:
+
+
+  Benchmark            Time(ns)    CPU(ns) Iterations
+  ---------------------------------------------------
+  BM_UFlat/0              73337      73091     190996 1.3GB/s  html      [ +1.7%]
+  BM_UFlat/1             696379     693501      20173 965.5MB/s  urls    [ +2.7%]
+  BM_UFlat/2               9765       9734    1472135 12.1GB/s  jpg      [ +0.7%]
+  BM_UFlat/3              29720      29621     472973 3.0GB/s  pdf       [ +1.8%]
+  BM_UFlat/4             294636     293834      47782 1.3GB/s  html4     [ +2.3%]
+  BM_UFlat/5              28399      28320     494700 828.5MB/s  cp      [ +3.5%]
+  BM_UFlat/6              12795      12760    1000000 833.3MB/s  c       [ +1.2%]
+  BM_UFlat/7               3984       3973    3526448 893.2MB/s  lsp     [ +5.7%]
+  BM_UFlat/8             991996     989322      14141 992.6MB/s  xls     [ +3.3%]
+  BM_UFlat/9             228620     227835      61404 636.6MB/s  txt1    [ +4.0%]
+  BM_UFlat/10            197114     196494      72165 607.5MB/s  txt2    [ +3.5%]
+  BM_UFlat/11            605240     603437      23217 674.4MB/s  txt3    [ +3.7%]
+  BM_UFlat/12            804157     802016      17456 573.0MB/s  txt4    [ +3.9%]
+  BM_UFlat/13            347860     346998      40346 1.4GB/s  bin       [ +1.2%]
+  BM_UFlat/14             44684      44559     315315 818.4MB/s  sum     [ +2.3%]
+  BM_UFlat/15              5120       5106    2739726 789.4MB/s  man     [ +3.3%]
+  BM_UFlat/16             76591      76355     183486 1.4GB/s  pb        [ +2.8%]
+  BM_UFlat/17            238564     237828      58824 739.1MB/s  gaviota [ +1.6%]
+  BM_UValidate/0          42194      42060     333333 2.3GB/s  html      [ -0.1%]
+  BM_UValidate/1         433182     432005      32407 1.5GB/s  urls      [ -0.1%]
+  BM_UValidate/2            197        196   71428571 603.3GB/s  jpg     [ +0.5%]
+  BM_UValidate/3          14494      14462     972222 6.1GB/s  pdf       [ +0.5%]
+  BM_UValidate/4         168444     167836      83832 2.3GB/s  html4     [ +0.1%]
+	
+R=jeff
+
+Revision created by MOE tool push_codebase.
+
+------------------------------------------------------------------------
+r41 | snappy.mirrorbot@gmail.com | 2011-06-03 22:47:14 +0200 (Fri, 03 Jun 2011) | 43 lines
+
+Speed up decompression by not needing a lookup table for literal items.
+
+Looking up into and decoding the values from char_table has long shown up as a
+hotspot in the decompressor. While it turns out that it's hard to make a more
+efficient decoder for the copy ops, the literals are simple enough that we can
+decode them without needing a table lookup. (This means that 1/4 of the table
+is now unused, although that in itself doesn't buy us anything.)
+
+The gains are small, but definitely present; some tests win as much as 10%,
+but 1-4% is more typical. These results are from Core i7, in 64-bit mode;
+Core 2 and Opteron show similar results. (I've run with more iterations
+than unusual to make sure the smaller gains don't drown entirely in noise.)
+
+  Benchmark            Time(ns)    CPU(ns) Iterations
+  ---------------------------------------------------
+  BM_UFlat/0              74665      74428     182055 1.3GB/s  html      [ +3.1%]
+  BM_UFlat/1             714106     711997      19663 940.4MB/s  urls    [ +4.4%]
+  BM_UFlat/2               9820       9789    1427115 12.1GB/s  jpg      [ -1.2%]
+  BM_UFlat/3              30461      30380     465116 2.9GB/s  pdf       [ +0.8%]
+  BM_UFlat/4             301445     300568      46512 1.3GB/s  html4     [ +2.2%]
+  BM_UFlat/5              29338      29263     479452 801.8MB/s  cp      [ +1.6%]
+  BM_UFlat/6              13004      12970    1000000 819.9MB/s  c       [ +2.1%]
+  BM_UFlat/7               4180       4168    3349282 851.4MB/s  lsp     [ +1.3%]
+  BM_UFlat/8            1026149    1024000      10000 959.0MB/s  xls     [+10.7%]
+  BM_UFlat/9             237441     236830      59072 612.4MB/s  txt1    [ +0.3%]
+  BM_UFlat/10            203966     203298      69307 587.2MB/s  txt2    [ +0.8%]
+  BM_UFlat/11            627230     625000      22400 651.2MB/s  txt3    [ +0.7%]
+  BM_UFlat/12            836188     833979      16787 551.0MB/s  txt4    [ +1.3%]
+  BM_UFlat/13            351904     350750      39886 1.4GB/s  bin       [ +3.8%]
+  BM_UFlat/14             45685      45562     308370 800.4MB/s  sum     [ +5.9%]
+  BM_UFlat/15              5286       5270    2656546 764.9MB/s  man     [ +1.5%]
+  BM_UFlat/16             78774      78544     178117 1.4GB/s  pb        [ +4.3%]
+  BM_UFlat/17            242270     241345      58091 728.3MB/s  gaviota [ +1.2%]
+  BM_UValidate/0          42149      42000     333333 2.3GB/s  html      [ -3.0%]
+  BM_UValidate/1         432741     431303      32483 1.5GB/s  urls      [ +7.8%]
+  BM_UValidate/2            198        197   71428571 600.7GB/s  jpg     [+16.8%]
+  BM_UValidate/3          14560      14521     965517 6.1GB/s  pdf       [ -4.1%]
+  BM_UValidate/4         169065     168671      83832 2.3GB/s  html4     [ -2.9%]
+
+R=jeff
+
+Revision created by MOE tool push_codebase.
+
+------------------------------------------------------------------------
+r40 | snappy.mirrorbot@gmail.com | 2011-06-03 00:57:41 +0200 (Fri, 03 Jun 2011) | 2 lines
+
+Release Snappy 1.0.3.
+
+------------------------------------------------------------------------
 r39 | snappy.mirrorbot@gmail.com | 2011-06-02 20:06:54 +0200 (Thu, 02 Jun 2011) | 11 lines
 
 Remove an unneeded goto in the decompressor; it turns out that the
