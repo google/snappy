@@ -229,6 +229,14 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 // The following guarantees declaration of the byte swap functions.
 #ifdef WORDS_BIGENDIAN
 
+#ifdef HAVE_SYS_BYTEORDER_H
+#include <sys/byteorder.h>
+#endif
+
+#ifdef HAVE_SYS_ENDIAN_H
+#include <sys/endian.h>
+#endif
+
 #ifdef _MSC_VER
 #include <stdlib.h>
 #define bswap_16(x) _byteswap_ushort(x)
@@ -242,8 +250,38 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 #define bswap_32(x) OSSwapInt32(x)
 #define bswap_64(x) OSSwapInt64(x)
 
-#else
+#elif defined(HAVE_BYTESWAP_H)
 #include <byteswap.h>
+
+#elif defined(bswap32)
+// FreeBSD defines bswap{16,32,64} in <sys/endian.h> (already #included).
+#define bswap_16(x) bswap16(x)
+#define bswap_32(x) bswap32(x)
+#define bswap_64(x) bswap64(x)
+
+#elif defined(BSWAP_64)
+// Solaris 10 defines BSWAP_{16,32,64} in <sys/byteorder.h> (already #included).
+#define bswap_16(x) BSWAP_16(x)
+#define bswap_32(x) BSWAP_32(x)
+#define bswap_64(x) BSWAP_64(x)
+
+#else
+
+inline uint16 bswap_16(uint16 x) {
+  return (x << 8) | (x >> 8);
+}
+
+inline uint32 bswap_32(uint32 x) {
+  x = ((x & 0xff00ff00UL) >> 8) | ((x & 0x00ff00ffUL) << 8);
+  return (x >> 16) | (x << 16);
+}
+
+inline uint64 bswap_64(uint64 x) {
+  x = ((x & 0xff00ff00ff00ff00ULL) >> 8) | ((x & 0x00ff00ff00ff00ffULL) << 8);
+  x = ((x & 0xffff0000ffff0000ULL) >> 16) | ((x & 0x0000ffff0000ffffULL) << 16);
+  return (x >> 32) | (x << 32);
+}
+
 #endif
 
 #endif  // WORDS_BIGENDIAN
