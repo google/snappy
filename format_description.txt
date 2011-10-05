@@ -1,5 +1,5 @@
 Snappy compressed format description
-Last revised: 2011-08-09
+Last revised: 2011-10-05
 
 
 This is not a formal specification, but should suffice to explain most
@@ -21,8 +21,8 @@ The stream starts with the uncompressed length (up to a maximum of 2^32 - 1),
 stored as a little-endian varint. Varints consist of a series of bytes,
 where the lower 7 bits are data and the upper bit is set iff there are
 more bytes to be read. In other words, an uncompressed length of 64 would
-be stored as 0x40, and an uncompressed length of 2097151 (0x1FFFFF)
-would be stored as 0xFF 0xFF 0x7F.
+be stored as 0x40, and an uncompressed length of 2097150 (0x1FFFFE)
+would be stored as 0xFE 0xFF 0x7F.
 
 
 2. The compressed stream itself
