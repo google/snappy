@@ -76,11 +76,11 @@ your calling file, and link against the compiled library.
 
 There are many ways to call Snappy, but the simplest possible is
 
-  snappy::Compress(input, &output);
+  snappy::Compress(input.data(), input.size(), &output);
 
 and similarly
 
-  snappy::Uncompress(input, &output);
+  snappy::Uncompress(input.data(), input.size(), &output);
 
 where "input" and "output" are both instances of std::string.
 
