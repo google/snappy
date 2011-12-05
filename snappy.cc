@@ -669,13 +669,20 @@ class SnappyDecompressor {
   template <class Writer>
   void DecompressAllTags(Writer* writer) {
     const char* ip = ip_;
-    for ( ;; ) {
-      if (ip_limit_ - ip < 5) {
-        ip_ = ip;
-        if (!RefillTag()) return;
-        ip = ip_;
-      }
 
+    // We could have put this refill fragment only at the beginning of the loop.
+    // However, duplicating it at the end of each branch gives the compiler more
+    // scope to optimize the <ip_limit_ - ip> expression based on the local
+    // context, which overall increases speed.
+    #define MAYBE_REFILL() \
+        if (ip_limit_ - ip < 5) { \
+          ip_ = ip; \
+          if (!RefillTag()) return; \
+          ip = ip_; \
+        }
+
+    MAYBE_REFILL();
+    for ( ;; ) {
       const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip++));
 
       if ((c & 0x3) == LITERAL) {
@@ -683,6 +690,7 @@ class SnappyDecompressor {
         if (writer->TryFastAppend(ip, ip_limit_ - ip, literal_length)) {
           DCHECK_LT(literal_length, 61);
           ip += literal_length;
+          MAYBE_REFILL();
           continue;
         }
         if (PREDICT_FALSE(literal_length >= 61)) {
@@ -709,6 +717,7 @@ class SnappyDecompressor {
           return;
         }
         ip += literal_length;
+        MAYBE_REFILL();
       } else {
         const uint32 entry = char_table[c];
         const uint32 trailer = LittleEndian::Load32(ip) & wordmask[entry >> 11];
@@ -722,8 +731,11 @@ class SnappyDecompressor {
         if (!writer->AppendFromSelf(copy_offset + trailer, length)) {
           return;
         }
+        MAYBE_REFILL();
       }
     }
+
+#undef MAYBE_REFILL
   }
 };
 
