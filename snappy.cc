@@ -805,6 +805,15 @@ static bool InternalUncompress(Source* r,
   SnappyDecompressor decompressor(r);
   uint32 uncompressed_len = 0;
   if (!decompressor.ReadUncompressedLength(&uncompressed_len)) return false;
+  return InternalUncompressAllTags(
+      &decompressor, writer, uncompressed_len, max_len);
+}
+
+template <typename Writer>
+static bool InternalUncompressAllTags(SnappyDecompressor* decompressor,
+                                      Writer* writer,
+                                      uint32 uncompressed_len,
+                                      uint32 max_len) {
   // Protect against possible DoS attack
   if (static_cast<uint64>(uncompressed_len) > max_len) {
     return false;
@@ -813,8 +822,8 @@ static bool InternalUncompress(Source* r,
   writer->SetExpectedLength(uncompressed_len);
 
   // Process the entire input
-  decompressor.DecompressAllTags(writer);
-  return (decompressor.eof() && writer->CheckLength());
+  decompressor->DecompressAllTags(writer);
+  return (decompressor->eof() && writer->CheckLength());
 }
 
 bool GetUncompressedLength(Source* source, uint32* result) {
