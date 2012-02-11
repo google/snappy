@@ -591,21 +591,23 @@ TYPED_TEST(CorruptedTest, VerifyCorrupted) {
     // Another security check; check a crazy big length can't DoS us with an
     // over-allocation.
     // Currently this is done only for 32-bit builds.  On 64-bit builds,
-    // where 3GBytes might be an acceptable allocation size, Uncompress()
+    // where 3 GB might be an acceptable allocation size, Uncompress()
     // attempts to decompress, and sometimes causes the test to run out of
     // memory.
     dest[0] = dest[1] = dest[2] = dest[3] = 0xff;
-    // This decodes to a really large size, i.e., 3221225471 bytes
+    // This decodes to a really large size, i.e., about 3 GB.
     dest[4] = 'k';
-    CHECK(!IsValidCompressedBuffer(TypeParam(dest)));
-    CHECK(!Uncompress(TypeParam(dest), &uncmp));
-    dest[0] = dest[1] = dest[2] = 0xff;
-    dest[3] = 0x7f;
     CHECK(!IsValidCompressedBuffer(TypeParam(dest)));
     CHECK(!Uncompress(TypeParam(dest), &uncmp));
   } else {
     LOG(WARNING) << "Crazy decompression lengths not checked on 64-bit build";
   }
+
+  // This decodes to about 2 MB; much smaller, but should still fail.
+  dest[0] = dest[1] = dest[2] = 0xff;
+  dest[3] = 0x00;
+  CHECK(!IsValidCompressedBuffer(TypeParam(dest)));
+  CHECK(!Uncompress(TypeParam(dest), &uncmp));
 
   // try reading stuff in from a bad file.
   for (int i = 1; i <= 3; ++i) {
