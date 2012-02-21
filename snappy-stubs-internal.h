@@ -178,6 +178,8 @@ class LogMessageVoidify {
 
 // Potentially unaligned loads and stores.
 
+// x86 and PowerPC can simply do these loads and stores native.
+
 #if defined(__i386__) || defined(__x86_64__) || defined(__powerpc__)
 
 #define UNALIGNED_LOAD16(_p) (*reinterpret_cast<const uint16 *>(_p))
@@ -187,6 +189,47 @@ class LogMessageVoidify {
 #define UNALIGNED_STORE16(_p, _val) (*reinterpret_cast<uint16 *>(_p) = (_val))
 #define UNALIGNED_STORE32(_p, _val) (*reinterpret_cast<uint32 *>(_p) = (_val))
 #define UNALIGNED_STORE64(_p, _val) (*reinterpret_cast<uint64 *>(_p) = (_val))
+
+// ARMv7 and newer support native unaligned accesses, but only of 16-bit
+// and 32-bit values (not 64-bit); older versions either raise a fatal signal,
+// do an unaligned read and rotate the words around a bit, or do the reads very
+// slowly (trip through kernel mode). There's no simple #define that says just
+// “ARMv7 or higher”, so we have to filter away all ARMv5 and ARMv6
+// sub-architectures.
+//
+// This is a mess, but there's not much we can do about it.
+
+#elif defined(__arm__) && \
+      !defined(__ARM_ARCH_5__) && \
+      !defined(__ARM_ARCH_5T__) && \
+      !defined(__ARM_ARCH_5TE__) && \
+      !defined(__ARM_ARCH_5TEJ__) && \
+      !defined(__ARM_ARCH_6__) && \
+      !defined(__ARM_ARCH_6J__) && \
+      !defined(__ARM_ARCH_6K__) && \
+      !defined(__ARM_ARCH_6Z__) && \
+      !defined(__ARM_ARCH_6ZK__) && \
+      !defined(__ARM_ARCH_6T2__)
+
+#define UNALIGNED_LOAD16(_p) (*reinterpret_cast<const uint16 *>(_p))
+#define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32 *>(_p))
+
+#define UNALIGNED_STORE16(_p, _val) (*reinterpret_cast<uint16 *>(_p) = (_val))
+#define UNALIGNED_STORE32(_p, _val) (*reinterpret_cast<uint32 *>(_p) = (_val))
+
+// TODO(user): NEON supports unaligned 64-bit loads and stores.
+// See if that would be more efficient on platforms supporting it,
+// at least for copies.
+
+inline uint64 UNALIGNED_LOAD64(const void *p) {
+  uint64 t;
+  memcpy(&t, p, sizeof t);
+  return t;
+}
+
+inline void UNALIGNED_STORE64(void *p, uint64 v) {
+  memcpy(p, &v, sizeof v);
+}
 
 #else
 
@@ -224,6 +267,20 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 }
 
 #endif
+
+// This can be more efficient than UNALIGNED_LOAD64 + UNALIGNED_STORE64
+// on some platforms, in particular ARM.
+inline void UnalignedCopy64(const void *src, void *dst) {
+  if (sizeof(void *) == 8) {
+    UNALIGNED_STORE64(dst, UNALIGNED_LOAD64(src));
+  } else {
+    const char *src_char = reinterpret_cast<const char *>(src);
+    char *dst_char = reinterpret_cast<char *>(dst);
+
+    UNALIGNED_STORE32(dst_char, UNALIGNED_LOAD32(src_char));
+    UNALIGNED_STORE32(dst_char + 4, UNALIGNED_LOAD32(src_char + 4));
+  }
+}
 
 // The following guarantees declaration of the byte swap functions.
 #ifdef WORDS_BIGENDIAN
