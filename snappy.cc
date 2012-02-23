@@ -272,15 +272,48 @@ uint16* WorkingMemory::GetHashTable(size_t input_size, int* table_size) {
 }
 }  // end namespace internal
 
-// For 0 <= offset <= 4, GetUint32AtOffset(UNALIGNED_LOAD64(p), offset) will
+// For 0 <= offset <= 4, GetUint32AtOffset(GetEightBytesAt(p), offset) will
 // equal UNALIGNED_LOAD32(p + offset).  Motivation: On x86-64 hardware we have
 // empirically found that overlapping loads such as
 //  UNALIGNED_LOAD32(p) ... UNALIGNED_LOAD32(p+1) ... UNALIGNED_LOAD32(p+2)
 // are slower than UNALIGNED_LOAD64(p) followed by shifts and casts to uint32.
+//
+// We have different versions for 64- and 32-bit; ideally we would avoid the
+// two functions and just inline the UNALIGNED_LOAD64 call into
+// GetUint32AtOffset, but GCC (at least not as of 4.6) is seemingly not clever
+// enough to avoid loading the value multiple times then. For 64-bit, the load
+// is done when GetEightBytesAt() is called, whereas for 32-bit, the load is
+// done at GetUint32AtOffset() time.
+
+#ifdef ARCH_K8
+
+typedef uint64 EightBytesReference;
+
+static inline EightBytesReference GetEightBytesAt(const char* ptr) {
+  return UNALIGNED_LOAD64(ptr);
+}
+
 static inline uint32 GetUint32AtOffset(uint64 v, int offset) {
-  DCHECK(0 <= offset && offset <= 4) << offset;
+  DCHECK_GE(offset, 0);
+  DCHECK_LE(offset, 4);
   return v >> (LittleEndian::IsLittleEndian() ? 8 * offset : 32 - 8 * offset);
 }
+
+#else
+
+typedef const char* EightBytesReference;
+
+static inline EightBytesReference GetEightBytesAt(const char* ptr) {
+  return ptr;
+}
+
+static inline uint32 GetUint32AtOffset(const char* v, int offset) {
+  DCHECK_GE(offset, 0);
+  DCHECK_LE(offset, 4);
+  return UNALIGNED_LOAD32(v + offset);
+}
+
+#endif
 
 // Flat array compression that does not emit the "uncompressed length"
 // prefix. Compresses "input" string to the "*op" buffer.
@@ -378,7 +411,7 @@ char* CompressFragment(const char* input,
       // though we don't yet know how big the literal will be.  We handle that
       // by proceeding to the next iteration of the main loop.  We also can exit
       // this loop via goto if we get close to exhausting the input.
-      uint64 input_bytes = 0;
+      EightBytesReference input_bytes;
       uint32 candidate_bytes = 0;
 
       do {
@@ -397,7 +430,7 @@ char* CompressFragment(const char* input,
         if (PREDICT_FALSE(ip >= ip_limit)) {
           goto emit_remainder;
         }
-        input_bytes = UNALIGNED_LOAD64(insert_tail);
+        input_bytes = GetEightBytesAt(insert_tail);
         uint32 prev_hash = HashBytes(GetUint32AtOffset(input_bytes, 0), shift);
         table[prev_hash] = ip - base_ip - 1;
         uint32 cur_hash = HashBytes(GetUint32AtOffset(input_bytes, 1), shift);
