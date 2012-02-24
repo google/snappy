@@ -1,3 +1,34 @@
+Snappy v1.0.5, February 24th 2012:
+
+  * More speed improvements. Exactly how big will depend on
+    the architecture:
+
+    - 3–10% faster decompression for the base case (x86-64).
+
+    - ARMv7 and higher can now use unaligned accesses,
+      and will see about 30% faster decompression and
+      20–40% faster compression.
+
+    - 32-bit platforms (ARM and 32-bit x86) will see 2–5%
+      faster compression.
+
+    These are all cumulative (e.g., ARM gets all three speedups).
+
+  * Fixed an issue where the unit test would crash on system
+    with less than 256 MB address space available,
+    e.g. some embedded platforms.
+
+  * Added a framing format description, for use over e.g. HTTP,
+    or for a command-line compressor. We do not have any
+    implementations of this at the current point, but there seems
+    to be enough of a general interest in the topic.
+    Also make the format description slightly clearer.
+
+  * Remove some compile-time warnings in -Wall
+    (mostly signed/unsigned comparisons), for easier embedding
+    into projects that use -Wall -Werror.
+
+
 Snappy v1.0.4, September 15th 2011:
 
   * Speeded up the decompressor somewhat; typically about 2–8%
