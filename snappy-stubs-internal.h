@@ -35,7 +35,6 @@
 #include "config.h"
 #endif
 
-#include <iostream>
 #include <string>
 
 #include <assert.h>
@@ -94,87 +93,6 @@ namespace snappy {
 
 static const uint32 kuint32max = static_cast<uint32>(0xFFFFFFFF);
 static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
-
-// Logging.
-
-#define LOG(level) LogMessage()
-#define VLOG(level) true ? (void)0 : \
-    snappy::LogMessageVoidify() & snappy::LogMessage()
-
-class LogMessage {
- public:
-  LogMessage() { }
-  ~LogMessage() {
-    cerr << endl;
-  }
-
-  LogMessage& operator<<(const std::string& msg) {
-    cerr << msg;
-    return *this;
-  }
-  LogMessage& operator<<(int x) {
-    cerr << x;
-    return *this;
-  }
-};
-
-// Asserts, both versions activated in debug mode only,
-// and ones that are always active.
-
-#define CRASH_UNLESS(condition) \
-    PREDICT_TRUE(condition) ? (void)0 : \
-    snappy::LogMessageVoidify() & snappy::LogMessageCrash()
-
-class LogMessageCrash : public LogMessage {
- public:
-  LogMessageCrash() { }
-  ~LogMessageCrash() {
-    cerr << endl;
-    abort();
-  }
-};
-
-// This class is used to explicitly ignore values in the conditional
-// logging macros.  This avoids compiler warnings like "value computed
-// is not used" and "statement has no effect".
-
-class LogMessageVoidify {
- public:
-  LogMessageVoidify() { }
-  // This has to be an operator with a precedence lower than << but
-  // higher than ?:
-  void operator&(const LogMessage&) { }
-};
-
-#define CHECK(cond) CRASH_UNLESS(cond)
-#define CHECK_LE(a, b) CRASH_UNLESS((a) <= (b))
-#define CHECK_GE(a, b) CRASH_UNLESS((a) >= (b))
-#define CHECK_EQ(a, b) CRASH_UNLESS((a) == (b))
-#define CHECK_NE(a, b) CRASH_UNLESS((a) != (b))
-#define CHECK_LT(a, b) CRASH_UNLESS((a) < (b))
-#define CHECK_GT(a, b) CRASH_UNLESS((a) > (b))
-
-#ifdef NDEBUG
-
-#define DCHECK(cond) CRASH_UNLESS(true)
-#define DCHECK_LE(a, b) CRASH_UNLESS(true)
-#define DCHECK_GE(a, b) CRASH_UNLESS(true)
-#define DCHECK_EQ(a, b) CRASH_UNLESS(true)
-#define DCHECK_NE(a, b) CRASH_UNLESS(true)
-#define DCHECK_LT(a, b) CRASH_UNLESS(true)
-#define DCHECK_GT(a, b) CRASH_UNLESS(true)
-
-#else
-
-#define DCHECK(cond) CHECK(cond)
-#define DCHECK_LE(a, b) CHECK_LE(a, b)
-#define DCHECK_GE(a, b) CHECK_GE(a, b)
-#define DCHECK_EQ(a, b) CHECK_EQ(a, b)
-#define DCHECK_NE(a, b) CHECK_NE(a, b)
-#define DCHECK_LT(a, b) CHECK_LT(a, b)
-#define DCHECK_GT(a, b) CHECK_GT(a, b)
-
-#endif
 
 // Potentially unaligned loads and stores.
 

@@ -31,6 +31,9 @@
 #ifndef UTIL_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
 #define UTIL_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
 
+#include <iostream>
+#include <string>
+
 #include "snappy-stubs-internal.h"
 
 #include <stdio.h>
@@ -495,6 +498,65 @@ namespace snappy {
 static void CompressFile(const char* fname);
 static void UncompressFile(const char* fname);
 static void MeasureFile(const char* fname);
+
+// Logging.
+
+#define LOG(level) LogMessage()
+#define VLOG(level) true ? (void)0 : \
+    snappy::LogMessageVoidify() & snappy::LogMessage()
+
+class LogMessage {
+ public:
+  LogMessage() { }
+  ~LogMessage() {
+    cerr << endl;
+  }
+
+  LogMessage& operator<<(const std::string& msg) {
+    cerr << msg;
+    return *this;
+  }
+  LogMessage& operator<<(int x) {
+    cerr << x;
+    return *this;
+  }
+};
+
+// Asserts, both versions activated in debug mode only,
+// and ones that are always active.
+
+#define CRASH_UNLESS(condition) \
+    PREDICT_TRUE(condition) ? (void)0 : \
+    snappy::LogMessageVoidify() & snappy::LogMessageCrash()
+
+class LogMessageCrash : public LogMessage {
+ public:
+  LogMessageCrash() { }
+  ~LogMessageCrash() {
+    cerr << endl;
+    abort();
+  }
+};
+
+// This class is used to explicitly ignore values in the conditional
+// logging macros.  This avoids compiler warnings like "value computed
+// is not used" and "statement has no effect".
+
+class LogMessageVoidify {
+ public:
+  LogMessageVoidify() { }
+  // This has to be an operator with a precedence lower than << but
+  // higher than ?:
+  void operator&(const LogMessage&) { }
+};
+
+#define CHECK(cond) CRASH_UNLESS(cond)
+#define CHECK_LE(a, b) CRASH_UNLESS((a) <= (b))
+#define CHECK_GE(a, b) CRASH_UNLESS((a) >= (b))
+#define CHECK_EQ(a, b) CRASH_UNLESS((a) == (b))
+#define CHECK_NE(a, b) CRASH_UNLESS((a) != (b))
+#define CHECK_LT(a, b) CRASH_UNLESS((a) < (b))
+#define CHECK_GT(a, b) CRASH_UNLESS((a) > (b))
 
 }  // namespace
 

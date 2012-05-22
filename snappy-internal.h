@@ -85,7 +85,7 @@ char* CompressFragment(const char* input,
 static inline int FindMatchLength(const char* s1,
                                   const char* s2,
                                   const char* s2_limit) {
-  DCHECK_GE(s2_limit, s2);
+  assert(s2_limit >= s2);
   int matched = 0;
 
   // Find out how long the match is. We loop over the data 64 bits at a
@@ -122,7 +122,7 @@ static inline int FindMatchLength(const char* s1,
                                   const char* s2,
                                   const char* s2_limit) {
   // Implementation based on the x86-64 version, above.
-  DCHECK_GE(s2_limit, s2);
+  assert(s2_limit >= s2);
   int matched = 0;
 
   while (s2 <= s2_limit - 4 &&

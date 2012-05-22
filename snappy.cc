@@ -95,7 +95,7 @@ enum {
 // Note that this does not match the semantics of either memcpy()
 // or memmove().
 static inline void IncrementalCopy(const char* src, char* op, int len) {
-  DCHECK_GT(len, 0);
+  assert(len > 0);
   do {
     *op++ = *src++;
   } while (--len > 0);
@@ -195,9 +195,9 @@ static inline char* EmitLiteral(char* op,
 }
 
 static inline char* EmitCopyLessThan64(char* op, size_t offset, int len) {
-  DCHECK_LE(len, 64);
-  DCHECK_GE(len, 4);
-  DCHECK_LT(offset, 65536);
+  assert(len <= 64);
+  assert(len >= 4);
+  assert(offset < 65536);
 
   if ((len < 12) && (offset < 2048)) {
     size_t len_minus_4 = len - 4;
@@ -253,8 +253,6 @@ uint16* WorkingMemory::GetHashTable(size_t input_size, int* table_size) {
   while (htsize < kMaxHashTableSize && htsize < input_size) {
     htsize <<= 1;
   }
-  CHECK_EQ(0, htsize & (htsize - 1)) << ": must be power of two";
-  CHECK_LE(htsize, kMaxHashTableSize) << ": hash table too large";
 
   uint16* table;
   if (htsize <= ARRAYSIZE(small_table_)) {
@@ -294,8 +292,8 @@ static inline EightBytesReference GetEightBytesAt(const char* ptr) {
 }
 
 static inline uint32 GetUint32AtOffset(uint64 v, int offset) {
-  DCHECK_GE(offset, 0);
-  DCHECK_LE(offset, 4);
+  assert(offset >= 0);
+  assert(offset <= 4);
   return v >> (LittleEndian::IsLittleEndian() ? 8 * offset : 32 - 8 * offset);
 }
 
@@ -308,8 +306,8 @@ static inline EightBytesReference GetEightBytesAt(const char* ptr) {
 }
 
 static inline uint32 GetUint32AtOffset(const char* v, int offset) {
-  DCHECK_GE(offset, 0);
-  DCHECK_LE(offset, 4);
+  assert(offset >= 0);
+  assert(offset <= 4);
   return UNALIGNED_LOAD32(v + offset);
 }
 
@@ -334,10 +332,10 @@ char* CompressFragment(const char* input,
                        const int table_size) {
   // "ip" is the input pointer, and "op" is the output pointer.
   const char* ip = input;
-  CHECK_LE(input_size, kBlockSize);
-  CHECK_EQ(table_size & (table_size - 1), 0) << ": table must be power of two";
+  assert(input_size <= kBlockSize);
+  assert((table_size & (table_size - 1)) == 0); // table must be power of two
   const int shift = 32 - Bits::Log2Floor(table_size);
-  DCHECK_EQ(static_cast<int>(kuint32max >> shift), table_size - 1);
+  assert(static_cast<int>(kuint32max >> shift) == table_size - 1);
   const char* ip_end = input + input_size;
   const char* base_ip = ip;
   // Bytes in [next_emit, ip) will be emitted as literal bytes.  Or
@@ -349,7 +347,7 @@ char* CompressFragment(const char* input,
     const char* ip_limit = input + input_size - kInputMarginBytes;
 
     for (uint32 next_hash = Hash(++ip, shift); ; ) {
-      DCHECK_LT(next_emit, ip);
+      assert(next_emit < ip);
       // The body of this loop calls EmitLiteral once and then EmitCopy one or
       // more times.  (The exception is that when we're close to exhausting
       // the input we goto emit_remainder.)
@@ -382,7 +380,7 @@ char* CompressFragment(const char* input,
       do {
         ip = next_ip;
         uint32 hash = next_hash;
-        DCHECK_EQ(hash, Hash(ip, shift));
+        assert(hash == Hash(ip, shift));
         uint32 bytes_between_hash_lookups = skip++ >> 5;
         next_ip = ip + bytes_between_hash_lookups;
         if (PREDICT_FALSE(next_ip > ip_limit)) {
@@ -390,8 +388,8 @@ char* CompressFragment(const char* input,
         }
         next_hash = Hash(next_ip, shift);
         candidate = base_ip + table[hash];
-        DCHECK_GE(candidate, base_ip);
-        DCHECK_LT(candidate, ip);
+        assert(candidate >= base_ip);
+        assert(candidate < ip);
 
         table[hash] = ip - base_ip;
       } while (PREDICT_TRUE(UNALIGNED_LOAD32(ip) !=
@@ -400,7 +398,7 @@ char* CompressFragment(const char* input,
       // Step 2: A 4-byte match has been found.  We'll later see if more
       // than 4 bytes match.  But, prior to the match, input
       // bytes [next_emit, ip) are unmatched.  Emit them as "literal bytes."
-      DCHECK_LE(next_emit + 16, ip_end);
+      assert(next_emit + 16 <= ip_end);
       op = EmitLiteral(op, next_emit, ip - next_emit, true);
 
       // Step 3: Call EmitCopy, and then see if another EmitCopy could
@@ -421,7 +419,7 @@ char* CompressFragment(const char* input,
         int matched = 4 + FindMatchLength(candidate + 4, ip + 4, ip_end);
         ip += matched;
         size_t offset = base - candidate;
-        DCHECK_EQ(0, memcmp(base, candidate, matched));
+        assert(0 == memcmp(base, candidate, matched));
         op = EmitCopy(op, offset, matched);
         // We could immediately start working at ip now, but to improve
         // compression we first update table[Hash(ip - 1, ...)].
@@ -554,9 +552,9 @@ static uint16 MakeEntry(unsigned int extra,
                         unsigned int len,
                         unsigned int copy_offset) {
   // Check that all of the fields fit within the allocated space
-  DCHECK_EQ(extra,       extra & 0x7);          // At most 3 bits
-  DCHECK_EQ(copy_offset, copy_offset & 0x7);    // At most 3 bits
-  DCHECK_EQ(len,         len & 0x7f);           // At most 7 bits
+  assert(extra       == (extra & 0x7));          // At most 3 bits
+  assert(copy_offset == (copy_offset & 0x7));    // At most 3 bits
+  assert(len         == (len & 0x7f));           // At most 7 bits
   return len | (copy_offset << 8) | (extra << 11);
 }
 
@@ -614,9 +612,15 @@ static void ComputeTable() {
   }
 
   // Check that each entry was initialized exactly once.
-  CHECK_EQ(assigned, 256);
+  if (assigned != 256) {
+    fprintf(stderr, "ComputeTable: assigned only %d of 256\n", assigned);
+    abort();
+  }
   for (int i = 0; i < 256; i++) {
-    CHECK_NE(dst[i], 0xffff);
+    if (dst[i] == 0xffff) {
+      fprintf(stderr, "ComputeTable: did not assign byte %d\n", i);
+      abort();
+    }
   }
 
   if (FLAGS_snappy_dump_decompression_table) {
@@ -631,7 +635,11 @@ static void ComputeTable() {
 
   // Check that computed table matched recorded table
   for (int i = 0; i < 256; i++) {
-    CHECK_EQ(dst[i], char_table[i]);
+    if (dst[i] != char_table[i]) {
+      fprintf(stderr, "ComputeTable: byte %d: computed (%x), expect (%x)\n",
+              i, static_cast<int>(dst[i]), static_cast<int>(char_table[i]));
+      abort();
+    }
   }
 }
 #endif /* !NDEBUG */
@@ -676,7 +684,7 @@ class SnappyDecompressor {
   // On succcess, stores the length in *result and returns true.
   // On failure, returns false.
   bool ReadUncompressedLength(uint32* result) {
-    DCHECK(ip_ == NULL);       // Must not have read anything yet
+    assert(ip_ == NULL);       // Must not have read anything yet
     // Length is encoded in 1..5 bytes
     *result = 0;
     uint32 shift = 0;
@@ -720,7 +728,7 @@ class SnappyDecompressor {
       if ((c & 0x3) == LITERAL) {
         size_t literal_length = (c >> 2) + 1u;
         if (writer->TryFastAppend(ip, ip_limit_ - ip, literal_length)) {
-          DCHECK_LT(literal_length, 61);
+          assert(literal_length < 61);
           ip += literal_length;
           MAYBE_REFILL();
           continue;
@@ -787,11 +795,11 @@ bool SnappyDecompressor::RefillTag() {
   }
 
   // Read the tag character
-  DCHECK_LT(ip, ip_limit_);
+  assert(ip < ip_limit_);
   const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip));
   const uint32 entry = char_table[c];
   const uint32 needed = (entry >> 11) + 1;  // +1 byte for 'c'
-  DCHECK_LE(needed, sizeof(scratch_));
+  assert(needed <= sizeof(scratch_));
 
   // Read more bytes from reader if needed
   uint32 nbuf = ip_limit_ - ip;
@@ -812,7 +820,7 @@ bool SnappyDecompressor::RefillTag() {
       nbuf += to_add;
       reader_->Skip(to_add);
     }
-    DCHECK_EQ(nbuf, needed);
+    assert(nbuf == needed);
     ip_ = scratch_;
     ip_limit_ = scratch_ + needed;
   } else if (nbuf < 5) {
@@ -880,7 +888,7 @@ size_t Compress(Source* reader, Sink* writer) {
     // Get next block to compress (without copying if possible)
     size_t fragment_size;
     const char* fragment = reader->Peek(&fragment_size);
-    DCHECK_NE(fragment_size, 0) << ": premature end of input";
+    assert(fragment_size != 0);  // premature end of input
     const size_t num_to_read = min(N, kBlockSize);
     size_t bytes_read = fragment_size;
 
@@ -907,11 +915,11 @@ size_t Compress(Source* reader, Sink* writer) {
         bytes_read += n;
         reader->Skip(n);
       }
-      DCHECK_EQ(bytes_read, num_to_read);
+      assert(bytes_read == num_to_read);
       fragment = scratch;
       fragment_size = num_to_read;
     }
-    DCHECK_EQ(fragment_size, num_to_read);
+    assert(fragment_size == num_to_read);
 
     // Get encoding table for compression
     int table_size;
