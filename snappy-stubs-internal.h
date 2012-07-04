@@ -118,6 +118,8 @@ static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
 // This is a mess, but there's not much we can do about it.
 
 #elif defined(__arm__) && \
+      !defined(__ARM_ARCH_4__) && \
+      !defined(__ARM_ARCH_4T__) && \
       !defined(__ARM_ARCH_5__) && \
       !defined(__ARM_ARCH_5T__) && \
       !defined(__ARM_ARCH_5TE__) && \
