@@ -47,7 +47,9 @@
 #include <sys/resource.h>
 #endif
 
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
 
 #ifdef HAVE_WINDOWS_H
 #define WIN32_LEAN_AND_MEAN
