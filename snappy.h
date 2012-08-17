@@ -56,6 +56,13 @@ namespace snappy {
   // number of bytes written.
   size_t Compress(Source* source, Sink* sink);
 
+  // Find the uncompressed length of the given stream, as given by the header.
+  // Note that the true length could deviate from this; the stream could e.g.
+  // be truncated.
+  //
+  // Also note that this leaves "*source" in a state that is unsuitable for
+  // further operations, such as RawUncompress(). You will need to rewind
+  // or recreate the source yourself before attempting any further calls.
   bool GetUncompressedLength(Source* source, uint32* result);
 
   // ------------------------------------------------------------------------
