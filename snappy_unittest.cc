@@ -971,18 +971,19 @@ TEST(Snappy, FindMatchLengthRandom) {
 
 static void CompressFile(const char* fname) {
   string fullinput;
-  File::ReadFileToStringOrDie(fname, &fullinput);
+  file::ReadFileToString(fname, &fullinput, file::Defaults()).CheckSuccess();
 
   string compressed;
   Compress(fullinput.data(), fullinput.size(), SNAPPY, &compressed, false);
 
-  File::WriteStringToFileOrDie(compressed,
-                               string(fname).append(".comp").c_str());
+  file::WriteStringToFile(
+      string(fname).append(".comp").c_str(), compressed,
+      file::Defaults()).CheckSuccess();
 }
 
 static void UncompressFile(const char* fname) {
   string fullinput;
-  File::ReadFileToStringOrDie(fname, &fullinput);
+  file::ReadFileToString(fname, &fullinput, file::Defaults()).CheckSuccess();
 
   size_t uncompLength;
   CHECK(CheckUncompressedLength(fullinput, &uncompLength));
@@ -991,13 +992,14 @@ static void UncompressFile(const char* fname) {
   uncompressed.resize(uncompLength);
   CHECK(snappy::Uncompress(fullinput.data(), fullinput.size(), &uncompressed));
 
-  File::WriteStringToFileOrDie(uncompressed,
-                               string(fname).append(".uncomp").c_str());
+  file::WriteStringToFile(
+      string(fname).append(".uncomp").c_str(), uncompressed,
+      file::Defaults()).CheckSuccess();
 }
 
 static void MeasureFile(const char* fname) {
   string fullinput;
-  File::ReadFileToStringOrDie(fname, &fullinput);
+  file::ReadFileToString(fname, &fullinput, file::Defaults()).CheckSuccess();
   printf("%-40s :\n", fname);
 
   int start_len = (FLAGS_start_len < 0) ? fullinput.size() : FLAGS_start_len;

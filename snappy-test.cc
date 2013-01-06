@@ -46,10 +46,13 @@ string ReadTestDataFile(const string& base) {
   string contents;
   const char* srcdir = getenv("srcdir");  // This is set by Automake.
   if (srcdir) {
-    File::ReadFileToStringOrDie(
-        string(srcdir) + "/testdata/" + base, &contents);
+    file::ReadFileToString(string(srcdir) + "/testdata/" + base,
+                           &contents,
+                           file::Defaults()).CheckSuccess();
   } else {
-    File::ReadFileToStringOrDie("testdata/" + base, &contents);
+    file::ReadFileToString("/testdata/" + base,
+                           &contents,
+                           file::Defaults()).CheckSuccess();
   }
   return contents;
 }

@@ -126,10 +126,20 @@ extern "C" {
 #endif
 
 namespace {
+
 namespace File {
   void Init() { }
+}  // namespace File
 
-  void ReadFileToStringOrDie(const char* filename, string* data) {
+namespace file {
+  int Defaults() { }
+
+  class DummyStatus {
+   public:
+    void CheckSuccess() { }
+  };
+
+  DummyStatus ReadFileToString(const char* filename, string* data, int unused) {
     FILE* fp = fopen(filename, "rb");
     if (fp == NULL) {
       perror(filename);
@@ -150,14 +160,18 @@ namespace File {
     fclose(fp);
   }
 
-  void ReadFileToStringOrDie(const string& filename, string* data) {
-    ReadFileToStringOrDie(filename.c_str(), data);
+  DummyStatus ReadFileToString(const string& filename,
+                               string* data,
+                               int unused) {
+    ReadFileToString(filename.c_str(), data, unused);
   }
 
-  void WriteStringToFileOrDie(const string& str, const char* filename) {
-    FILE* fp = fopen(filename, "wb");
+  DummyStatus WriteStringToFile(const string& str,
+                                const string& filename,
+                                int unused) {
+    FILE* fp = fopen(filename.c_str(), "wb");
     if (fp == NULL) {
-      perror(filename);
+      perror(filename.c_str());
       exit(1);
     }
 
@@ -169,7 +183,8 @@ namespace File {
 
     fclose(fp);
   }
-}  // namespace File
+}  // namespace file
+
 }  // namespace
 
 namespace snappy {
