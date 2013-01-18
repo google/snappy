@@ -142,15 +142,16 @@ namespace snappy {
   bool IsValidCompressedBuffer(const char* compressed,
                                size_t compressed_length);
 
-  // *** DO NOT CHANGE THE VALUE OF kBlockSize ***
+  // The size of a compression block. Note that many parts of the compression
+  // code assumes that kBlockSize <= 65536; in particular, the hash table
+  // can only store 16-bit offsets, and EmitCopy() also assumes the offset
+  // is 65535 bytes or less. Note also that if you change this, it will
+  // affect the framing format (see framing_format.txt).
   //
-  // New Compression code chops up the input into blocks of at most
-  // the following size.  This ensures that back-references in the
-  // output never cross kBlockSize block boundaries.  This can be
-  // helpful in implementing blocked decompression.  However the
-  // decompression code should not rely on this guarantee since older
-  // compression code may not obey it.
-  static const int kBlockLog = 15;
+  // Note that there might be older data around that is compressed with larger
+  // block sizes, so the decompression code should not rely on the
+  // non-existence of long backreferences.
+  static const int kBlockLog = 16;
   static const size_t kBlockSize = 1 << kBlockLog;
 
   static const int kMaxHashTableBits = 14;
