@@ -50,7 +50,7 @@ string ReadTestDataFile(const string& base) {
                            &contents,
                            file::Defaults()).CheckSuccess();
   } else {
-    file::ReadFileToString("/testdata/" + base,
+    file::ReadFileToString("testdata/" + base,
                            &contents,
                            file::Defaults()).CheckSuccess();
   }
