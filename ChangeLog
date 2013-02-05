@@ -1,4 +1,405 @@
 ------------------------------------------------------------------------
+r72 | snappy.mirrorbot@gmail.com | 2013-02-05 15:30:05 +0100 (Tue, 05 Feb 2013) | 9 lines
+
+Make ./snappy_unittest pass without "srcdir" being defined.
+
+Previously, snappy_unittests would read from an absolute path /testdata/..;
+convert it to use a relative path instead.
+
+Patch from Marc-Antonie Ruel.
+
+R=maruel
+
+------------------------------------------------------------------------
+r71 | snappy.mirrorbot@gmail.com | 2013-01-18 13:16:36 +0100 (Fri, 18 Jan 2013) | 287 lines
+
+Increase the Zippy block size from 32 kB to 64 kB, winning ~3% density
+while being effectively performance neutral.
+
+The longer story about density is that we win 3-6% density on the benchmarks 
+where this has any effect at all; many of the benchmarks (cp, c, lsp, man)
+are smaller than 32 kB and thus will have no effect. Binary data also seems
+to win little or nothing; of course, the already-compressed data wins nothing.
+The protobuf benchmark wins as much as ~18% depending on architecture,
+but I wouldn't be too sure that this is representative of protobuf data in
+general.
+
+As of performance, we lose a tiny amount since we get more tags (e.g., a long
+literal might be broken up into literal-copy-literal), but we win it back with
+less clearing of the hash table, and more opportunities to skip incompressible
+data (e.g. in the jpg benchmark). Decompression seems to get ever so slightly
+slower, again due to more tags. The total net change is about as close to zero
+as we can get, so the end effect seems to be simply more density and no
+real performance change.
+
+The comment about not changing kBlockSize, scary as it is, is not really
+relevant, since we're never going to have a block-level decompressor without
+explicitly marked blocks. Replace it with something more appropriate.
+
+This affects the framing format, but it's okay to change it since it basically
+has no users yet.
+
+
+Density (note that cp, c, lsp and man are all smaller than 32 kB):
+
+   Benchmark         Description   Base (%)  New (%)  Improvement
+   --------------------------------------------------------------
+   ZFlat/0           html            22.57    22.31     +5.6%
+   ZFlat/1           urls            50.89    47.77     +6.5%
+   ZFlat/2           jpg             99.88    99.87     +0.0%
+   ZFlat/3           pdf             82.13    82.07     +0.1%
+   ZFlat/4           html4           23.55    22.51     +4.6%
+   ZFlat/5           cp              48.12    48.12     +0.0%
+   ZFlat/6           c               42.40    42.40     +0.0%
+   ZFlat/7           lsp             48.37    48.37     +0.0%
+   ZFlat/8           xls             41.34    41.23     +0.3%
+   ZFlat/9           txt1            59.81    57.87     +3.4%
+   ZFlat/10          txt2            64.07    61.93     +3.5%
+   ZFlat/11          txt3            57.11    54.92     +4.0%
+   ZFlat/12          txt4            68.35    66.22     +3.2%
+   ZFlat/13          bin             18.21    18.11     +0.6%
+   ZFlat/14          sum             51.88    48.96     +6.0%
+   ZFlat/15          man             59.36    59.36     +0.0%
+   ZFlat/16          pb              23.15    19.64    +17.9%
+   ZFlat/17          gaviota         38.27    37.72     +1.5%
+   Geometric mean                    45.51    44.15     +3.1%
+
+
+Microbenchmarks (64-bit, opt):
+
+Westmere 2.8 GHz:
+
+   Benchmark                          Base (ns)  New (ns)                                Improvement
+   -------------------------------------------------------------------------------------------------
+   BM_UFlat/0                             75342     75027  1.3GB/s  html                    +0.4%
+   BM_UFlat/1                            723767    744269  899.6MB/s  urls                  -2.8%
+   BM_UFlat/2                             10072     10072  11.7GB/s  jpg                    +0.0%
+   BM_UFlat/3                             30747     30388  2.9GB/s  pdf                     +1.2%
+   BM_UFlat/4                            307353    306063  1.2GB/s  html4                   +0.4%
+   BM_UFlat/5                             28593     28743  816.3MB/s  cp                    -0.5%
+   BM_UFlat/6                             12958     12998  818.1MB/s  c                     -0.3%
+   BM_UFlat/7                              3700      3792  935.8MB/s  lsp                   -2.4%
+   BM_UFlat/8                            999685    999905  982.1MB/s  xls                   -0.0%
+   BM_UFlat/9                            232954    230079  630.4MB/s  txt1                  +1.2%
+   BM_UFlat/10                           200785    201468  592.6MB/s  txt2                  -0.3%
+   BM_UFlat/11                           617267    610968  666.1MB/s  txt3                  +1.0%
+   BM_UFlat/12                           821595    822475  558.7MB/s  txt4                  -0.1%
+   BM_UFlat/13                           377097    377632  1.3GB/s  bin                     -0.1%
+   BM_UFlat/14                            45476     45260  805.8MB/s  sum                   +0.5%
+   BM_UFlat/15                             4985      5003  805.7MB/s  man                   -0.4%
+   BM_UFlat/16                            80813     77494  1.4GB/s  pb                      +4.3%
+   BM_UFlat/17                           251792    241553  727.7MB/s  gaviota               +4.2%
+   BM_UValidate/0                         40343     40354  2.4GB/s  html                    -0.0%
+   BM_UValidate/1                        426890    451574  1.4GB/s  urls                    -5.5%
+   BM_UValidate/2                           187       179  661.9GB/s  jpg                   +4.5%
+   BM_UValidate/3                         13783     13827  6.4GB/s  pdf                     -0.3%
+   BM_UValidate/4                        162393    163335  2.3GB/s  html4                   -0.6%
+   BM_UDataBuffer/0                       93756     93302  1046.7MB/s  html                 +0.5%
+   BM_UDataBuffer/1                      886714    916292  730.7MB/s  urls                  -3.2%
+   BM_UDataBuffer/2                       15861     16401  7.2GB/s  jpg                     -3.3%
+   BM_UDataBuffer/3                       38934     39224  2.2GB/s  pdf                     -0.7%
+   BM_UDataBuffer/4                      381008    379428  1029.5MB/s  html4                +0.4%
+   BM_UCord/0                             92528     91098  1072.0MB/s  html                 +1.6%
+   BM_UCord/1                            858421    885287  756.3MB/s  urls                  -3.0%
+   BM_UCord/2                             13140     13464  8.8GB/s  jpg                     -2.4%
+   BM_UCord/3                             39012     37773  2.3GB/s  pdf                     +3.3%
+   BM_UCord/4                            376869    371267  1052.1MB/s  html4                +1.5%
+   BM_UCordString/0                       75810     75303  1.3GB/s  html                    +0.7%
+   BM_UCordString/1                      735290    753841  888.2MB/s  urls                  -2.5%
+   BM_UCordString/2                       11945     13113  9.0GB/s  jpg                     -8.9%
+   BM_UCordString/3                       33901     32562  2.7GB/s  pdf                     +4.1%
+   BM_UCordString/4                      310985    309390  1.2GB/s  html4                   +0.5%
+   BM_UCordValidate/0                     40952     40450  2.4GB/s  html                    +1.2%
+   BM_UCordValidate/1                    433842    456531  1.4GB/s  urls                    -5.0%
+   BM_UCordValidate/2                      1179      1173  100.8GB/s  jpg                   +0.5%
+   BM_UCordValidate/3                     14481     14392  6.1GB/s  pdf                     +0.6%
+   BM_UCordValidate/4                    164364    164151  2.3GB/s  html4                   +0.1%
+   BM_ZFlat/0                            160610    156601  623.6MB/s  html (22.31 %)        +2.6%
+   BM_ZFlat/1                           1995238   1993582  335.9MB/s  urls (47.77 %)        +0.1%
+   BM_ZFlat/2                             30133     24983  4.7GB/s  jpg (99.87 %)          +20.6%
+   BM_ZFlat/3                             74453     73128  1.2GB/s  pdf (82.07 %)           +1.8%
+   BM_ZFlat/4                            647674    633729  616.4MB/s  html4 (22.51 %)       +2.2%
+   BM_ZFlat/5                             76259     76090  308.4MB/s  cp (48.12 %)          +0.2%
+   BM_ZFlat/6                             31106     31084  342.1MB/s  c (42.40 %)           +0.1%
+   BM_ZFlat/7                             10507     10443  339.8MB/s  lsp (48.37 %)         +0.6%
+   BM_ZFlat/8                           1811047   1793325  547.6MB/s  xls (41.23 %)         +1.0%
+   BM_ZFlat/9                            597903    581793  249.3MB/s  txt1 (57.87 %)        +2.8%
+   BM_ZFlat/10                           525320    514522  232.0MB/s  txt2 (61.93 %)        +2.1%
+   BM_ZFlat/11                          1596591   1551636  262.3MB/s  txt3 (54.92 %)        +2.9%
+   BM_ZFlat/12                          2134523   2094033  219.5MB/s  txt4 (66.22 %)        +1.9%
+   BM_ZFlat/13                           593024    587869  832.6MB/s  bin (18.11 %)         +0.9%
+   BM_ZFlat/14                           114746    110666  329.5MB/s  sum (48.96 %)         +3.7%
+   BM_ZFlat/15                            14376     14485  278.3MB/s  man (59.36 %)         -0.8%
+   BM_ZFlat/16                           167908    150070  753.6MB/s  pb (19.64 %)         +11.9%
+   BM_ZFlat/17                           460228    442253  397.5MB/s  gaviota (37.72 %)     +4.1%
+   BM_ZCord/0                            164896    160241  609.4MB/s  html                  +2.9%
+   BM_ZCord/1                           2070239   2043492  327.7MB/s  urls                  +1.3%
+   BM_ZCord/2                             54402     47002  2.5GB/s  jpg                    +15.7%
+   BM_ZCord/3                             85871     83832  1073.1MB/s  pdf                  +2.4%
+   BM_ZCord/4                            664078    648825  602.0MB/s  html4                 +2.4%
+   BM_ZDataBuffer/0                      174874    172549  566.0MB/s  html                  +1.3%
+   BM_ZDataBuffer/1                     2134410   2139173  313.0MB/s  urls                  -0.2%
+   BM_ZDataBuffer/2                       71911     69551  1.7GB/s  jpg                     +3.4%
+   BM_ZDataBuffer/3                       98236     99727  902.1MB/s  pdf                   -1.5%
+   BM_ZDataBuffer/4                      710776    699104  558.8MB/s  html4                 +1.7%
+   Sum of all benchmarks               27358908  27200688                                   +0.6%
+
+
+Sandy Bridge 2.6 GHz:
+
+   Benchmark                          Base (ns)  New (ns)                                Improvement
+   -------------------------------------------------------------------------------------------------
+   BM_UFlat/0                             49356     49018  1.9GB/s  html                    +0.7%
+   BM_UFlat/1                            516764    531955  1.2GB/s  urls                    -2.9%
+   BM_UFlat/2                              6982      7304  16.2GB/s  jpg                    -4.4%
+   BM_UFlat/3                             15285     15598  5.6GB/s  pdf                     -2.0%
+   BM_UFlat/4                            206557    206669  1.8GB/s  html4                   -0.1%
+   BM_UFlat/5                             13681     13567  1.7GB/s  cp                      +0.8%
+   BM_UFlat/6                              6571      6592  1.6GB/s  c                       -0.3%
+   BM_UFlat/7                              2008      1994  1.7GB/s  lsp                     +0.7%
+   BM_UFlat/8                            775700    773286  1.2GB/s  xls                     +0.3%
+   BM_UFlat/9                            165578    164480  881.8MB/s  txt1                  +0.7%
+   BM_UFlat/10                           143707    144139  828.2MB/s  txt2                  -0.3%
+   BM_UFlat/11                           443026    436281  932.8MB/s  txt3                  +1.5%
+   BM_UFlat/12                           603129    595856  771.2MB/s  txt4                  +1.2%
+   BM_UFlat/13                           271682    270450  1.8GB/s  bin                     +0.5%
+   BM_UFlat/14                            26200     25666  1.4GB/s  sum                     +2.1%
+   BM_UFlat/15                             2620      2608  1.5GB/s  man                     +0.5%
+   BM_UFlat/16                            48908     47756  2.3GB/s  pb                      +2.4%
+   BM_UFlat/17                           174638    170346  1031.9MB/s  gaviota              +2.5%
+   BM_UValidate/0                         31922     31898  3.0GB/s  html                    +0.1%
+   BM_UValidate/1                        341265    363554  1.8GB/s  urls                    -6.1%
+   BM_UValidate/2                           160       151  782.8GB/s  jpg                   +6.0%
+   BM_UValidate/3                         10402     10380  8.5GB/s  pdf                     +0.2%
+   BM_UValidate/4                        129490    130587  2.9GB/s  html4                   -0.8%
+   BM_UDataBuffer/0                       59383     58736  1.6GB/s  html                    +1.1%
+   BM_UDataBuffer/1                      619222    637786  1049.8MB/s  urls                 -2.9%
+   BM_UDataBuffer/2                       10775     11941  9.9GB/s  jpg                     -9.8%
+   BM_UDataBuffer/3                       18002     17930  4.9GB/s  pdf                     +0.4%
+   BM_UDataBuffer/4                      259182    259306  1.5GB/s  html4                   -0.0%
+   BM_UCord/0                             59379     57814  1.6GB/s  html                    +2.7%
+   BM_UCord/1                            598456    615162  1088.4MB/s  urls                 -2.7%
+   BM_UCord/2                              8519      8628  13.7GB/s  jpg                    -1.3%
+   BM_UCord/3                             18123     17537  5.0GB/s  pdf                     +3.3%
+   BM_UCord/4                            252375    252331  1.5GB/s  html4                   +0.0%
+   BM_UCordString/0                       49494     49790  1.9GB/s  html                    -0.6%
+   BM_UCordString/1                      524659    541803  1.2GB/s  urls                    -3.2%
+   BM_UCordString/2                        8206      8354  14.2GB/s  jpg                    -1.8%
+   BM_UCordString/3                       17235     16537  5.3GB/s  pdf                     +4.2%
+   BM_UCordString/4                      210188    211072  1.8GB/s  html4                   -0.4%
+   BM_UCordValidate/0                     31956     31587  3.0GB/s  html                    +1.2%
+   BM_UCordValidate/1                    340828    362141  1.8GB/s  urls                    -5.9%
+   BM_UCordValidate/2                       783       744  158.9GB/s  jpg                   +5.2%
+   BM_UCordValidate/3                     10543     10462  8.4GB/s  pdf                     +0.8%
+   BM_UCordValidate/4                    130150    129789  2.9GB/s  html4                   +0.3%
+   BM_ZFlat/0                            113873    111200  878.2MB/s  html (22.31 %)        +2.4%
+   BM_ZFlat/1                           1473023   1489858  449.4MB/s  urls (47.77 %)        -1.1%
+   BM_ZFlat/2                             23569     19486  6.1GB/s  jpg (99.87 %)          +21.0%
+   BM_ZFlat/3                             49178     48046  1.8GB/s  pdf (82.07 %)           +2.4%
+   BM_ZFlat/4                            475063    469394  832.2MB/s  html4 (22.51 %)       +1.2%
+   BM_ZFlat/5                             46910     46816  501.2MB/s  cp (48.12 %)          +0.2%
+   BM_ZFlat/6                             16883     16916  628.6MB/s  c (42.40 %)           -0.2%
+   BM_ZFlat/7                              5381      5447  651.5MB/s  lsp (48.37 %)         -1.2%
+   BM_ZFlat/8                           1466870   1473861  666.3MB/s  xls (41.23 %)         -0.5%
+   BM_ZFlat/9                            468006    464101  312.5MB/s  txt1 (57.87 %)        +0.8%
+   BM_ZFlat/10                           408157    408957  291.9MB/s  txt2 (61.93 %)        -0.2%
+   BM_ZFlat/11                          1253348   1232910  330.1MB/s  txt3 (54.92 %)        +1.7%
+   BM_ZFlat/12                          1702373   1702977  269.8MB/s  txt4 (66.22 %)        -0.0%
+   BM_ZFlat/13                           439792    438557  1116.0MB/s  bin (18.11 %)        +0.3%
+   BM_ZFlat/14                            80766     78851  462.5MB/s  sum (48.96 %)         +2.4%
+   BM_ZFlat/15                             7420      7542  534.5MB/s  man (59.36 %)         -1.6%
+   BM_ZFlat/16                           112043    100126  1.1GB/s  pb (19.64 %)           +11.9%
+   BM_ZFlat/17                           368877    357703  491.4MB/s  gaviota (37.72 %)     +3.1%
+   BM_ZCord/0                            116402    113564  859.9MB/s  html                  +2.5%
+   BM_ZCord/1                           1507156   1519911  440.5MB/s  urls                  -0.8%
+   BM_ZCord/2                             39860     33686  3.5GB/s  jpg                    +18.3%
+   BM_ZCord/3                             56211     54694  1.6GB/s  pdf                     +2.8%
+   BM_ZCord/4                            485594    479212  815.1MB/s  html4                 +1.3%
+   BM_ZDataBuffer/0                      123185    121572  803.3MB/s  html                  +1.3%
+   BM_ZDataBuffer/1                     1569111   1589380  421.3MB/s  urls                  -1.3%
+   BM_ZDataBuffer/2                       53143     49556  2.4GB/s  jpg                     +7.2%
+   BM_ZDataBuffer/3                       65725     66826  1.3GB/s  pdf                     -1.6%
+   BM_ZDataBuffer/4                      517871    514750  758.9MB/s  html4                 +0.6%
+   Sum of all benchmarks               20258879  20315484                                   -0.3%
+
+
+AMD Instanbul 2.4 GHz:
+
+   Benchmark                          Base (ns)  New (ns)                                Improvement
+   -------------------------------------------------------------------------------------------------
+   BM_UFlat/0                             97120     96585  1011.1MB/s  html                 +0.6%
+   BM_UFlat/1                            917473    948016  706.3MB/s  urls                  -3.2%
+   BM_UFlat/2                             21496     23938  4.9GB/s  jpg                    -10.2%
+   BM_UFlat/3                             44751     45639  1.9GB/s  pdf                     -1.9%
+   BM_UFlat/4                            391950    391413  998.0MB/s  html4                 +0.1%
+   BM_UFlat/5                             37366     37201  630.7MB/s  cp                    +0.4%
+   BM_UFlat/6                             18350     18318  580.5MB/s  c                     +0.2%
+   BM_UFlat/7                              5672      5661  626.9MB/s  lsp                   +0.2%
+   BM_UFlat/8                           1533390   1529441  642.1MB/s  xls                   +0.3%
+   BM_UFlat/9                            335477    336553  431.0MB/s  txt1                  -0.3%
+   BM_UFlat/10                           285140    292080  408.7MB/s  txt2                  -2.4%
+   BM_UFlat/11                           888507    894758  454.9MB/s  txt3                  -0.7%
+   BM_UFlat/12                          1187643   1210928  379.5MB/s  txt4                  -1.9%
+   BM_UFlat/13                           493717    507447  964.5MB/s  bin                   -2.7%
+   BM_UFlat/14                            61740     60870  599.1MB/s  sum                   +1.4%
+   BM_UFlat/15                             7211      7187  560.9MB/s  man                   +0.3%
+   BM_UFlat/16                            97435     93100  1.2GB/s  pb                      +4.7%
+   BM_UFlat/17                           362662    356395  493.2MB/s  gaviota               +1.8%
+   BM_UValidate/0                         47475     47118  2.0GB/s  html                    +0.8%
+   BM_UValidate/1                        501304    529741  1.2GB/s  urls                    -5.4%
+   BM_UValidate/2                           276       243  486.2GB/s  jpg                  +13.6%
+   BM_UValidate/3                         16361     16261  5.4GB/s  pdf                     +0.6%
+   BM_UValidate/4                        190741    190353  2.0GB/s  html4                   +0.2%
+   BM_UDataBuffer/0                      111080    109771  889.6MB/s  html                  +1.2%
+   BM_UDataBuffer/1                     1051035   1085999  616.5MB/s  urls                  -3.2%
+   BM_UDataBuffer/2                       25801     25463  4.6GB/s  jpg                     +1.3%
+   BM_UDataBuffer/3                       50493     49946  1.8GB/s  pdf                     +1.1%
+   BM_UDataBuffer/4                      447258    444138  879.5MB/s  html4                 +0.7%
+   BM_UCord/0                            109350    107909  905.0MB/s  html                  +1.3%
+   BM_UCord/1                           1023396   1054964  634.7MB/s  urls                  -3.0%
+   BM_UCord/2                             25292     24371  4.9GB/s  jpg                     +3.8%
+   BM_UCord/3                             48955     49736  1.8GB/s  pdf                     -1.6%
+   BM_UCord/4                            440452    437331  893.2MB/s  html4                 +0.7%
+   BM_UCordString/0                       98511     98031  996.2MB/s  html                  +0.5%
+   BM_UCordString/1                      933230    963495  694.9MB/s  urls                  -3.1%
+   BM_UCordString/2                       23311     24076  4.9GB/s  jpg                     -3.2%
+   BM_UCordString/3                       45568     46196  1.9GB/s  pdf                     -1.4%
+   BM_UCordString/4                      397791    396934  984.1MB/s  html4                 +0.2%
+   BM_UCordValidate/0                     47537     46921  2.0GB/s  html                    +1.3%
+   BM_UCordValidate/1                    505071    532716  1.2GB/s  urls                    -5.2%
+   BM_UCordValidate/2                      1663      1621  72.9GB/s  jpg                    +2.6%
+   BM_UCordValidate/3                     16890     16926  5.2GB/s  pdf                     -0.2%
+   BM_UCordValidate/4                    192365    191984  2.0GB/s  html4                   +0.2%
+   BM_ZFlat/0                            184708    179103  545.3MB/s  html (22.31 %)        +3.1%
+   BM_ZFlat/1                           2293864   2302950  290.7MB/s  urls (47.77 %)        -0.4%
+   BM_ZFlat/2                             52852     47618  2.5GB/s  jpg (99.87 %)          +11.0%
+   BM_ZFlat/3                            100766     96179  935.3MB/s  pdf (82.07 %)         +4.8%
+   BM_ZFlat/4                            741220    727977  536.6MB/s  html4 (22.51 %)       +1.8%
+   BM_ZFlat/5                             85402     85418  274.7MB/s  cp (48.12 %)          -0.0%
+   BM_ZFlat/6                             36558     36494  291.4MB/s  c (42.40 %)           +0.2%
+   BM_ZFlat/7                             12706     12507  283.7MB/s  lsp (48.37 %)         +1.6%
+   BM_ZFlat/8                           2336823   2335688  420.5MB/s  xls (41.23 %)         +0.0%
+   BM_ZFlat/9                            701804    681153  212.9MB/s  txt1 (57.87 %)        +3.0%
+   BM_ZFlat/10                           606700    597194  199.9MB/s  txt2 (61.93 %)        +1.6%
+   BM_ZFlat/11                          1852283   1803238  225.7MB/s  txt3 (54.92 %)        +2.7%
+   BM_ZFlat/12                          2475527   2443354  188.1MB/s  txt4 (66.22 %)        +1.3%
+   BM_ZFlat/13                           694497    696654  702.6MB/s  bin (18.11 %)         -0.3%
+   BM_ZFlat/14                           136929    129855  280.8MB/s  sum (48.96 %)         +5.4%
+   BM_ZFlat/15                            17172     17124  235.4MB/s  man (59.36 %)         +0.3%
+   BM_ZFlat/16                           190364    171763  658.4MB/s  pb (19.64 %)         +10.8%
+   BM_ZFlat/17                           567285    555190  316.6MB/s  gaviota (37.72 %)     +2.2%
+   BM_ZCord/0                            193490    187031  522.1MB/s  html                  +3.5%
+   BM_ZCord/1                           2427537   2415315  277.2MB/s  urls                  +0.5%
+   BM_ZCord/2                             85378     81412  1.5GB/s  jpg                     +4.9%
+   BM_ZCord/3                            121898    119419  753.3MB/s  pdf                   +2.1%
+   BM_ZCord/4                            779564    762961  512.0MB/s  html4                 +2.2%
+   BM_ZDataBuffer/0                      213820    207272  471.1MB/s  html                  +3.2%
+   BM_ZDataBuffer/1                     2589010   2586495  258.9MB/s  urls                  +0.1%
+   BM_ZDataBuffer/2                      121871    118885  1018.4MB/s  jpg                  +2.5%
+   BM_ZDataBuffer/3                      145382    145986  616.2MB/s  pdf                   -0.4%
+   BM_ZDataBuffer/4                      868117    852754  458.1MB/s  html4                 +1.8%
+   Sum of all benchmarks               33771833  33744763                                   +0.1%
+
+------------------------------------------------------------------------
+r70 | snappy.mirrorbot@gmail.com | 2013-01-06 20:21:26 +0100 (Sun, 06 Jan 2013) | 6 lines
+
+Adjust the Snappy open-source distribution for the changes in Google's
+internal file API.
+
+R=sanjay
+
+
+------------------------------------------------------------------------
+r69 | snappy.mirrorbot@gmail.com | 2013-01-04 12:54:20 +0100 (Fri, 04 Jan 2013) | 15 lines
+
+Change a few ORs to additions where they don't matter. This helps the compiler
+use the LEA instruction more efficiently, since e.g. a + (b << 2) can be encoded
+as one instruction. Even more importantly, it can constant-fold the
+COPY_* enums together with the shifted negative constants, which also saves
+some instructions. (We don't need it for LITERAL, since it happens to be 0.)
+
+I am unsure why the compiler couldn't do this itself, but the theory is that
+it cannot prove that len-1 and len-4 cannot underflow/wrap, and thus can't
+do the optimization safely.
+
+The gains are small but measurable; 0.5-1.0% over the BM_Z* benchmarks
+(measured on Westmere, Sandy Bridge and Istanbul).
+
+R=sanjay
+
+------------------------------------------------------------------------
+r68 | snappy.mirrorbot@gmail.com | 2012-10-08 13:37:16 +0200 (Mon, 08 Oct 2012) | 5 lines
+
+Stop giving -Werror to automake, due to an incompatibility between current
+versions of libtool and automake on non-GNU platforms (e.g. Mac OS X).
+
+R=sanjay
+
+------------------------------------------------------------------------
+r67 | snappy.mirrorbot@gmail.com | 2012-08-17 15:54:47 +0200 (Fri, 17 Aug 2012) | 5 lines
+
+Fix public issue 66: Document GetUncompressedLength better, in particular that
+it leaves the source in a state that's not appropriate for RawUncompress.
+
+R=sanjay
+
+------------------------------------------------------------------------
+r66 | snappy.mirrorbot@gmail.com | 2012-07-31 13:44:44 +0200 (Tue, 31 Jul 2012) | 5 lines
+
+Fix public issue 64: Check for <sys/time.h> at configure time,
+since MSVC seemingly does not have it.
+
+R=sanjay
+
+------------------------------------------------------------------------
+r65 | snappy.mirrorbot@gmail.com | 2012-07-04 11:34:48 +0200 (Wed, 04 Jul 2012) | 10 lines
+
+Handle the case where gettimeofday() goes backwards or returns the same value
+twice; it could cause division by zero in the unit test framework.
+(We already had one fix for this in place, but it was incomplete.)
+
+This could in theory happen on any system, since there are few guarantees
+about gettimeofday(), but seems to only happen in practice on GNU/Hurd, where
+gettimeofday() is cached and only updated ever so often.
+
+R=sanjay
+
+------------------------------------------------------------------------
+r64 | snappy.mirrorbot@gmail.com | 2012-07-04 11:28:33 +0200 (Wed, 04 Jul 2012) | 6 lines
+
+Mark ARMv4 as not supporting unaligned accesses (not just ARMv5 and ARMv6);
+apparently Debian still targets these by default, giving us segfaults on
+armel.
+
+R=sanjay
+
+------------------------------------------------------------------------
+r63 | snappy.mirrorbot@gmail.com | 2012-05-22 11:46:05 +0200 (Tue, 22 May 2012) | 5 lines
+
+Fix public bug #62: Remove an extraneous comma at the end of an enum list,
+causing compile errors when embedded in Mozilla on OpenBSD.
+
+R=sanjay
+
+------------------------------------------------------------------------
+r62 | snappy.mirrorbot@gmail.com | 2012-05-22 11:32:50 +0200 (Tue, 22 May 2012) | 8 lines
+
+Snappy library no longer depends on iostream.
+
+Achieved by moving logging macro definitions to a test-only
+header file, and by changing non-test code to use assert,
+fprintf, and abort instead of LOG/CHECK macros.
+
+R=sesse
+
+------------------------------------------------------------------------
+r61 | snappy.mirrorbot@gmail.com | 2012-02-24 16:46:37 +0100 (Fri, 24 Feb 2012) | 4 lines
+
+Release Snappy 1.0.5.
+
+R=sanjay
+
+------------------------------------------------------------------------
 r60 | snappy.mirrorbot@gmail.com | 2012-02-23 18:00:36 +0100 (Thu, 23 Feb 2012) | 57 lines
 
 For 32-bit platforms, do not try to accelerate multiple neighboring

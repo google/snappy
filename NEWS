@@ -1,3 +1,18 @@
+Snappy v1.1.0, January 18th 2013:
+
+  * Snappy now uses 64 kB block size instead of 32 kB. On average,
+    this means it compresses about 3% denser (more so for some
+    inputs), at the same or better speeds.
+
+  * libsnappy no longer depends on iostream.
+
+  * Some small performance improvements in compression on x86
+    (0.5–1%).
+
+  * Various portability fixes for ARM-based platforms, for MSVC,
+    and for GNU/Hurd.
+
+
 Snappy v1.0.5, February 24th 2012:
 
   * More speed improvements. Exactly how big will depend on
