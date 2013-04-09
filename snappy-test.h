@@ -139,10 +139,10 @@ namespace file {
     void CheckSuccess() { }
   };
 
-  DummyStatus ReadFileToString(const char* filename, string* data, int unused) {
-    FILE* fp = fopen(filename, "rb");
+  DummyStatus GetContents(const string& filename, string* data, int unused) {
+    FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
-      perror(filename);
+      perror(filename.c_str());
       exit(1);
     }
 
@@ -160,15 +160,9 @@ namespace file {
     fclose(fp);
   }
 
-  DummyStatus ReadFileToString(const string& filename,
-                               string* data,
-                               int unused) {
-    ReadFileToString(filename.c_str(), data, unused);
-  }
-
-  DummyStatus WriteStringToFile(const string& str,
-                                const string& filename,
-                                int unused) {
+  DummyStatus SetContents(const string& filename,
+                          const string& str,
+                          int unused) {
     FILE* fp = fopen(filename.c_str(), "wb");
     if (fp == NULL) {
       perror(filename.c_str());
@@ -202,6 +196,8 @@ void Test_SnappyCorruption_UnterminatedVarint();
 void Test_Snappy_ReadPastEndOfBuffer();
 void Test_Snappy_FindMatchLength();
 void Test_Snappy_FindMatchLengthRandom();
+
+string ReadTestDataFile(const string& base, size_t size_limit);
 
 string ReadTestDataFile(const string& base);
 
