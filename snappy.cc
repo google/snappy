@@ -839,27 +839,18 @@ bool SnappyDecompressor::RefillTag() {
 }
 
 template <typename Writer>
-static bool InternalUncompress(Source* r,
-                               Writer* writer,
-                               uint32 max_len) {
+static bool InternalUncompress(Source* r, Writer* writer) {
   // Read the uncompressed length from the front of the compressed input
   SnappyDecompressor decompressor(r);
   uint32 uncompressed_len = 0;
   if (!decompressor.ReadUncompressedLength(&uncompressed_len)) return false;
-  return InternalUncompressAllTags(
-      &decompressor, writer, uncompressed_len, max_len);
+  return InternalUncompressAllTags(&decompressor, writer, uncompressed_len);
 }
 
 template <typename Writer>
 static bool InternalUncompressAllTags(SnappyDecompressor* decompressor,
                                       Writer* writer,
-                                      uint32 uncompressed_len,
-                                      uint32 max_len) {
-  // Protect against possible DoS attack
-  if (static_cast<uint64>(uncompressed_len) > max_len) {
-    return false;
-  }
-
+                                      uint32 uncompressed_len) {
   writer->SetExpectedLength(uncompressed_len);
 
   // Process the entire input
@@ -1039,7 +1030,7 @@ bool RawUncompress(const char* compressed, size_t n, char* uncompressed) {
 
 bool RawUncompress(Source* compressed, char* uncompressed) {
   SnappyArrayWriter output(uncompressed);
-  return InternalUncompress(compressed, &output, kuint32max);
+  return InternalUncompress(compressed, &output);
 }
 
 bool Uncompress(const char* compressed, size_t n, string* uncompressed) {
@@ -1047,9 +1038,9 @@ bool Uncompress(const char* compressed, size_t n, string* uncompressed) {
   if (!GetUncompressedLength(compressed, n, &ulength)) {
     return false;
   }
-  // Protect against possible DoS attack
-  if ((static_cast<uint64>(ulength) + uncompressed->size()) >
-      uncompressed->max_size()) {
+  // On 32-bit builds: max_size() < kuint32max.  Check for that instead
+  // of crashing (e.g., consider externally specified compressed data).
+  if (ulength > uncompressed->max_size()) {
     return false;
   }
   STLStringResizeUninitialized(uncompressed, ulength);
@@ -1088,7 +1079,7 @@ class SnappyDecompressionValidator {
 bool IsValidCompressedBuffer(const char* compressed, size_t n) {
   ByteArraySource reader(compressed, n);
   SnappyDecompressionValidator writer;
-  return InternalUncompress(&reader, &writer, kuint32max);
+  return InternalUncompress(&reader, &writer);
 }
 
 void RawCompress(const char* input,
