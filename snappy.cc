@@ -945,6 +945,183 @@ size_t Compress(Source* reader, Sink* writer) {
 }
 
 // -----------------------------------------------------------------------
+// IOVec interfaces
+// -----------------------------------------------------------------------
+
+// A type that writes to an iovec.
+// Note that this is not a "ByteSink", but a type that matches the
+// Writer template argument to SnappyDecompressor::DecompressAllTags().
+class SnappyIOVecWriter {
+ private:
+  const struct iovec* output_iov_;
+  const size_t output_iov_count_;
+
+  // We are currently writing into output_iov_[curr_iov_index_].
+  int curr_iov_index_;
+
+  // Bytes written to output_iov_[curr_iov_index_] so far.
+  size_t curr_iov_written_;
+
+  // Total bytes decompressed into output_iov_ so far.
+  size_t total_written_;
+
+  // Maximum number of bytes that will be decompressed into output_iov_.
+  size_t output_limit_;
+
+  inline char* GetIOVecPointer(int index, size_t offset) {
+    return reinterpret_cast<char*>(output_iov_[index].iov_base) +
+        offset;
+  }
+
+ public:
+  // Does not take ownership of iov. iov must be valid during the
+  // entire lifetime of the SnappyIOVecWriter.
+  inline SnappyIOVecWriter(const struct iovec* iov, size_t iov_count)
+      : output_iov_(iov),
+        output_iov_count_(iov_count),
+        curr_iov_index_(0),
+        curr_iov_written_(0),
+        total_written_(0),
+        output_limit_(-1) {
+  }
+
+  inline void SetExpectedLength(size_t len) {
+    output_limit_ = len;
+  }
+
+  inline bool CheckLength() const {
+    return total_written_ == output_limit_;
+  }
+
+  inline bool Append(const char* ip, size_t len) {
+    if (total_written_ + len > output_limit_) {
+      return false;
+    }
+
+    while (len > 0) {
+      assert(curr_iov_written_ <= output_iov_[curr_iov_index_].iov_len);
+      if (curr_iov_written_ >= output_iov_[curr_iov_index_].iov_len) {
+        // This iovec is full. Go to the next one.
+        if (curr_iov_index_ + 1 >= output_iov_count_) {
+          return false;
+        }
+        curr_iov_written_ = 0;
+        ++curr_iov_index_;
+      }
+
+      const size_t to_write = std::min(
+          len, output_iov_[curr_iov_index_].iov_len - curr_iov_written_);
+      memcpy(GetIOVecPointer(curr_iov_index_, curr_iov_written_),
+             ip,
+             to_write);
+      curr_iov_written_ += to_write;
+      total_written_ += to_write;
+      ip += to_write;
+      len -= to_write;
+    }
+
+    return true;
+  }
+
+  inline bool TryFastAppend(const char* ip, size_t available, size_t len) {
+    const size_t space_left = output_limit_ - total_written_;
+    if (len <= 16 && available >= 16 && space_left >= 16 &&
+        output_iov_[curr_iov_index_].iov_len - curr_iov_written_ >= 16) {
+      // Fast path, used for the majority (about 95%) of invocations.
+      char* ptr = GetIOVecPointer(curr_iov_index_, curr_iov_written_);
+      UnalignedCopy64(ip, ptr);
+      UnalignedCopy64(ip + 8, ptr + 8);
+      curr_iov_written_ += len;
+      total_written_ += len;
+      return true;
+    }
+
+    return false;
+  }
+
+  inline bool AppendFromSelf(size_t offset, size_t len) {
+    if (offset > total_written_ || offset == 0) {
+      return false;
+    }
+    const size_t space_left = output_limit_ - total_written_;
+    if (len > space_left) {
+      return false;
+    }
+
+    // Locate the iovec from which we need to start the copy.
+    int from_iov_index = curr_iov_index_;
+    size_t from_iov_offset = curr_iov_written_;
+    while (offset > 0) {
+      if (from_iov_offset >= offset) {
+        from_iov_offset -= offset;
+        break;
+      }
+
+      offset -= from_iov_offset;
+      --from_iov_index;
+      assert(from_iov_index >= 0);
+      from_iov_offset = output_iov_[from_iov_index].iov_len;
+    }
+
+    // Copy <len> bytes starting from the iovec pointed to by from_iov_index to
+    // the current iovec.
+    while (len > 0) {
+      assert(from_iov_index <= curr_iov_index_);
+      if (from_iov_index != curr_iov_index_) {
+        const size_t to_copy = std::min(
+            output_iov_[from_iov_index].iov_len - from_iov_offset,
+            len);
+        Append(GetIOVecPointer(from_iov_index, from_iov_offset), to_copy);
+        len -= to_copy;
+        if (len > 0) {
+          ++from_iov_index;
+          from_iov_offset = 0;
+        }
+      } else {
+        assert(curr_iov_written_ <= output_iov_[curr_iov_index_].iov_len);
+        size_t to_copy = std::min(output_iov_[curr_iov_index_].iov_len -
+                                      curr_iov_written_,
+                                  len);
+        if (to_copy == 0) {
+          // This iovec is full. Go to the next one.
+          if (curr_iov_index_ + 1 >= output_iov_count_) {
+            return false;
+          }
+          ++curr_iov_index_;
+          curr_iov_written_ = 0;
+          continue;
+        }
+        if (to_copy > len) {
+          to_copy = len;
+        }
+        IncrementalCopy(GetIOVecPointer(from_iov_index, from_iov_offset),
+                        GetIOVecPointer(curr_iov_index_, curr_iov_written_),
+                        to_copy);
+        curr_iov_written_ += to_copy;
+        from_iov_offset += to_copy;
+        total_written_ += to_copy;
+        len -= to_copy;
+      }
+    }
+
+    return true;
+  }
+
+};
+
+bool RawUncompressToIOVec(const char* compressed, size_t compressed_length,
+                          const struct iovec* iov, size_t iov_cnt) {
+  ByteArraySource reader(compressed, compressed_length);
+  return RawUncompressToIOVec(&reader, iov, iov_cnt);
+}
+
+bool RawUncompressToIOVec(Source* compressed, const struct iovec* iov,
+                          size_t iov_cnt) {
+  SnappyIOVecWriter output(iov, iov_cnt);
+  return InternalUncompress(compressed, &output);
+}
+
+// -----------------------------------------------------------------------
 // Flat array interfaces
 // -----------------------------------------------------------------------
 

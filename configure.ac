@@ -110,6 +110,11 @@ if test "$ac_cv_header_stddef_h" = "yes"; then
 else
     AC_SUBST([ac_cv_have_stddef_h], [0])
 fi
+if test "$ac_cv_header_sys_uio_h" = "yes"; then
+    AC_SUBST([ac_cv_have_sys_uio_h], [1])
+else
+    AC_SUBST([ac_cv_have_sys_uio_h], [0])
+fi
 
 # Export the version to snappy-stubs-public.h.
 SNAPPY_MAJOR="snappy_major"

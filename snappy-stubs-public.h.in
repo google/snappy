@@ -44,6 +44,10 @@
 #include <stddef.h>
 #endif
 
+#if @ac_cv_have_sys_uio_h@
+#include <sys/uio.h>
+#endif
+
 #define SNAPPY_MAJOR @SNAPPY_MAJOR@
 #define SNAPPY_MINOR @SNAPPY_MINOR@
 #define SNAPPY_PATCHLEVEL @SNAPPY_PATCHLEVEL@
@@ -79,6 +83,15 @@ typedef std::string string;
 #define DISALLOW_COPY_AND_ASSIGN(TypeName) \
   TypeName(const TypeName&);               \
   void operator=(const TypeName&)
+
+#if !@ac_cv_have_sys_uio_h@
+// Windows does not have an iovec type, yet the concept is universally useful.
+// It is simple to define it ourselves, so we put it inside our own namespace.
+struct iovec {
+	void* iov_base;
+	size_t iov_len;
+};
+#endif
 
 }  // namespace snappy
 
