@@ -94,7 +94,7 @@ enum {
 //    ababababababababababab
 // Note that this does not match the semantics of either memcpy()
 // or memmove().
-static inline void IncrementalCopy(const char* src, char* op, int len) {
+static inline void IncrementalCopy(const char* src, char* op, ssize_t len) {
   assert(len > 0);
   do {
     *op++ = *src++;
@@ -136,9 +136,7 @@ namespace {
 
 const int kMaxIncrementCopyOverflow = 10;
 
-}  // namespace
-
-static inline void IncrementalCopyFastPath(const char* src, char* op, int len) {
+inline void IncrementalCopyFastPath(const char* src, char* op, ssize_t len) {
   while (op - src < 8) {
     UnalignedCopy64(src, op);
     len -= op - src;
@@ -151,6 +149,8 @@ static inline void IncrementalCopyFastPath(const char* src, char* op, int len) {
     len -= 8;
   }
 }
+
+}  // namespace
 
 static inline char* EmitLiteral(char* op,
                                 const char* literal,
