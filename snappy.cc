@@ -82,6 +82,7 @@ enum {
   COPY_2_BYTE_OFFSET = 2,
   COPY_4_BYTE_OFFSET = 3
 };
+static const int kMaximumTagLength = 5;  // COPY_4_BYTE_OFFSET plus the actual offset.
 
 // Copy "len" bytes from "src" to "op", one byte at a time.  Used for
 // handling COPY operations where the input and output regions may
@@ -469,21 +470,26 @@ char* CompressFragment(const char* input,
 //   bool Append(const char* ip, size_t length);
 //   bool AppendFromSelf(uint32 offset, size_t length);
 //
-//   // The difference between TryFastAppend and Append is that TryFastAppend
-//   // is allowed to read up to <available> bytes from the input buffer,
-//   // whereas Append is allowed to read <length>.
+//   // The rules for how TryFastAppend differs from Append are somewhat
+//   // convoluted:
 //   //
-//   // Also, TryFastAppend is allowed to return false, declining the append,
-//   // without it being a fatal error -- just "return false" would be
-//   // a perfectly legal implementation of TryFastAppend. The intention
-//   // is for TryFastAppend to allow a fast path in the common case of
-//   // a small append.
+//   //  - TryFastAppend is allowed to decline (return false) at any
+//   //    time, for any reason -- just "return false" would be
+//   //    a perfectly legal implementation of TryFastAppend.
+//   //    The intention is for TryFastAppend to allow a fast path
+//   //    in the common case of a small append.
+//   //  - TryFastAppend is allowed to read up to <available> bytes
+//   //    from the input buffer, whereas Append is allowed to read
+//   //    <length>. However, if it returns true, it must leave
+//   //    at least five (kMaximumTagLength) bytes in the input buffer
+//   //    afterwards, so that there is always enough space to read the
+//   //    next tag without checking for a refill.
+//   //  - TryFastAppend must always return decline (return false)
+//   //    if <length> is 61 or more, as in this case the literal length is not
+//   //    decoded fully. In practice, this should not be a big problem,
+//   //    as it is unlikely that one would implement a fast path accepting
+//   //    this much data.
 //   //
-//   // NOTE(user): TryFastAppend must always return decline (return false)
-//   // if <length> is 61 or more, as in this case the literal length is not
-//   // decoded fully. In practice, this should not be a big problem,
-//   // as it is unlikely that one would implement a fast path accepting
-//   // this much data.
 //   bool TryFastAppend(const char* ip, size_t available, size_t length);
 // };
 
@@ -652,7 +658,7 @@ class SnappyDecompressor {
   const char*   ip_limit_;       // Points just past buffered bytes
   uint32        peeked_;         // Bytes peeked from reader (need to skip)
   bool          eof_;            // Hit end of input without an error?
-  char          scratch_[5];     // Temporary buffer for PeekFast() boundaries
+  char          scratch_[kMaximumTagLength];  // See RefillTag().
 
   // Ensure that all of the tag metadata for the next tag is available
   // in [ip_..ip_limit_-1].  Also ensures that [ip,ip+4] is readable even
@@ -715,7 +721,7 @@ class SnappyDecompressor {
     // scope to optimize the <ip_limit_ - ip> expression based on the local
     // context, which overall increases speed.
     #define MAYBE_REFILL() \
-        if (ip_limit_ - ip < 5) { \
+        if (ip_limit_ - ip < kMaximumTagLength) { \
           ip_ = ip; \
           if (!RefillTag()) return; \
           ip = ip_; \
@@ -730,7 +736,9 @@ class SnappyDecompressor {
         if (writer->TryFastAppend(ip, ip_limit_ - ip, literal_length)) {
           assert(literal_length < 61);
           ip += literal_length;
-          MAYBE_REFILL();
+          // NOTE(user): There is no MAYBE_REFILL() here, as TryFastAppend()
+          // will not return true unless there's already at least five spare
+          // bytes in addition to the literal.
           continue;
         }
         if (PREDICT_FALSE(literal_length >= 61)) {
@@ -823,7 +831,7 @@ bool SnappyDecompressor::RefillTag() {
     assert(nbuf == needed);
     ip_ = scratch_;
     ip_limit_ = scratch_ + needed;
-  } else if (nbuf < 5) {
+  } else if (nbuf < kMaximumTagLength) {
     // Have enough bytes, but move into scratch_ so that we do not
     // read past end of input
     memmove(scratch_, ip, nbuf);
@@ -1025,7 +1033,7 @@ class SnappyIOVecWriter {
 
   inline bool TryFastAppend(const char* ip, size_t available, size_t len) {
     const size_t space_left = output_limit_ - total_written_;
-    if (len <= 16 && available >= 16 && space_left >= 16 &&
+    if (len <= 16 && available >= 16 + kMaximumTagLength && space_left >= 16 &&
         output_iov_[curr_iov_index_].iov_len - curr_iov_written_ >= 16) {
       // Fast path, used for the majority (about 95%) of invocations.
       char* ptr = GetIOVecPointer(curr_iov_index_, curr_iov_written_);
@@ -1162,7 +1170,7 @@ class SnappyArrayWriter {
   inline bool TryFastAppend(const char* ip, size_t available, size_t len) {
     char* op = op_;
     const size_t space_left = op_limit_ - op;
-    if (len <= 16 && available >= 16 && space_left >= 16) {
+    if (len <= 16 && available >= 16 + kMaximumTagLength && space_left >= 16) {
       // Fast path, used for the majority (about 95%) of invocations.
       UnalignedCopy64(ip, op);
       UnalignedCopy64(ip + 8, op + 8);

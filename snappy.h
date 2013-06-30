@@ -178,7 +178,6 @@ namespace snappy {
 
   static const int kMaxHashTableBits = 14;
   static const size_t kMaxHashTableSize = 1 << kMaxHashTableBits;
-
 }  // end namespace snappy
 
 
