@@ -1185,7 +1185,16 @@ class SnappyArrayWriter {
     char* op = op_;
     const size_t space_left = op_limit_ - op;
 
-    if (op - base_ <= offset - 1u) {  // -1u catches offset==0
+    // Check if we try to append from before the start of the buffer.
+    // Normally this would just be a check for "produced < offset",
+    // but "produced <= offset - 1u" is equivalent for every case
+    // except the one where offset==0, where the right side will wrap around
+    // to a very big number. This is convenient, as offset==0 is another
+    // invalid case that we also want to catch, so that we do not go
+    // into an infinite loop.
+    assert(op >= base_);
+    size_t produced = op - base_;
+    if (produced <= offset - 1u) {
       return false;
     }
     if (len <= 16 && offset >= 8 && space_left >= 16) {
@@ -1255,7 +1264,9 @@ class SnappyDecompressionValidator {
     return false;
   }
   inline bool AppendFromSelf(size_t offset, size_t len) {
-    if (produced_ <= offset - 1u) return false;  // -1u catches offset==0
+    // See SnappyArrayWriter::AppendFromSelf for an explanation of
+    // the "offset - 1u" trick.
+    if (produced_ <= offset - 1u) return false;
     produced_ += len;
     return produced_ <= expected_;
   }
