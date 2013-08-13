@@ -18,6 +18,8 @@ AC_SUBST([LIBTOOL_DEPS])
 AC_PROG_CXX
 AC_LANG([C++])
 AC_C_BIGENDIAN
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
 AC_CHECK_HEADERS([stdint.h stddef.h sys/mman.h sys/resource.h windows.h byteswap.h sys/byteswap.h sys/endian.h sys/time.h])
 
 # Don't use AC_FUNC_MMAP, as it checks for mappings of already-mapped memory,
