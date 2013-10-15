@@ -1,3 +1,16 @@
+Snappy v1.1.1, October 15th 2013:
+
+  * Add support for uncompressing to iovecs (scatter I/O).
+    The bulk of this patch was contributed by Mohit Aron.
+
+  * Speed up decompression by ~2%; much more so (~13-20%) on
+    a few benchmarks on given compilers and CPUs.
+
+  * Fix a few issues with MSVC compilation.
+
+  * Support truncated test data in the benchmark.
+
+
 Snappy v1.1.0, January 18th 2013:
 
   * Snappy now uses 64 kB block size instead of 32 kB. On average,
