@@ -1191,23 +1191,14 @@ static struct {
 } files[] = {
   { "html", "html", 0 },
   { "urls", "urls.10K", 0 },
-  { "jpg", "house.jpg", 0 },
-  { "jpg_200", "house.jpg", 200 },
-  { "pdf", "mapreduce-osdi-1.pdf", 0 },
+  { "jpg", "fireworks.jpeg", 0 },
+  { "jpg_200", "fireworks.jpeg", 200 },
+  { "pdf", "paper-100k.pdf", 0 },
   { "html4", "html_x_4", 0 },
-  { "cp", "cp.html", 0 },
-  { "c", "fields.c", 0 },
-  { "lsp", "grammar.lsp", 0 },
-  { "xls", "kennedy.xls", 0 },
-  { "xls_200", "kennedy.xls", 200 },
   { "txt1", "alice29.txt", 0 },
   { "txt2", "asyoulik.txt", 0 },
   { "txt3", "lcet10.txt", 0 },
   { "txt4", "plrabn12.txt", 0 },
-  { "bin", "ptt5", 0 },
-  { "bin_200", "ptt5", 200 },
-  { "sum", "sum", 0 },
-  { "man", "xargs.1", 0 },
   { "pb", "geo.protodata", 0 },
   { "gaviota", "kppkn.gtb", 0 },
 };
@@ -1344,7 +1335,6 @@ BENCHMARK(BM_ZFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
 
 int main(int argc, char** argv) {
   InitGoogle(argv[0], &argc, &argv, true);
-  File::Init();
   RunSpecifiedBenchmarks();
 
 
