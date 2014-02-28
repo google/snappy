@@ -1,4 +1,34 @@
 ------------------------------------------------------------------------
+r83 | snappy.mirrorbot@gmail.com | 2014-02-19 11:31:49 +0100 (Wed, 19 Feb 2014) | 9 lines
+
+Fix public issue 82: Stop distributing benchmark data files that have
+unclear or unsuitable licensing.
+
+In general, we replace the files we can with liberally licensed data,
+and remove all the others (in particular all the parts of the Canterbury
+corpus that are not clearly in the public domain). The replacements
+do not always have the exact same characteristics as the original ones,
+but they are more than good enough to be useful for benchmarking.
+
+------------------------------------------------------------------------
+r82 | snappy.mirrorbot@gmail.com | 2013-10-25 15:31:27 +0200 (Fri, 25 Oct 2013) | 8 lines
+
+Add support for padding in the Snappy framed format.
+
+This is specifically motivated by DICOM's demands that embedded data
+must be of an even number of bytes, but could in principle be used for
+any sort of padding/alignment needed.
+
+R=sanjay
+
+------------------------------------------------------------------------
+r81 | snappy.mirrorbot@gmail.com | 2013-10-15 17:21:31 +0200 (Tue, 15 Oct 2013) | 4 lines
+
+Release Snappy 1.1.1.
+
+R=jeff
+
+------------------------------------------------------------------------
 r80 | snappy.mirrorbot@gmail.com | 2013-08-13 14:55:00 +0200 (Tue, 13 Aug 2013) | 6 lines
 
 Add autoconf tests for size_t and ssize_t. Sort-of resolves public issue 79;
