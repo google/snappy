@@ -129,7 +129,12 @@ test.)
 Contact
 =======
 
-Snappy is distributed through Google Code. For the latest version, a bug tracker,
-and other information, see
+Snappy is distributed through Github & Google Code.
+
+For the latest version & code, see
+
+  https://github.com/google/snappy
+
+For the a bug tracker and other information, see
 
   http://code.google.com/p/snappy/
