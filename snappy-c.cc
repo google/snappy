@@ -28,6 +28,60 @@
 
 #include "snappy.h"
 #include "snappy-c.h"
+#include "snappy-sinksource.h"
+
+namespace snappy {
+  // A Source implementation that delegates to an array of snappy_source function
+  // pointers
+  class CSource : public Source {
+   public:
+    explicit CSource(const struct snappy_source* ops, void* userdata)
+      : ops_(ops), userdata_(userdata) { }
+    virtual ~CSource() {
+      if (ops_->close) {
+        ops_->close(userdata_);
+      }
+    }
+    size_t Available() const {
+      return ops_->available(userdata_);
+    }
+    const char* Peek(size_t* len) {
+      return ops_->peek(len, userdata_);
+    }
+    virtual void Skip(size_t n) {
+      return ops_->skip(n, userdata_);
+    }
+   private:
+    const struct snappy_source* ops_;
+    void* userdata_;
+  };
+
+  // A Sink implementation that delegates to an array of snappy_source function
+  // pointers
+  class CSink : public Sink {
+   public:
+    explicit CSink(const struct snappy_sink* ops, void* userdata)
+      : ops_(ops), userdata_(userdata) { }
+    virtual ~CSink() {
+      if (ops_->close) {
+        ops_->close(userdata_);
+      }
+    }
+    void Append(const char* data, size_t n) {
+      ops_->append(data, n, userdata_);
+    }
+    char* GetAppendBuffer(size_t len, char* scratch) {
+      if (ops_->get_append_buffer) {
+        return ops_->get_append_buffer(len, scratch, userdata_);
+      } else {
+        return scratch;
+      }
+    }
+   private:
+    const struct snappy_sink* ops_;
+    void* userdata_;
+  };
+}
 
 extern "C" {
 
@@ -85,6 +139,17 @@ snappy_status snappy_validate_compressed_buffer(const char *compressed,
   } else {
     return SNAPPY_INVALID_INPUT;
   }
+}
+
+snappy_status snappy_compress_stream(const struct snappy_source* source,
+                                     void* source_userdata,
+                                     const struct snappy_sink* sink,
+                                     void* sink_userdata,
+                                     size_t* compressed_length) {
+  snappy::CSource reader(source, source_userdata);
+  snappy::CSink writer(sink, sink_userdata);
+  *compressed_length = snappy::Compress(&reader, &writer);
+  return SNAPPY_OK;
 }
 
 }  // extern "C"
