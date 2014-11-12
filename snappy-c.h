@@ -131,6 +131,94 @@ snappy_status snappy_uncompressed_length(const char* compressed,
 snappy_status snappy_validate_compressed_buffer(const char* compressed,
                                                 size_t compressed_length);
 
+struct snappy_source {
+
+  /*
+   * Return the number of bytes left to read from the source
+   */
+  size_t (*available) (void* userdata);
+
+  /*
+   * Peek at the next flat region of the source. Does not reposition
+   * the source. The returned region is empty iff available() == 0.
+   *
+   * Returns a pointer to the beginning of the region and store its
+   * length in *len.
+   *
+   * The returned region is valid until the next call to the skip() or
+   * close() function pointers, whichever occurs first.
+   *
+   * The returned region may be larger than available() (for example
+   * if this ByteSource is a view on a substring of a larger source).
+   * The caller is responsible for ensuring that it only reads the
+   * available() bytes.
+   */
+  const char* (*peek) (size_t* len, void* userdata);
+
+  /*
+   * Skip the next n bytes.  Invalidates any buffer returned by
+   * a previous call to this struct's peek() function pointer.
+   * REQUIRES: available(userdata) >= n
+   */
+  void (*skip) (size_t n, void* userdata);
+
+  /*
+   * An optional function called once after the source has been exhaused.
+   * No function pointers will be called after this, so an implementation
+   * can free the userdata.
+   */
+  void (*close) (void* userdata);
+};
+
+struct snappy_sink {
+
+  /*
+   * Append "bytes[0,n-1]" to this.
+   */
+  void (*append) (const char * bytes, size_t n, void* userdata);
+
+  /*
+   * Returns a writable buffer of the specified length for appending.
+   * May return a pointer to the caller-owned scratch buffer which
+   * must have at least the indicated length.  The returned buffer is
+   * only valid until the next operation on this Sink.
+   *
+   * After writing at most "length" bytes, call append() with the
+   * pointer returned from this function and the number of bytes
+   * written.  Many append() implementations will avoid copying
+   * bytes if this function returned an internal buffer.
+   *
+   * If a non-scratch buffer is returned, the caller may only pass a
+   * prefix of it to append().  That is, it is not correct to pass an
+   * interior pointer of the returned array to append().
+   *
+   * If this function pointer is NULL then the scratch buffer will always
+   * be used.
+   */
+  char* (*get_append_buffer) (size_t length, char* scratch, void* userdata);
+
+  /*
+   * An optional function called once after the source has been exhaused.
+   * No function pointers will be called after this, so an implementation
+   * can free the userdata.
+   */
+  void (*close) (void* userdata);
+};
+
+/*
+ * Compress the bytes read from "source" structure of function pointers and
+ * passes the compressed data to the function pointers in the "sink" 
+ * structure. Returns SNAPPY_OK and stores the total length of the compressed
+ * data processed into compressed_length normally. The source_userdata and
+ * sink_userdata opaque pointers will be passed to all the functions in the
+ * source and sink structures respectively.
+ */
+snappy_status snappy_compress_stream(const struct snappy_source* source,
+                                     void* source_userdata,
+                                     const struct snappy_sink* sink,
+                                     void* sink_userdata,
+                                     size_t* compressed_length);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

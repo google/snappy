@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "snappy.h"
+#include "snappy-c.h"
 #include "snappy-internal.h"
 #include "snappy-test.h"
 #include "snappy-sinksource.h"
@@ -1125,6 +1126,69 @@ TEST(Snappy, FindMatchLengthRandom) {
   }
 }
 
+static char* stream_get_append_buffer(size_t length, char* scratch, void* userdata) {
+  return *static_cast<char**>(userdata);
+}
+static void stream_append(const char * data, size_t n, void* userdata) {
+  char** dest = static_cast<char**>(userdata);
+  if (data != *dest) {
+    memcpy(*dest, data, n);
+  }
+  *dest += n;
+}
+
+struct stream_state {
+  const char* ptr;
+  size_t left;
+};
+
+size_t stream_available(void* userdata) {
+  struct stream_state* state = static_cast<struct stream_state*>(userdata);
+  return state->left;
+}
+const char* stream_peek(size_t* len, void* userdata) {
+  struct stream_state* state = static_cast<struct stream_state*>(userdata);
+  *len = state->left;
+  return state->ptr;
+}
+void stream_skip(size_t n, void* userdata) {
+  struct stream_state* state = static_cast<struct stream_state*>(userdata);
+  state->left -= n;
+  state->ptr += n;
+}
+
+TEST(SnappyC, Stream) {
+  struct snappy_sink sink = {
+    .get_append_buffer = stream_get_append_buffer,
+    .append = stream_append
+  };
+  struct snappy_source source = {
+    .available = stream_available,
+    .peek = stream_peek,
+    .skip = stream_skip
+  };
+
+  DataEndingAtUnreadablePage input("data data data, &c.");
+  string compressed;
+  compressed.resize(MaxCompressedLength(input.size()));
+
+  struct stream_state state = {
+    .ptr = input.data(),
+    .left = input.size()
+  };
+  size_t compressed_length = 0;
+
+  EXPECT_EQ(SNAPPY_OK,
+            snappy_compress_stream(&source, &state, &sink, const_cast<char*>(compressed.data()), &compressed_length));
+  compressed.resize(compressed_length);
+  CHECK_LE(compressed_length, snappy::MaxCompressedLength(input.size()));
+  CHECK(snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
+
+  string uncompressed;
+  DataEndingAtUnreadablePage c(compressed);
+  CHECK(snappy::Uncompress(c.data(), c.size(), &uncompressed));
+  CHECK_EQ(uncompressed, input);
+}
 
 static void CompressFile(const char* fname) {
   string fullinput;
