@@ -138,7 +138,7 @@ namespace {
 const int kMaxIncrementCopyOverflow = 10;
 
 inline void IncrementalCopyFastPath(const char* src, char* op, ssize_t len) {
-  while (op - src < 8) {
+  while (PREDICT_FALSE(op - src < 8)) {
     UnalignedCopy64(src, op);
     len -= op - src;
     op += op - src;
@@ -215,7 +215,7 @@ static inline char* EmitCopyLessThan64(char* op, size_t offset, int len) {
 
 static inline char* EmitCopy(char* op, size_t offset, int len) {
   // Emit 64 byte copies but make sure to keep at least four bytes reserved
-  while (len >= 68) {
+  while (PREDICT_FALSE(len >= 68)) {
     op = EmitCopyLessThan64(op, offset, 64);
     len -= 64;
   }
