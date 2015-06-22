@@ -1147,7 +1147,8 @@ class SnappyArrayWriter {
  public:
   inline explicit SnappyArrayWriter(char* dst)
       : base_(dst),
-        op_(dst) {
+        op_(dst),
+        op_limit_(dst) {
   }
 
   inline void SetExpectedLength(size_t len) {
@@ -1254,7 +1255,7 @@ class SnappyDecompressionValidator {
   size_t produced_;
 
  public:
-  inline SnappyDecompressionValidator() : produced_(0) { }
+  inline SnappyDecompressionValidator() : expected_(0), produced_(0) { }
   inline void SetExpectedLength(size_t len) {
     expected_ = len;
   }
