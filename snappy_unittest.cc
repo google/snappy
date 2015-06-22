@@ -488,6 +488,23 @@ static int VerifyString(const string& input) {
   return uncompressed.size();
 }
 
+static void VerifyStringSink(const string& input) {
+  string compressed;
+  DataEndingAtUnreadablePage i(input);
+  const size_t written = snappy::Compress(i.data(), i.size(), &compressed);
+  CHECK_EQ(written, compressed.size());
+  CHECK_LE(compressed.size(),
+           snappy::MaxCompressedLength(input.size()));
+  CHECK(snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
+
+  string uncompressed;
+  uncompressed.resize(input.size());
+  snappy::UncheckedByteArraySink sink(string_as_array(&uncompressed));
+  DataEndingAtUnreadablePage c(compressed);
+  snappy::ByteArraySource source(c.data(), c.size());
+  CHECK(snappy::Uncompress(&source, &sink));
+  CHECK_EQ(uncompressed, input);
+}
 
 static void VerifyIOVec(const string& input) {
   string compressed;
@@ -559,6 +576,28 @@ static void VerifyNonBlockedCompression(const string& input) {
   CHECK(snappy::Uncompress(compressed.data(), compressed.size(), &uncomp_str));
   CHECK_EQ(uncomp_str, input);
 
+  // Uncompress using source/sink
+  string uncomp_str2;
+  uncomp_str2.resize(input.size());
+  snappy::UncheckedByteArraySink sink(string_as_array(&uncomp_str2));
+  snappy::ByteArraySource source(compressed.data(), compressed.size());
+  CHECK(snappy::Uncompress(&source, &sink));
+  CHECK_EQ(uncomp_str2, input);
+
+  // Uncompress into iovec
+  {
+    static const int kNumBlocks = 10;
+    struct iovec vec[kNumBlocks];
+    const int block_size = 1 + input.size() / kNumBlocks;
+    string iovec_data(block_size * kNumBlocks, 'x');
+    for (int i = 0; i < kNumBlocks; i++) {
+      vec[i].iov_base = string_as_array(&iovec_data) + i * block_size;
+      vec[i].iov_len = block_size;
+    }
+    CHECK(snappy::RawUncompressToIOVec(compressed.data(), compressed.size(),
+                                       vec, kNumBlocks));
+    CHECK_EQ(string(iovec_data.data(), input.size()), input);
+  }
 }
 
 // Expand the input so that it is at least K times as big as block size
@@ -577,6 +616,8 @@ static int Verify(const string& input) {
   // Compress using string based routines
   const int result = VerifyString(input);
 
+  // Verify using sink based routines
+  VerifyStringSink(input);
 
   VerifyNonBlockedCompression(input);
   VerifyIOVec(input);
@@ -1291,6 +1332,37 @@ static void BM_UIOVec(int iters, int arg) {
 }
 BENCHMARK(BM_UIOVec)->DenseRange(0, 4);
 
+static void BM_UFlatSink(int iters, int arg) {
+  StopBenchmarkTiming();
+
+  // Pick file to process based on "arg"
+  CHECK_GE(arg, 0);
+  CHECK_LT(arg, ARRAYSIZE(files));
+  string contents = ReadTestDataFile(files[arg].filename,
+                                     files[arg].size_limit);
+
+  string zcontents;
+  snappy::Compress(contents.data(), contents.size(), &zcontents);
+  char* dst = new char[contents.size()];
+
+  SetBenchmarkBytesProcessed(static_cast<int64>(iters) *
+                             static_cast<int64>(contents.size()));
+  SetBenchmarkLabel(files[arg].label);
+  StartBenchmarkTiming();
+  while (iters-- > 0) {
+    snappy::ByteArraySource source(zcontents.data(), zcontents.size());
+    snappy::UncheckedByteArraySink sink(dst);
+    CHECK(snappy::Uncompress(&source, &sink));
+  }
+  StopBenchmarkTiming();
+
+  string s(dst, contents.size());
+  CHECK_EQ(contents, s);
+
+  delete[] dst;
+}
+
+BENCHMARK(BM_UFlatSink)->DenseRange(0, ARRAYSIZE(files) - 1);
 
 static void BM_ZFlat(int iters, int arg) {
   StopBenchmarkTiming();

@@ -84,6 +84,18 @@ namespace snappy {
   bool Uncompress(const char* compressed, size_t compressed_length,
                   string* uncompressed);
 
+  // Decompresses "compressed" to "*uncompressed".
+  //
+  // returns false if the message is corrupted and could not be decompressed
+  bool Uncompress(Source* compressed, Sink* uncompressed);
+
+  // This routine uncompresses as much of the "compressed" as possible
+  // into sink.  It returns the number of valid bytes added to sink
+  // (extra invalid bytes may have been added due to errors; the caller
+  // should ignore those). The emitted data typically has length
+  // GetUncompressedLength(), but may be shorter if an error is
+  // encountered.
+  size_t UncompressAsMuchAsPossible(Source* compressed, Sink* uncompressed);
 
   // ------------------------------------------------------------------------
   // Lower-level character array based routines.  May be useful for
@@ -163,6 +175,14 @@ namespace snappy {
   // a factor of four faster than actual decompression.
   bool IsValidCompressedBuffer(const char* compressed,
                                size_t compressed_length);
+
+  // Returns true iff the contents of "compressed" can be uncompressed
+  // successfully.  Does not return the uncompressed data.  Takes
+  // time proportional to *compressed length, but is usually at least
+  // a factor of four faster than actual decompression.
+  // On success, consumes all of *compressed.  On failure, consumes an
+  // unspecified prefix of *compressed.
+  bool IsValidCompressed(Source* compressed);
 
   // The size of a compression block. Note that many parts of the compression
   // code assumes that kBlockSize <= 65536; in particular, the hash table

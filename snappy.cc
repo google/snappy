@@ -863,6 +863,7 @@ static bool InternalUncompressAllTags(SnappyDecompressor* decompressor,
 
   // Process the entire input
   decompressor->DecompressAllTags(writer);
+  writer->Flush();
   return (decompressor->eof() && writer->CheckLength());
 }
 
@@ -1115,6 +1116,7 @@ class SnappyIOVecWriter {
     return true;
   }
 
+  inline void Flush() {}
 };
 
 bool RawUncompressToIOVec(const char* compressed, size_t compressed_length,
@@ -1215,6 +1217,10 @@ class SnappyArrayWriter {
     op_ = op + len;
     return true;
   }
+  inline size_t Produced() const {
+    return op_ - base_;
+  }
+  inline void Flush() {}
 };
 
 bool RawUncompress(const char* compressed, size_t n, char* uncompressed) {
@@ -1269,12 +1275,18 @@ class SnappyDecompressionValidator {
     produced_ += len;
     return produced_ <= expected_;
   }
+  inline void Flush() {}
 };
 
 bool IsValidCompressedBuffer(const char* compressed, size_t n) {
   ByteArraySource reader(compressed, n);
   SnappyDecompressionValidator writer;
   return InternalUncompress(&reader, &writer);
+}
+
+bool IsValidCompressed(Source* compressed) {
+  SnappyDecompressionValidator writer;
+  return InternalUncompress(compressed, &writer);
 }
 
 void RawCompress(const char* input,
@@ -1300,6 +1312,241 @@ size_t Compress(const char* input, size_t input_length, string* compressed) {
   return compressed_length;
 }
 
+// -----------------------------------------------------------------------
+// Sink interface
+// -----------------------------------------------------------------------
+
+// A type that decompresses into a Sink. The template parameter
+// Allocator must export one method "char* Allocate(int size);", which
+// allocates a buffer of "size" and appends that to the destination.
+template <typename Allocator>
+class SnappyScatteredWriter {
+  Allocator allocator_;
+
+  // We need random access into the data generated so far.  Therefore
+  // we keep track of all of the generated data as an array of blocks.
+  // All of the blocks except the last have length kBlockSize.
+  vector<char*> blocks_;
+  size_t expected_;
+
+  // Total size of all fully generated blocks so far
+  size_t full_size_;
+
+  // Pointer into current output block
+  char* op_base_;       // Base of output block
+  char* op_ptr_;        // Pointer to next unfilled byte in block
+  char* op_limit_;      // Pointer just past block
+
+  inline size_t Size() const {
+    return full_size_ + (op_ptr_ - op_base_);
+  }
+
+  bool SlowAppend(const char* ip, size_t len);
+  bool SlowAppendFromSelf(size_t offset, size_t len);
+
+ public:
+  inline explicit SnappyScatteredWriter(const Allocator& allocator)
+      : allocator_(allocator),
+        full_size_(0),
+        op_base_(NULL),
+        op_ptr_(NULL),
+        op_limit_(NULL) {
+  }
+
+  inline void SetExpectedLength(size_t len) {
+    assert(blocks_.empty());
+    expected_ = len;
+  }
+
+  inline bool CheckLength() const {
+    return Size() == expected_;
+  }
+
+  // Return the number of bytes actually uncompressed so far
+  inline size_t Produced() const {
+    return Size();
+  }
+
+  inline bool Append(const char* ip, size_t len) {
+    size_t avail = op_limit_ - op_ptr_;
+    if (len <= avail) {
+      // Fast path
+      memcpy(op_ptr_, ip, len);
+      op_ptr_ += len;
+      return true;
+    } else {
+      return SlowAppend(ip, len);
+    }
+  }
+
+  inline bool TryFastAppend(const char* ip, size_t available, size_t length) {
+    char* op = op_ptr_;
+    const int space_left = op_limit_ - op;
+    if (length <= 16 && available >= 16 + kMaximumTagLength &&
+        space_left >= 16) {
+      // Fast path, used for the majority (about 95%) of invocations.
+      UNALIGNED_STORE64(op, UNALIGNED_LOAD64(ip));
+      UNALIGNED_STORE64(op + 8, UNALIGNED_LOAD64(ip + 8));
+      op_ptr_ = op + length;
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  inline bool AppendFromSelf(size_t offset, size_t len) {
+    // See SnappyArrayWriter::AppendFromSelf for an explanation of
+    // the "offset - 1u" trick.
+    if (offset - 1u < op_ptr_ - op_base_) {
+      const size_t space_left = op_limit_ - op_ptr_;
+      if (space_left >= len + kMaxIncrementCopyOverflow) {
+        // Fast path: src and dst in current block.
+        IncrementalCopyFastPath(op_ptr_ - offset, op_ptr_, len);
+        op_ptr_ += len;
+        return true;
+      }
+    }
+    return SlowAppendFromSelf(offset, len);
+  }
+
+  // Called at the end of the decompress. We ask the allocator
+  // write all blocks to the sink.
+  inline void Flush() { allocator_.Flush(Produced()); }
+};
+
+template<typename Allocator>
+bool SnappyScatteredWriter<Allocator>::SlowAppend(const char* ip, size_t len) {
+  size_t avail = op_limit_ - op_ptr_;
+  while (len > avail) {
+    // Completely fill this block
+    memcpy(op_ptr_, ip, avail);
+    op_ptr_ += avail;
+    assert(op_limit_ - op_ptr_ == 0);
+    full_size_ += (op_ptr_ - op_base_);
+    len -= avail;
+    ip += avail;
+
+    // Bounds check
+    if (full_size_ + len > expected_) {
+      return false;
+    }
+
+    // Make new block
+    size_t bsize = min<size_t>(kBlockSize, expected_ - full_size_);
+    op_base_ = allocator_.Allocate(bsize);
+    op_ptr_ = op_base_;
+    op_limit_ = op_base_ + bsize;
+    blocks_.push_back(op_base_);
+    avail = bsize;
+  }
+
+  memcpy(op_ptr_, ip, len);
+  op_ptr_ += len;
+  return true;
+}
+
+template<typename Allocator>
+bool SnappyScatteredWriter<Allocator>::SlowAppendFromSelf(size_t offset,
+                                                         size_t len) {
+  // Overflow check
+  // See SnappyArrayWriter::AppendFromSelf for an explanation of
+  // the "offset - 1u" trick.
+  const size_t cur = Size();
+  if (offset - 1u >= cur) return false;
+  if (expected_ - cur < len) return false;
+
+  // Currently we shouldn't ever hit this path because Compress() chops the
+  // input into blocks and does not create cross-block copies. However, it is
+  // nice if we do not rely on that, since we can get better compression if we
+  // allow cross-block copies and thus might want to change the compressor in
+  // the future.
+  size_t src = cur - offset;
+  while (len-- > 0) {
+    char c = blocks_[src >> kBlockLog][src & (kBlockSize-1)];
+    Append(&c, 1);
+    src++;
+  }
+  return true;
+}
+
+class SnappySinkAllocator {
+ public:
+  explicit SnappySinkAllocator(Sink* dest): dest_(dest) {}
+  ~SnappySinkAllocator() {}
+
+  char* Allocate(int size) {
+    Datablock block(new char[size], size);
+    blocks_.push_back(block);
+    return block.data;
+  }
+
+  // We flush only at the end, because the writer wants
+  // random access to the blocks and once we hand the
+  // block over to the sink, we can't access it anymore.
+  // Also we don't write more than has been actually written
+  // to the blocks.
+  void Flush(size_t size) {
+    size_t size_written = 0;
+    size_t block_size;
+    for (int i = 0; i < blocks_.size(); ++i) {
+      block_size = min<size_t>(blocks_[i].size, size - size_written);
+      dest_->AppendAndTakeOwnership(blocks_[i].data, block_size,
+                                    &SnappySinkAllocator::Deleter, NULL);
+      size_written += block_size;
+    }
+    blocks_.clear();
+  }
+
+ private:
+  struct Datablock {
+    char* data;
+    size_t size;
+    Datablock(char* p, size_t s) : data(p), size(s) {}
+  };
+
+  static void Deleter(void* arg, const char* bytes, size_t size) {
+    delete[] bytes;
+  }
+
+  Sink* dest_;
+  vector<Datablock> blocks_;
+
+  // Note: copying this object is allowed
+};
+
+size_t UncompressAsMuchAsPossible(Source* compressed, Sink* uncompressed) {
+  SnappySinkAllocator allocator(uncompressed);
+  SnappyScatteredWriter<SnappySinkAllocator> writer(allocator);
+  InternalUncompress(compressed, &writer);
+  return writer.Produced();
+}
+
+bool Uncompress(Source* compressed, Sink* uncompressed) {
+  // Read the uncompressed length from the front of the compressed input
+  SnappyDecompressor decompressor(compressed);
+  uint32 uncompressed_len = 0;
+  if (!decompressor.ReadUncompressedLength(&uncompressed_len)) {
+    return false;
+  }
+
+  char c;
+  size_t allocated_size;
+  char* buf = uncompressed->GetAppendBufferVariable(
+      1, uncompressed_len, &c, 1, &allocated_size);
+
+  // If we can get a flat buffer, then use it, otherwise do block by block
+  // uncompression
+  if (allocated_size >= uncompressed_len) {
+    SnappyArrayWriter writer(buf);
+    bool result = InternalUncompressAllTags(
+        &decompressor, &writer, uncompressed_len);
+    uncompressed->Append(buf, writer.Produced());
+    return result;
+  } else {
+    SnappySinkAllocator allocator(uncompressed);
+    SnappyScatteredWriter<SnappySinkAllocator> writer(allocator);
+    return InternalUncompressAllTags(&decompressor, &writer, uncompressed_len);
+  }
+}
 
 } // end namespace snappy
-
