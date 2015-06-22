@@ -160,6 +160,7 @@ static size_t MinimumRequiredOutputSpace(size_t input_size,
 
     default:
       LOG(FATAL) << "Unknown compression type number " << comp;
+      return 0;
   }
 }
 
@@ -445,7 +446,7 @@ static void Measure(const char* data,
     }
 
     compressed_size = 0;
-    for (int i = 0; i < compressed.size(); i++) {
+    for (size_t i = 0; i < compressed.size(); i++) {
       compressed_size += compressed[i].size();
     }
   }
@@ -501,13 +502,13 @@ static void VerifyIOVec(const string& input) {
   // ranging from 1 to 10.
   char* buf = new char[input.size()];
   ACMRandom rnd(input.size());
-  int num = rnd.Next() % 10 + 1;
+  size_t num = rnd.Next() % 10 + 1;
   if (input.size() < num) {
     num = input.size();
   }
   struct iovec* iov = new iovec[num];
   int used_so_far = 0;
-  for (int i = 0; i < num; ++i) {
+  for (size_t i = 0; i < num; ++i) {
     iov[i].iov_base = buf + used_so_far;
     if (i == num - 1) {
       iov[i].iov_len = input.size() - used_so_far;
@@ -617,7 +618,7 @@ TEST(CorruptedTest, VerifyCorrupted) {
   // This is testing for a security bug - a buffer that decompresses to 100k
   // but we lie in the snappy header and only reserve 0 bytes of memory :)
   source.resize(100000);
-  for (int i = 0; i < source.length(); ++i) {
+  for (size_t i = 0; i < source.length(); ++i) {
     source[i] = 'A';
   }
   snappy::Compress(source.data(), source.size(), &dest);
@@ -632,7 +633,7 @@ TEST(CorruptedTest, VerifyCorrupted) {
     // where 3 GB might be an acceptable allocation size, Uncompress()
     // attempts to decompress, and sometimes causes the test to run out of
     // memory.
-    dest[0] = dest[1] = dest[2] = dest[3] = 0xff;
+    dest[0] = dest[1] = dest[2] = dest[3] = '\xff';
     // This decodes to a really large size, i.e., about 3 GB.
     dest[4] = 'k';
     CHECK(!IsValidCompressedBuffer(dest));
@@ -642,7 +643,7 @@ TEST(CorruptedTest, VerifyCorrupted) {
   }
 
   // This decodes to about 2 MB; much smaller, but should still fail.
-  dest[0] = dest[1] = dest[2] = 0xff;
+  dest[0] = dest[1] = dest[2] = '\xff';
   dest[3] = 0x00;
   CHECK(!IsValidCompressedBuffer(dest));
   CHECK(!Uncompress(dest, &uncmp));
@@ -759,7 +760,7 @@ TEST(Snappy, RandomData) {
     }
 
     string x;
-    int len = rnd.Uniform(4096);
+    size_t len = rnd.Uniform(4096);
     if (i < 100) {
       len = 65536 + rnd.Uniform(65536);
     }
@@ -950,11 +951,11 @@ TEST(SnappyCorruption, TruncatedVarint) {
 TEST(SnappyCorruption, UnterminatedVarint) {
   string compressed, uncompressed;
   size_t ulength;
-  compressed.push_back(128);
-  compressed.push_back(128);
-  compressed.push_back(128);
-  compressed.push_back(128);
-  compressed.push_back(128);
+  compressed.push_back('\x80');
+  compressed.push_back('\x80');
+  compressed.push_back('\x80');
+  compressed.push_back('\x80');
+  compressed.push_back('\x80');
   compressed.push_back(10);
   CHECK(!CheckUncompressedLength(compressed, &ulength));
   CHECK(!snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
