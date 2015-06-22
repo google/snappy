@@ -1241,7 +1241,6 @@ bool Uncompress(const char* compressed, size_t n, string* uncompressed) {
   return RawUncompress(compressed, n, string_as_array(uncompressed));
 }
 
-
 // A Writer that drops everything on the floor and just does validation
 class SnappyDecompressionValidator {
  private:

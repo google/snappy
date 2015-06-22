@@ -59,7 +59,6 @@ DEFINE_bool(fastlz, false,
             "Run FastLZ compression (http://www.fastlz.org/");
 DEFINE_bool(snappy, true, "Run snappy compression");
 
-
 DEFINE_bool(write_compressed, false,
             "Write compressed versions of each file to <file>.comp");
 DEFINE_bool(write_uncompressed, false,
@@ -278,7 +277,6 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
       break;
     }
 
-
     default: {
       return false;     // the asked-for library wasn't compiled in
     }
@@ -369,7 +367,6 @@ static bool Uncompress(const string& compressed, CompressorType comp,
                             string_as_array(output));
       break;
     }
-
 
     default: {
       return false;     // the asked-for library wasn't compiled in
@@ -473,7 +470,6 @@ static void Measure(const char* data,
          comp_rate,
          urate.c_str());
 }
-
 
 static int VerifyString(const string& input) {
   string compressed;
@@ -589,12 +585,9 @@ static int Verify(const string& input) {
     VerifyIOVec(input);
   }
 
-
   return result;
 }
 
-// This test checks to ensure that snappy doesn't coredump if it gets
-// corrupted data.
 
 static bool IsValidCompressedBuffer(const string& c) {
   return snappy::IsValidCompressedBuffer(c.data(), c.size());
@@ -603,11 +596,13 @@ static bool Uncompress(const string& c, string* u) {
   return snappy::Uncompress(c.data(), c.size(), u);
 }
 
-TYPED_TEST(CorruptedTest, VerifyCorrupted) {
+// This test checks to ensure that snappy doesn't coredump if it gets
+// corrupted data.
+TEST(CorruptedTest, VerifyCorrupted) {
   string source = "making sure we don't crash with corrupted input";
   VLOG(1) << source;
   string dest;
-  TypeParam uncmp;
+  string uncmp;
   snappy::Compress(source.data(), source.size(), &dest);
 
   // Mess around with the data. It's hard to simulate all possible
@@ -616,8 +611,8 @@ TYPED_TEST(CorruptedTest, VerifyCorrupted) {
   dest[1]--;
   dest[3]++;
   // this really ought to fail.
-  CHECK(!IsValidCompressedBuffer(TypeParam(dest)));
-  CHECK(!Uncompress(TypeParam(dest), &uncmp));
+  CHECK(!IsValidCompressedBuffer(dest));
+  CHECK(!Uncompress(dest, &uncmp));
 
   // This is testing for a security bug - a buffer that decompresses to 100k
   // but we lie in the snappy header and only reserve 0 bytes of memory :)
@@ -627,8 +622,8 @@ TYPED_TEST(CorruptedTest, VerifyCorrupted) {
   }
   snappy::Compress(source.data(), source.size(), &dest);
   dest[0] = dest[1] = dest[2] = dest[3] = 0;
-  CHECK(!IsValidCompressedBuffer(TypeParam(dest)));
-  CHECK(!Uncompress(TypeParam(dest), &uncmp));
+  CHECK(!IsValidCompressedBuffer(dest));
+  CHECK(!Uncompress(dest, &uncmp));
 
   if (sizeof(void *) == 4) {
     // Another security check; check a crazy big length can't DoS us with an
@@ -640,8 +635,8 @@ TYPED_TEST(CorruptedTest, VerifyCorrupted) {
     dest[0] = dest[1] = dest[2] = dest[3] = 0xff;
     // This decodes to a really large size, i.e., about 3 GB.
     dest[4] = 'k';
-    CHECK(!IsValidCompressedBuffer(TypeParam(dest)));
-    CHECK(!Uncompress(TypeParam(dest), &uncmp));
+    CHECK(!IsValidCompressedBuffer(dest));
+    CHECK(!Uncompress(dest, &uncmp));
   } else {
     LOG(WARNING) << "Crazy decompression lengths not checked on 64-bit build";
   }
@@ -649,8 +644,8 @@ TYPED_TEST(CorruptedTest, VerifyCorrupted) {
   // This decodes to about 2 MB; much smaller, but should still fail.
   dest[0] = dest[1] = dest[2] = 0xff;
   dest[3] = 0x00;
-  CHECK(!IsValidCompressedBuffer(TypeParam(dest)));
-  CHECK(!Uncompress(TypeParam(dest), &uncmp));
+  CHECK(!IsValidCompressedBuffer(dest));
+  CHECK(!Uncompress(dest, &uncmp));
 
   // try reading stuff in from a bad file.
   for (int i = 1; i <= 3; ++i) {
@@ -665,8 +660,8 @@ TYPED_TEST(CorruptedTest, VerifyCorrupted) {
     snappy::ByteArraySource source(data.data(), data.size());
     CHECK(!snappy::GetUncompressedLength(&source, &ulen2) ||
           (ulen2 < (1<<20)));
-    CHECK(!IsValidCompressedBuffer(TypeParam(data)));
-    CHECK(!Uncompress(TypeParam(data), &uncmp));
+    CHECK(!IsValidCompressedBuffer(data));
+    CHECK(!Uncompress(data, &uncmp));
   }
 }
 
@@ -929,7 +924,6 @@ TEST(Snappy, IOVecCopyOverflow) {
   }
 }
 
-
 static bool CheckUncompressedLength(const string& compressed,
                                     size_t* ulength) {
   const bool result1 = snappy::GetUncompressedLength(compressed.data(),
@@ -997,7 +991,6 @@ TEST(Snappy, ZeroOffsetCopyValidation) {
   //  \x12\x00\x00      Copy with offset==0, length==5
   EXPECT_FALSE(snappy::IsValidCompressedBuffer(compressed, 4));
 }
-
 
 namespace {
 
@@ -1125,21 +1118,20 @@ TEST(Snappy, FindMatchLengthRandom) {
   }
 }
 
-
 static void CompressFile(const char* fname) {
   string fullinput;
-  file::GetContents(fname, &fullinput, file::Defaults()).CheckSuccess();
+  CHECK_OK(file::GetContents(fname, &fullinput, file::Defaults()));
 
   string compressed;
   Compress(fullinput.data(), fullinput.size(), SNAPPY, &compressed, false);
 
-  file::SetContents(string(fname).append(".comp"), compressed, file::Defaults())
-      .CheckSuccess();
+  CHECK_OK(file::SetContents(string(fname).append(".comp"), compressed,
+                             file::Defaults()));
 }
 
 static void UncompressFile(const char* fname) {
   string fullinput;
-  file::GetContents(fname, &fullinput, file::Defaults()).CheckSuccess();
+  CHECK_OK(file::GetContents(fname, &fullinput, file::Defaults()));
 
   size_t uncompLength;
   CHECK(CheckUncompressedLength(fullinput, &uncompLength));
@@ -1148,13 +1140,13 @@ static void UncompressFile(const char* fname) {
   uncompressed.resize(uncompLength);
   CHECK(snappy::Uncompress(fullinput.data(), fullinput.size(), &uncompressed));
 
-  file::SetContents(string(fname).append(".uncomp"), uncompressed,
-                    file::Defaults()).CheckSuccess();
+  CHECK_OK(file::SetContents(string(fname).append(".uncomp"), uncompressed,
+                             file::Defaults()));
 }
 
 static void MeasureFile(const char* fname) {
   string fullinput;
-  file::GetContents(fname, &fullinput, file::Defaults()).CheckSuccess();
+  CHECK_OK(file::GetContents(fname, &fullinput, file::Defaults()));
   printf("%-40s :\n", fname);
 
   int start_len = (FLAGS_start_len < 0) ? fullinput.size() : FLAGS_start_len;
@@ -1329,14 +1321,12 @@ static void BM_ZFlat(int iters, int arg) {
 }
 BENCHMARK(BM_ZFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
 
-
 }  // namespace snappy
 
 
 int main(int argc, char** argv) {
   InitGoogle(argv[0], &argc, &argv, true);
   RunSpecifiedBenchmarks();
-
 
   if (argc >= 2) {
     for (int arg = 1; arg < argc; arg++) {
