@@ -28,8 +28,8 @@
 //
 // Internals shared between the Snappy implementation and its unittest.
 
-#ifndef UTIL_SNAPPY_SNAPPY_INTERNAL_H_
-#define UTIL_SNAPPY_SNAPPY_INTERNAL_H_
+#ifndef THIRD_PARTY_SNAPPY_SNAPPY_INTERNAL_H_
+#define THIRD_PARTY_SNAPPY_SNAPPY_INTERNAL_H_
 
 #include "snappy-stubs-internal.h"
 
@@ -147,4 +147,4 @@ static inline int FindMatchLength(const char* s1,
 }  // end namespace internal
 }  // end namespace snappy
 
-#endif  // UTIL_SNAPPY_SNAPPY_INTERNAL_H_
+#endif  // THIRD_PARTY_SNAPPY_SNAPPY_INTERNAL_H_

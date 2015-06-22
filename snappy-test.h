@@ -28,8 +28,8 @@
 //
 // Various stubs for the unit tests for the open-source version of Snappy.
 
-#ifndef UTIL_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
-#define UTIL_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
+#ifndef THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
+#define THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
 
 #include <iostream>
 #include <string>
@@ -579,4 +579,4 @@ using snappy::CompressFile;
 using snappy::UncompressFile;
 using snappy::MeasureFile;
 
-#endif  // UTIL_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
+#endif  // THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_

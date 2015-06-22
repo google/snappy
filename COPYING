@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ===
 
-Some of the benchmark data in util/zippy/testdata is licensed differently:
+Some of the benchmark data in testdata/ is licensed differently:
 
  - fireworks.jpeg is Copyright 2013 Steinar H. Gunderson, and
    is licensed under the Creative Commons Attribution 3.0 license
