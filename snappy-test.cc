@@ -28,12 +28,15 @@
 //
 // Various stubs for the unit tests for the open-source version of Snappy.
 
-#include "snappy-test.h"
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #ifdef HAVE_WINDOWS_H
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
+
+#include "snappy-test.h"
 
 #include <algorithm>
 

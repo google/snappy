@@ -52,7 +52,6 @@
 #endif
 
 #ifdef HAVE_WINDOWS_H
-#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
 
@@ -548,6 +547,13 @@ class LogMessage {
     PREDICT_TRUE(condition) ? (void)0 : \
     snappy::LogMessageVoidify() & snappy::LogMessageCrash()
 
+#ifdef _MSC_VER
+// ~LogMessageCrash calls abort() and therefore never exits. This is by design
+// so temporarily disable warning C4722.
+#pragma warning(push)
+#pragma warning(disable:4722)
+#endif
+
 class LogMessageCrash : public LogMessage {
  public:
   LogMessageCrash() { }
@@ -556,6 +562,10 @@ class LogMessageCrash : public LogMessage {
     abort();
   }
 };
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 // This class is used to explicitly ignore values in the conditional
 // logging macros.  This avoids compiler warnings like "value computed
