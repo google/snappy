@@ -1,3 +1,15 @@
+Snappy v1.1.3, July 6th 2015:
+
+This is the first release to be done from GitHub, which means that
+some minor things like the ChangeLog format has changed (git log
+format instead of svn log).
+
+  * Add support for Uncompress() from a Source to a Sink.
+
+  * Various minor changes to improve MSVC support; in particular,
+    the unit tests now compile and run under MSVC.
+
+
 Snappy v1.1.2, February 28th 2014:
 
 This is a maintenance release with no changes to the actual library
