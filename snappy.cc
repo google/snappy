@@ -966,7 +966,7 @@ class SnappyIOVecWriter {
   const size_t output_iov_count_;
 
   // We are currently writing into output_iov_[curr_iov_index_].
-  int curr_iov_index_;
+  size_t curr_iov_index_;
 
   // Bytes written to output_iov_[curr_iov_index_] so far.
   size_t curr_iov_written_;
@@ -977,7 +977,7 @@ class SnappyIOVecWriter {
   // Maximum number of bytes that will be decompressed into output_iov_.
   size_t output_limit_;
 
-  inline char* GetIOVecPointer(int index, size_t offset) {
+  inline char* GetIOVecPointer(size_t index, size_t offset) {
     return reinterpret_cast<char*>(output_iov_[index].iov_base) +
         offset;
   }
@@ -1058,7 +1058,7 @@ class SnappyIOVecWriter {
     }
 
     // Locate the iovec from which we need to start the copy.
-    int from_iov_index = curr_iov_index_;
+    size_t from_iov_index = curr_iov_index_;
     size_t from_iov_offset = curr_iov_written_;
     while (offset > 0) {
       if (from_iov_offset >= offset) {
@@ -1067,8 +1067,8 @@ class SnappyIOVecWriter {
       }
 
       offset -= from_iov_offset;
+      assert(from_iov_index > 0);
       --from_iov_index;
-      assert(from_iov_index >= 0);
       from_iov_offset = output_iov_[from_iov_index].iov_len;
     }
 
