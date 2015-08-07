@@ -107,7 +107,7 @@ significantly more user-friendly. You can find Google Test at
 You probably also want the gflags library for handling of command-line flags;
 you can find it at
 
-  http://code.google.com/p/google-gflags/
+  http://gflags.github.io/gflags/
 
 In addition to the unit tests, snappy contains microbenchmarks used to
 tune compression and decompression performance. These are automatically run
@@ -132,4 +132,4 @@ Contact
 Snappy is distributed through Google Code. For the latest version, a bug tracker,
 and other information, see
 
-  http://code.google.com/p/snappy/
+  https://github.com/google/snappy
