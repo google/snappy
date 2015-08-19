@@ -64,6 +64,9 @@ DEFINE_bool(write_compressed, false,
 DEFINE_bool(write_uncompressed, false,
             "Write uncompressed versions of each file to <file>.uncomp");
 
+DEFINE_bool(snappy_dump_decompression_table, false,
+            "If true, we print the decompression table during tests.");
+
 namespace snappy {
 
 
@@ -1157,6 +1160,100 @@ TEST(Snappy, FindMatchLengthRandom) {
         EXPECT_EQ(s[j], t[j]);
       }
     }
+  }
+}
+
+static uint16 MakeEntry(unsigned int extra,
+                        unsigned int len,
+                        unsigned int copy_offset) {
+  // Check that all of the fields fit within the allocated space
+  assert(extra       == (extra & 0x7));          // At most 3 bits
+  assert(copy_offset == (copy_offset & 0x7));    // At most 3 bits
+  assert(len         == (len & 0x7f));           // At most 7 bits
+  return len | (copy_offset << 8) | (extra << 11);
+}
+
+// Check that the decompression table is correct, and optionally print out
+// the computed one.
+TEST(Snappy, VerifyCharTable) {
+  using snappy::internal::LITERAL;
+  using snappy::internal::COPY_1_BYTE_OFFSET;
+  using snappy::internal::COPY_2_BYTE_OFFSET;
+  using snappy::internal::COPY_4_BYTE_OFFSET;
+  using snappy::internal::char_table;
+  using snappy::internal::wordmask;
+
+  uint16 dst[256];
+
+  // Place invalid entries in all places to detect missing initialization
+  int assigned = 0;
+  for (int i = 0; i < 256; i++) {
+    dst[i] = 0xffff;
+  }
+
+  // Small LITERAL entries.  We store (len-1) in the top 6 bits.
+  for (unsigned int len = 1; len <= 60; len++) {
+    dst[LITERAL | ((len-1) << 2)] = MakeEntry(0, len, 0);
+    assigned++;
+  }
+
+  // Large LITERAL entries.  We use 60..63 in the high 6 bits to
+  // encode the number of bytes of length info that follow the opcode.
+  for (unsigned int extra_bytes = 1; extra_bytes <= 4; extra_bytes++) {
+    // We set the length field in the lookup table to 1 because extra
+    // bytes encode len-1.
+    dst[LITERAL | ((extra_bytes+59) << 2)] = MakeEntry(extra_bytes, 1, 0);
+    assigned++;
+  }
+
+  // COPY_1_BYTE_OFFSET.
+  //
+  // The tag byte in the compressed data stores len-4 in 3 bits, and
+  // offset/256 in 5 bits.  offset%256 is stored in the next byte.
+  //
+  // This format is used for length in range [4..11] and offset in
+  // range [0..2047]
+  for (unsigned int len = 4; len < 12; len++) {
+    for (unsigned int offset = 0; offset < 2048; offset += 256) {
+      dst[COPY_1_BYTE_OFFSET | ((len-4)<<2) | ((offset>>8)<<5)] =
+        MakeEntry(1, len, offset>>8);
+      assigned++;
+    }
+  }
+
+  // COPY_2_BYTE_OFFSET.
+  // Tag contains len-1 in top 6 bits, and offset in next two bytes.
+  for (unsigned int len = 1; len <= 64; len++) {
+    dst[COPY_2_BYTE_OFFSET | ((len-1)<<2)] = MakeEntry(2, len, 0);
+    assigned++;
+  }
+
+  // COPY_4_BYTE_OFFSET.
+  // Tag contents len-1 in top 6 bits, and offset in next four bytes.
+  for (unsigned int len = 1; len <= 64; len++) {
+    dst[COPY_4_BYTE_OFFSET | ((len-1)<<2)] = MakeEntry(4, len, 0);
+    assigned++;
+  }
+
+  // Check that each entry was initialized exactly once.
+  EXPECT_EQ(256, assigned) << "Assigned only " << assigned << " of 256";
+  for (int i = 0; i < 256; i++) {
+    EXPECT_NE(0xffff, dst[i]) << "Did not assign byte " << i;
+  }
+
+  if (FLAGS_snappy_dump_decompression_table) {
+    printf("static const uint16 char_table[256] = {\n  ");
+    for (int i = 0; i < 256; i++) {
+      printf("0x%04x%s",
+             dst[i],
+             ((i == 255) ? "\n" : (((i%8) == 7) ? ",\n  " : ", ")));
+    }
+    printf("};\n");
+  }
+
+  // Check that computed table matched recorded table.
+  for (int i = 0; i < 256; i++) {
+    EXPECT_EQ(dst[i], char_table[i]) << "Mismatch in byte " << i;
   }
 }
 
