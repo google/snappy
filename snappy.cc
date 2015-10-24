@@ -95,7 +95,7 @@ size_t MaxCompressedLength(size_t source_len) {
 //    ababababababababababab
 // Note that this does not match the semantics of either memcpy()
 // or memmove().
-static inline void IncrementalCopy(const char* src, char* op, ssize_t len) {
+static inline void IncrementalCopy(const char* src, char* op, ptrdiff_t len) {
   assert(len > 0);
   do {
     *op++ = *src++;
@@ -137,7 +137,7 @@ namespace {
 
 const int kMaxIncrementCopyOverflow = 10;
 
-inline void IncrementalCopyFastPath(const char* src, char* op, ssize_t len) {
+inline void IncrementalCopyFastPath(const char* src, char* op, ptrdiff_t len) {
   while (PREDICT_FALSE(op - src < 8)) {
     UnalignedCopy64(src, op);
     len -= op - src;
