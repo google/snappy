@@ -196,6 +196,7 @@ void Test_Snappy_RandomData();
 void Test_Snappy_FourByteOffset();
 void Test_SnappyCorruption_TruncatedVarint();
 void Test_SnappyCorruption_UnterminatedVarint();
+void Test_SnappyCorruption_OverflowingVarint();
 void Test_Snappy_ReadPastEndOfBuffer();
 void Test_Snappy_FindMatchLength();
 void Test_Snappy_FindMatchLengthRandom();
@@ -500,6 +501,7 @@ static inline int RUN_ALL_TESTS() {
   snappy::Test_Snappy_FourByteOffset();
   snappy::Test_SnappyCorruption_TruncatedVarint();
   snappy::Test_SnappyCorruption_UnterminatedVarint();
+  snappy::Test_SnappyCorruption_OverflowingVarint();
   snappy::Test_Snappy_ReadPastEndOfBuffer();
   snappy::Test_Snappy_FindMatchLength();
   snappy::Test_Snappy_FindMatchLengthRandom();

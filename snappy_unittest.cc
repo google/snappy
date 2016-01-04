@@ -1007,6 +1007,20 @@ TEST(SnappyCorruption, UnterminatedVarint) {
                             &uncompressed));
 }
 
+TEST(SnappyCorruption, OverflowingVarint) {
+  string compressed, uncompressed;
+  size_t ulength;
+  compressed.push_back('\xfb');
+  compressed.push_back('\xff');
+  compressed.push_back('\xff');
+  compressed.push_back('\xff');
+  compressed.push_back('\x7f');
+  CHECK(!CheckUncompressedLength(compressed, &ulength));
+  CHECK(!snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
+  CHECK(!snappy::Uncompress(compressed.data(), compressed.size(),
+                            &uncompressed));
+}
+
 TEST(Snappy, ReadPastEndOfBuffer) {
   // Check that we do not read past end of input
 

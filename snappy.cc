@@ -545,7 +545,9 @@ class SnappyDecompressor {
       if (n == 0) return false;
       const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip));
       reader_->Skip(1);
-      *result |= static_cast<uint32>(c & 0x7f) << shift;
+      uint32 val = c & 0x7f;
+      if (((val << shift) >> shift) != val) return false;
+      *result |= val << shift;
       if (c < 128) {
         break;
       }
