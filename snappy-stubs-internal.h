@@ -140,6 +140,12 @@ static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
       !defined(__ARM_ARCH_6ZK__) && \
       !defined(__ARM_ARCH_6T2__)
 
+#if __GNUC__
+#define ATTRIBUTE_PACKED __attribute__((__packed__))
+#else
+#define ATTRIBUTE_PACKED
+#endif
+
 namespace base {
 namespace internal {
 
