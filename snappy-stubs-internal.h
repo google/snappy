@@ -163,15 +163,15 @@ struct Unaligned32Struct {
 }  // namespace base
 
 #define UNALIGNED_LOAD16(_p) \
-    ((reinterpret_cast<const ::base::internal::Unaligned16Struct *>(_p))->value)
+    ((reinterpret_cast<const ::snappy::base::internal::Unaligned16Struct *>(_p))->value)
 #define UNALIGNED_LOAD32(_p) \
-    ((reinterpret_cast<const ::base::internal::Unaligned32Struct *>(_p))->value)
+    ((reinterpret_cast<const ::snappy::base::internal::Unaligned32Struct *>(_p))->value)
 
 #define UNALIGNED_STORE16(_p, _val) \
-    ((reinterpret_cast<::base::internal::Unaligned16Struct *>(_p))->value = \
+    ((reinterpret_cast< ::snappy::base::internal::Unaligned16Struct *>(_p))->value = \
          (_val))
 #define UNALIGNED_STORE32(_p, _val) \
-    ((reinterpret_cast<::base::internal::Unaligned32Struct *>(_p))->value = \
+    ((reinterpret_cast< ::snappy::base::internal::Unaligned32Struct *>(_p))->value = \
          (_val))
 
 // TODO(user): NEON supports unaligned 64-bit loads and stores.
