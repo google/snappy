@@ -1,18 +1,26 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "snappy", "snappy.vcproj", "{9C2150BB-37DC-4D32-99F9-C76DC1A48939}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Express 2013 for Windows Desktop
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "snappy", "snappy.vcxproj", "{9C2150BB-37DC-4D32-99F9-C76DC1A48939}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Win32 = Debug|Win32
-		Release|Win32 = Release|Win32
+		Debug|win32 = Debug|win32
+		Debug|win64 = Debug|win64
+		Release|win32 = Release|win32
+		Release|win64 = Release|win64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Debug|Win32.ActiveCfg = Debug|Win32
-		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Debug|Win32.Build.0 = Debug|Win32
-		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Release|Win32.ActiveCfg = Release|Win32
-		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Release|Win32.Build.0 = Release|Win32
+		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Debug|win32.ActiveCfg = Debug|Win32
+		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Debug|win32.Build.0 = Debug|Win32
+		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Debug|win64.ActiveCfg = Debug|x64
+		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Debug|win64.Build.0 = Debug|x64
+		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Release|win32.ActiveCfg = Release|Win32
+		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Release|win32.Build.0 = Release|Win32
+		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Release|win64.ActiveCfg = Release|x64
+		{9C2150BB-37DC-4D32-99F9-C76DC1A48939}.Release|win64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
