@@ -46,6 +46,7 @@
 #endif
 
 #include "snappy-stubs-public.h"
+#include "snappy-visibility.h"
 
 #if defined(__x86_64__)
 
@@ -426,8 +427,9 @@ inline int Bits::FindLSBSetNonZero64(uint64 n) {
 
 #endif  // End portable versions.
 
-// Variable-length integer encoding.
-class Varint {
+// Variable-length integer encoding (This is used by the unit tests
+// so we need to export it out of the shared object)
+class SNAPPY_PUBLIC_API Varint {
  public:
   // Maximum lengths of varint encoding of uint32.
   static const int kMax32 = 5;

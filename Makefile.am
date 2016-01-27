@@ -4,6 +4,7 @@ ACLOCAL_AMFLAGS = -I m4
 lib_LTLIBRARIES = libsnappy.la
 libsnappy_la_SOURCES = snappy.cc snappy-sinksource.cc snappy-stubs-internal.cc snappy-c.cc
 libsnappy_la_LDFLAGS = -version-info $(SNAPPY_LTVERSION)
+libsnappy_la_LDFLAGS = -Dsnappy_EXPORTS
 
 include_HEADERS = snappy.h snappy-sinksource.h snappy-stubs-public.h snappy-c.h
 noinst_HEADERS = snappy-internal.h snappy-stubs-internal.h snappy-test.h
