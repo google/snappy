@@ -36,6 +36,7 @@
 #include <windows.h>
 #endif
 
+#include "snappy.h"
 #include "snappy-test.h"
 
 #include <algorithm>

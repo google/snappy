@@ -36,7 +36,6 @@
 #include <string>
 #include <vector>
 
-
 namespace snappy {
 
 using internal::COPY_1_BYTE_OFFSET;
