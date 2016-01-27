@@ -92,4 +92,8 @@
    significant byte first (like Motorola and SPARC, unlike Intel and VAX). */
 #cmakedefine WORDS_BIGENDIAN
 
+#if defined(_MSC_VER) && (_MSC_VER <= 1900)
+typedef __int64 ssize_t;
+#endif
+
 #endif
