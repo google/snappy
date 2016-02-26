@@ -2,6 +2,9 @@
 rm -rf autom4te.cache
 aclocal -I m4
 autoheader
-libtoolize --copy
+case `uname` in 
+    Darwin*) glibtoolize --copy ;;
+    *) libtoolize --copy ;;
+esac
 automake --add-missing --copy
 autoconf
