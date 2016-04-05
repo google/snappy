@@ -47,12 +47,12 @@
 
 #include "snappy-stubs-public.h"
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__aarch64__)
 
 // Enable 64-bit optimized versions of some routines.
 #define ARCH_K8 1
 
-#endif
+#endif //__x86_64__ || __aarch64__
 
 // Needed by OS X, among others.
 #ifndef MAP_ANONYMOUS
