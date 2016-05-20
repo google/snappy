@@ -9,6 +9,7 @@ m4_define([snappy_ltversion], [4:0:3])
 
 AC_INIT([snappy], [snappy_major.snappy_minor.snappy_patchlevel])
 AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_AUX_DIR([.])
 
 # These are flags passed to automake (though they look like gcc flags!)
 AM_INIT_AUTOMAKE([-Wall])
