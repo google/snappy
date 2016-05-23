@@ -130,5 +130,5 @@ AC_SUBST([SNAPPY_PATCHLEVEL])
 AC_SUBST([SNAPPY_LTVERSION], snappy_ltversion)
 
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile snappy-stubs-public.h])
+AC_CONFIG_FILES([Makefile snappy-stubs-public.h snappy.pc])
 AC_OUTPUT
