@@ -1151,7 +1151,7 @@ void RawCompress(const char* input,
 
 size_t Compress(const char* input, size_t input_length, string* compressed) {
   // Pre-grow the buffer to the max length of the compressed output
-  compressed->resize(MaxCompressedLength(input_length));
+  STLStringResizeUninitialized(compressed, MaxCompressedLength(input_length));
 
   size_t compressed_length;
   RawCompress(input, input_length, string_as_array(compressed),
