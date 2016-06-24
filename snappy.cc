@@ -614,15 +614,15 @@ class SnappyDecompressor {
         ip += literal_length;
         MAYBE_REFILL();
       } else {
-        const uint32 entry = char_table[c];
-        const uint32 trailer = LittleEndian::Load32(ip) & wordmask[entry >> 11];
-        const uint32 length = entry & 0xff;
+        const size_t entry = char_table[c];
+        const size_t trailer = LittleEndian::Load32(ip) & wordmask[entry >> 11];
+        const size_t length = entry & 0xff;
         ip += entry >> 11;
 
         // copy_offset/256 is encoded in bits 8..10.  By just fetching
         // those bits, we get copy_offset (since the bit-field starts at
         // bit 8).
-        const uint32 copy_offset = entry & 0x700;
+        const size_t copy_offset = entry & 0x700;
         if (!writer->AppendFromSelf(copy_offset + trailer, length)) {
           return;
         }
