@@ -157,26 +157,30 @@ static inline char* EmitLiteral(char* op,
                                 const char* literal,
                                 int len,
                                 bool allow_fast_path) {
-  int n = len - 1;      // Zero-length literals are disallowed
-  if (n < 60) {
+  // The vast majority of copies are below 16 bytes, for which a
+  // call to memcpy is overkill. This fast path can sometimes
+  // copy up to 15 bytes too much, but that is okay in the
+  // main loop, since we have a bit to go on for both sides:
+  //
+  //   - The input will always have kInputMarginBytes = 15 extra
+  //     available bytes, as long as we're in the main loop, and
+  //     if not, allow_fast_path = false.
+  //   - The output will always have 32 spare bytes (see
+  //     MaxCompressedLength).
+  assert(len > 0);      // Zero-length literals are disallowed
+  int n = len - 1;
+  if (allow_fast_path && len <= 16) {
     // Fits in tag byte
     *op++ = LITERAL | (n << 2);
 
-    // The vast majority of copies are below 16 bytes, for which a
-    // call to memcpy is overkill. This fast path can sometimes
-    // copy up to 15 bytes too much, but that is okay in the
-    // main loop, since we have a bit to go on for both sides:
-    //
-    //   - The input will always have kInputMarginBytes = 15 extra
-    //     available bytes, as long as we're in the main loop, and
-    //     if not, allow_fast_path = false.
-    //   - The output will always have 32 spare bytes (see
-    //     MaxCompressedLength).
-    if (allow_fast_path && len <= 16) {
-      UnalignedCopy64(literal, op);
-      UnalignedCopy64(literal + 8, op + 8);
-      return op + len;
-    }
+    UnalignedCopy64(literal, op);
+    UnalignedCopy64(literal + 8, op + 8);
+    return op + len;
+  }
+
+  if (n < 60) {
+    // Fits in tag byte
+    *op++ = LITERAL | (n << 2);
   } else {
     // Encode in upcoming bytes
     char* base = op;
