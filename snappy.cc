@@ -41,7 +41,6 @@ namespace snappy {
 
 using internal::COPY_1_BYTE_OFFSET;
 using internal::COPY_2_BYTE_OFFSET;
-using internal::COPY_4_BYTE_OFFSET;
 using internal::LITERAL;
 using internal::char_table;
 using internal::kMaximumTagLength;
@@ -199,42 +198,54 @@ static inline char* EmitLiteral(char* op,
   return op + len;
 }
 
-static inline char* EmitCopyLessThan64(char* op, size_t offset, int len) {
+static inline char* EmitCopyAtMost64(char* op, size_t offset, size_t len,
+                                     bool len_less_than_12) {
   assert(len <= 64);
   assert(len >= 4);
   assert(offset < 65536);
+  assert(len_less_than_12 == (len < 12));
 
-  if ((len < 12) && (offset < 2048)) {
-    size_t len_minus_4 = len - 4;
-    assert(len_minus_4 < 8);            // Must fit in 3 bits
-    *op++ = COPY_1_BYTE_OFFSET + ((len_minus_4) << 2) + ((offset >> 8) << 5);
+  if (len_less_than_12 && PREDICT_TRUE(offset < 2048)) {
+    // offset fits in 11 bits.  The 3 highest go in the top of the first byte,
+    // and the rest go in the second byte.
+    *op++ = COPY_1_BYTE_OFFSET + ((len - 4) << 2) + ((offset >> 3) & 0xe0);
     *op++ = offset & 0xff;
   } else {
-    *op++ = COPY_2_BYTE_OFFSET + ((len-1) << 2);
-    LittleEndian::Store16(op, offset);
-    op += 2;
+    // Write 4 bytes, though we only care about 3 of them.  The output buffer
+    // is required to have some slack, so the extra byte won't overrun it.
+    uint32 u = COPY_2_BYTE_OFFSET + ((len - 1) << 2) + (offset << 8);
+    LittleEndian::Store32(op, u);
+    op += 3;
   }
   return op;
 }
 
-static inline char* EmitCopy(char* op, size_t offset, int len) {
-  // Emit 64 byte copies but make sure to keep at least four bytes reserved
-  while (PREDICT_FALSE(len >= 68)) {
-    op = EmitCopyLessThan64(op, offset, 64);
-    len -= 64;
-  }
+static inline char* EmitCopy(char* op, size_t offset, size_t len,
+                             bool len_less_than_12) {
+  assert(len_less_than_12 == (len < 12));
+  if (len_less_than_12) {
+    return EmitCopyAtMost64(op, offset, len, true);
+  } else {
+    // A special case for len <= 64 might help, but so far measurements suggest
+    // it's in the noise.
 
-  // Emit an extra 60 byte copy if have too much data to fit in one copy
-  if (len > 64) {
-    op = EmitCopyLessThan64(op, offset, 60);
-    len -= 60;
-  }
+    // Emit 64 byte copies but make sure to keep at least four bytes reserved.
+    while (PREDICT_FALSE(len >= 68)) {
+      op = EmitCopyAtMost64(op, offset, 64, false);
+      len -= 64;
+    }
 
-  // Emit remainder
-  op = EmitCopyLessThan64(op, offset, len);
-  return op;
+    // One or two copies will now finish the job.
+    if (len > 64) {
+      op = EmitCopyAtMost64(op, offset, 60, false);
+      len -= 60;
+    }
+
+    // Emit remainder.
+    op = EmitCopyAtMost64(op, offset, len, len < 12);
+    return op;
+  }
 }
-
 
 bool GetUncompressedLength(const char* start, size_t n, size_t* result) {
   uint32 v = 0;
@@ -422,19 +433,20 @@ char* CompressFragment(const char* input,
         // We have a 4-byte match at ip, and no need to emit any
         // "literal bytes" prior to ip.
         const char* base = ip;
-        int matched = 4 + FindMatchLength(candidate + 4, ip + 4, ip_end);
+        pair<size_t, bool> p = FindMatchLength(candidate + 4, ip + 4, ip_end);
+        size_t matched = 4 + p.first;
         ip += matched;
         size_t offset = base - candidate;
         assert(0 == memcmp(base, candidate, matched));
-        op = EmitCopy(op, offset, matched);
-        // We could immediately start working at ip now, but to improve
-        // compression we first update table[Hash(ip - 1, ...)].
-        const char* insert_tail = ip - 1;
+        op = EmitCopy(op, offset, matched, p.second);
         next_emit = ip;
         if (PREDICT_FALSE(ip >= ip_limit)) {
           goto emit_remainder;
         }
-        input_bytes = GetEightBytesAt(insert_tail);
+        // We are now looking for a 4-byte match again.  We read
+        // table[Hash(ip, shift)] for that.  To improve compression,
+        // we also update table[Hash(ip - 1, shift)] and table[Hash(ip, shift)].
+        input_bytes = GetEightBytesAt(ip - 1);
         uint32 prev_hash = HashBytes(GetUint32AtOffset(input_bytes, 0), shift);
         table[prev_hash] = ip - base_ip - 1;
         uint32 cur_hash = HashBytes(GetUint32AtOffset(input_bytes, 1), shift);

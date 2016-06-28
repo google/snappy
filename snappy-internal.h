@@ -70,11 +70,12 @@ char* CompressFragment(const char* input,
                        uint16* table,
                        const int table_size);
 
-// Return the largest n such that
+// Find the largest n such that
 //
 //   s1[0,n-1] == s2[0,n-1]
 //   and n <= (s2_limit - s2).
 //
+// Return make_pair(n, n < 8).
 // Does not read *s2_limit or beyond.
 // Does not read *(s1 + (s2_limit - s2)) or beyond.
 // Requires that s2_limit >= s2.
@@ -82,11 +83,27 @@ char* CompressFragment(const char* input,
 // Separate implementation for x86_64, for speed.  Uses the fact that
 // x86_64 is little endian.
 #if defined(ARCH_K8)
-static inline int FindMatchLength(const char* s1,
-                                  const char* s2,
-                                  const char* s2_limit) {
+static inline pair<size_t, bool> FindMatchLength(const char* s1,
+                                                 const char* s2,
+                                                 const char* s2_limit) {
   assert(s2_limit >= s2);
-  int matched = 0;
+  size_t matched = 0;
+
+  // This block isn't necessary for correctness; we could just start looping
+  // immediately.  As an optimization though, it is useful.  It creates some not
+  // uncommon code paths that determine, without extra effort, whether the match
+  // length is less than 8.  In short, we are hoping to avoid a conditional
+  // branch, and perhaps get better code layout from the C++ compiler.
+  if (PREDICT_TRUE(s2 <= s2_limit - 8)) {
+    uint64 a1 = UNALIGNED_LOAD64(s1);
+    uint64 a2 = UNALIGNED_LOAD64(s2);
+    if (a1 != a2) {
+      return pair<size_t, bool>(Bits::FindLSBSetNonZero64(a1 ^ a2) >> 3, true);
+    } else {
+      matched = 8;
+      s2 += 8;
+    }
+  }
 
   // Find out how long the match is. We loop over the data 64 bits at a
   // time until we find a 64-bit block that doesn't match; then we find
@@ -97,14 +114,11 @@ static inline int FindMatchLength(const char* s1,
       s2 += 8;
       matched += 8;
     } else {
-      // On current (mid-2008) Opteron models there is a 3% more
-      // efficient code sequence to find the first non-matching byte.
-      // However, what follows is ~10% better on Intel Core 2 and newer,
-      // and we expect AMD's bsf instruction to improve.
       uint64 x = UNALIGNED_LOAD64(s2) ^ UNALIGNED_LOAD64(s1 + matched);
       int matching_bits = Bits::FindLSBSetNonZero64(x);
       matched += matching_bits >> 3;
-      return matched;
+      assert(matched >= 8);
+      return pair<size_t, bool>(matched, false);
     }
   }
   while (PREDICT_TRUE(s2 < s2_limit)) {
@@ -112,15 +126,15 @@ static inline int FindMatchLength(const char* s1,
       ++s2;
       ++matched;
     } else {
-      return matched;
+      return pair<size_t, bool>(matched, matched < 8);
     }
   }
-  return matched;
+  return pair<size_t, bool>(matched, matched < 8);
 }
 #else
-static inline int FindMatchLength(const char* s1,
-                                  const char* s2,
-                                  const char* s2_limit) {
+static inline pair<size_t, bool> FindMatchLength(const char* s1,
+                                                 const char* s2,
+                                                 const char* s2_limit) {
   // Implementation based on the x86-64 version, above.
   assert(s2_limit >= s2);
   int matched = 0;
@@ -140,7 +154,7 @@ static inline int FindMatchLength(const char* s1,
       ++matched;
     }
   }
-  return matched;
+  return pair<size_t, bool>(matched, matched < 8);
 }
 #endif
 
