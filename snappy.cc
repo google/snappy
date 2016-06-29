@@ -578,6 +578,10 @@ class SnappyDecompressor {
   template <class Writer>
   void DecompressAllTags(Writer* writer) {
     const char* ip = ip_;
+    // For position-independent executables, accessing global arrays can be
+    // slow.  Move wordmask array onto the stack to mitigate this.
+    uint32 wordmask[sizeof(internal::wordmask)/sizeof(uint32)];
+    memcpy(wordmask, internal::wordmask, sizeof(wordmask));
 
     // We could have put this refill fragment only at the beginning of the loop.
     // However, duplicating it at the end of each branch gives the compiler more
