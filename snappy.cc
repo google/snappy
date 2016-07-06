@@ -1067,19 +1067,41 @@ class SnappyArrayWriter {
     if (produced <= offset - 1u) {
       return false;
     }
-    if (len <= 16 && offset >= 8 && space_left >= 16) {
-      // Fast path, used for the majority (70-80%) of dynamic invocations.
+    if (offset >= 8 && space_left >= 16) {
       UnalignedCopy64(op - offset, op);
       UnalignedCopy64(op - offset + 8, op + 8);
-    } else {
-      if (space_left >= len + kMaxIncrementCopyOverflow) {
-        IncrementalCopyFastPath(op - offset, op, len);
+      if (PREDICT_TRUE(len <= 16)) {
+        // Fast path, used for the majority (70-80%) of dynamic invocations.
+        op_ = op + len;
+        return true;
+      }
+      op += 16;
+      // Copy 8 bytes at a time.  This will write as many as 7 bytes more
+      // than necessary, so we check if space_left >= len + 7.
+      if (space_left >= len + 7) {
+        const char* src = op - offset;
+        ssize_t l = len - 16;  // 16 bytes were already handled, above.
+        do {
+          UnalignedCopy64(src, op);
+          src += 8;
+          op += 8;
+          l -= 8;
+        } while (l > 0);
+        // l is now negative if we wrote extra bytes; adjust op_ accordingly.
+        op_ = op + l;
+        return true;
+      } else if (space_left < len) {
+        return false;
       } else {
-        if (space_left < len) {
-          return false;
-        }
+        len -= 16;
         IncrementalCopy(op - offset, op, len);
       }
+    } else if (space_left >= len + kMaxIncrementCopyOverflow) {
+      IncrementalCopyFastPath(op - offset, op, len);
+    } else if (space_left < len) {
+      return false;
+    } else {
+      IncrementalCopy(op - offset, op, len);
     }
 
     op_ = op + len;
