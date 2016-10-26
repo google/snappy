@@ -944,7 +944,7 @@ bool SnappyDecompressor::RefillTag() {
       const char *src = reader_->Peek(&length);
       if (length == 0)
         return false;
-      uint32 to_add = std::min<uint32>(needed - nbuf, length);
+      uint32_t to_add = std::min<uint32>(needed - nbuf, length);
       memcpy(scratch_ + nbuf, src, to_add);
       nbuf += to_add;
       reader_->Skip(to_add);
