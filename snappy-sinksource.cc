@@ -36,12 +36,12 @@ Source::~Source() { }
 
 Sink::~Sink() { }
 
-char* Sink::GetAppendBuffer(size_t length, char* scratch) {
+char* Sink::GetAppendBuffer(size_t /*length*/, char* scratch) {
   return scratch;
 }
 
 char* Sink::GetAppendBufferVariable(
-      size_t min_size, size_t desired_size_hint, char* scratch,
+    size_t /*min_size*/, size_t /*desired_size_hint*/, char* scratch,
       size_t scratch_size, size_t* allocated_size) {
   *allocated_size = scratch_size;
   return scratch;
@@ -79,7 +79,8 @@ void UncheckedByteArraySink::Append(const char* data, size_t n) {
   dest_ += n;
 }
 
-char* UncheckedByteArraySink::GetAppendBuffer(size_t len, char* scratch) {
+char* UncheckedByteArraySink::GetAppendBuffer(
+      size_t /*len*/, char* /*scratch*/) {
   return dest_;
 }
 
@@ -95,8 +96,8 @@ void UncheckedByteArraySink::AppendAndTakeOwnership(
 }
 
 char* UncheckedByteArraySink::GetAppendBufferVariable(
-      size_t min_size, size_t desired_size_hint, char* scratch,
-      size_t scratch_size, size_t* allocated_size) {
+    size_t /*min_size*/, size_t desired_size_hint, char* /*scratch*/,
+      size_t /*scratch_size*/, size_t* allocated_size) {
   *allocated_size = desired_size_hint;
   return dest_;
 }

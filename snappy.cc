@@ -1358,11 +1358,12 @@ public:
   inline SnappyDecompressionValidator() : expected_(0), produced_(0) {}
   inline void SetExpectedLength(size_t len) { expected_ = len; }
   inline bool CheckLength() const { return expected_ == produced_; }
-  inline bool Append(const char *ip, size_t len) {
+  inline bool Append(const char * /*ip*/, size_t len) {
     produced_ += len;
     return produced_ <= expected_;
   }
-  inline bool TryFastAppend(const char *ip, size_t available, size_t length) {
+  inline bool TryFastAppend(const char * /*ip*/, size_t /*available*/,
+                            size_t /*length*/) {
     return false;
   }
   inline bool AppendFromSelf(size_t offset, size_t len) {
@@ -1588,7 +1589,7 @@ private:
     Datablock(char *p, size_t s) : data(p), size(s) {}
   };
 
-  static void Deleter(void *arg, const char *bytes, size_t size) {
+  static void Deleter(void * /*arg*/, const char *bytes, size_t /*size*/) {
     delete[] bytes;
   }
 
