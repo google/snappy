@@ -393,10 +393,10 @@ static void Measure(const char* data,
   {
     // Chop the input into blocks
     int num_blocks = (length + block_size - 1) / block_size;
-    vector<const char*> input(num_blocks);
-    vector<size_t> input_length(num_blocks);
-    vector<string> compressed(num_blocks);
-    vector<string> output(num_blocks);
+    std::vector<const char*> input(num_blocks);
+    std::vector<size_t> input_length(num_blocks);
+    std::vector<string> compressed(num_blocks);
+    std::vector<string> output(num_blocks);
     for (int b = 0; b < num_blocks; b++) {
       int input_start = b * block_size;
       int input_limit = min<int>((b+1)*block_size, length);
@@ -1054,7 +1054,8 @@ TEST(Snappy, ZeroOffsetCopyValidation) {
 namespace {
 
 int TestFindMatchLength(const char* s1, const char *s2, unsigned length) {
-  pair<size_t, bool> p = snappy::internal::FindMatchLength(s1, s2, s2 + length);
+  std::pair<size_t, bool> p =
+      snappy::internal::FindMatchLength(s1, s2, s2 + length);
   CHECK_EQ(p.first < 8, p.second);
   return p.first;
 }

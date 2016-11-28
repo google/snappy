@@ -433,7 +433,8 @@ char* CompressFragment(const char* input,
         // We have a 4-byte match at ip, and no need to emit any
         // "literal bytes" prior to ip.
         const char* base = ip;
-        pair<size_t, bool> p = FindMatchLength(candidate + 4, ip + 4, ip_end);
+        std::pair<size_t, bool> p =
+            FindMatchLength(candidate + 4, ip + 4, ip_end);
         size_t matched = 4 + p.first;
         ip += matched;
         size_t offset = base - candidate;
@@ -1216,7 +1217,7 @@ class SnappyScatteredWriter {
   // We need random access into the data generated so far.  Therefore
   // we keep track of all of the generated data as an array of blocks.
   // All of the blocks except the last have length kBlockSize.
-  vector<char*> blocks_;
+  std::vector<char*> blocks_;
   size_t expected_;
 
   // Total size of all fully generated blocks so far
@@ -1399,7 +1400,7 @@ class SnappySinkAllocator {
   }
 
   Sink* dest_;
-  vector<Datablock> blocks_;
+  std::vector<Datablock> blocks_;
 
   // Note: copying this object is allowed
 };

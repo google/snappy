@@ -83,9 +83,9 @@ char* CompressFragment(const char* input,
 // Separate implementation for x86_64, for speed.  Uses the fact that
 // x86_64 is little endian.
 #if defined(ARCH_K8)
-static inline pair<size_t, bool> FindMatchLength(const char* s1,
-                                                 const char* s2,
-                                                 const char* s2_limit) {
+static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
+                                                      const char* s2,
+                                                      const char* s2_limit) {
   assert(s2_limit >= s2);
   size_t matched = 0;
 
@@ -98,7 +98,8 @@ static inline pair<size_t, bool> FindMatchLength(const char* s1,
     uint64 a1 = UNALIGNED_LOAD64(s1);
     uint64 a2 = UNALIGNED_LOAD64(s2);
     if (a1 != a2) {
-      return pair<size_t, bool>(Bits::FindLSBSetNonZero64(a1 ^ a2) >> 3, true);
+      return std::pair<size_t, bool>(Bits::FindLSBSetNonZero64(a1 ^ a2) >> 3,
+                                     true);
     } else {
       matched = 8;
       s2 += 8;
@@ -118,7 +119,7 @@ static inline pair<size_t, bool> FindMatchLength(const char* s1,
       int matching_bits = Bits::FindLSBSetNonZero64(x);
       matched += matching_bits >> 3;
       assert(matched >= 8);
-      return pair<size_t, bool>(matched, false);
+      return std::pair<size_t, bool>(matched, false);
     }
   }
   while (PREDICT_TRUE(s2 < s2_limit)) {
@@ -126,15 +127,15 @@ static inline pair<size_t, bool> FindMatchLength(const char* s1,
       ++s2;
       ++matched;
     } else {
-      return pair<size_t, bool>(matched, matched < 8);
+      return std::pair<size_t, bool>(matched, matched < 8);
     }
   }
-  return pair<size_t, bool>(matched, matched < 8);
+  return std::pair<size_t, bool>(matched, matched < 8);
 }
 #else
-static inline pair<size_t, bool> FindMatchLength(const char* s1,
-                                                 const char* s2,
-                                                 const char* s2_limit) {
+static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
+                                                      const char* s2,
+                                                      const char* s2_limit) {
   // Implementation based on the x86-64 version, above.
   assert(s2_limit >= s2);
   int matched = 0;
@@ -154,7 +155,7 @@ static inline pair<size_t, bool> FindMatchLength(const char* s1,
       ++matched;
     }
   }
-  return pair<size_t, bool>(matched, matched < 8);
+  return std::pair<size_t, bool>(matched, matched < 8);
 }
 #endif
 
