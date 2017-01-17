@@ -64,11 +64,14 @@ set(Snappy_sources
   "snappy-stubs-internal.cc"
   "snappy-c.cc"
 )
+add_definitions(
+  -fPIC
+)
 add_library(snappy STATIC
   "${Snappy_sources}"
 )
 
-if(ENABLE_TESTS)
+if(ENABLE_SNAPPY_TESTS)
   add_definitions(
     -DHAVE_CONFIG_H
   )
@@ -112,4 +115,4 @@ if(ENABLE_TESTS)
     COMMAND ${CMAKE_COMMAND} -E copy_directory
       "${Snappy_SOURCE_DIR}/testdata" "${Snappy_BINARY_DIR}/testdata"
   )
-endif(ENABLE_TESTS)
+endif(ENABLE_SNAPPY_TESTS)
