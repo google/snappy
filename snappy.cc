@@ -30,6 +30,9 @@
 #include "snappy-internal.h"
 #include "snappy-sinksource.h"
 
+#if defined(__x86_64__) || defined(_M_X64)
+#include <emmintrin.h>
+#endif
 #include <stdio.h>
 
 #include <algorithm>
@@ -83,71 +86,125 @@ size_t MaxCompressedLength(size_t source_len) {
   return 32 + source_len + source_len/6;
 }
 
-// Copy "len" bytes from "src" to "op", one byte at a time.  Used for
-// handling COPY operations where the input and output regions may
-// overlap.  For example, suppose:
-//    src    == "ab"
-//    op     == src + 2
-//    len    == 20
-// After IncrementalCopy(src, op, len), the result will have
-// eleven copies of "ab"
-//    ababababababababababab
-// Note that this does not match the semantics of either memcpy()
-// or memmove().
-static inline void IncrementalCopy(const char* src, char* op, ssize_t len) {
-  assert(len > 0);
-  do {
-    *op++ = *src++;
-  } while (--len > 0);
-}
-
-// Equivalent to IncrementalCopy except that it can write up to ten extra
-// bytes after the end of the copy, and that it is faster.
-//
-// The main part of this loop is a simple copy of eight bytes at a time until
-// we've copied (at least) the requested amount of bytes.  However, if op and
-// src are less than eight bytes apart (indicating a repeating pattern of
-// length < 8), we first need to expand the pattern in order to get the correct
-// results. For instance, if the buffer looks like this, with the eight-byte
-// <src> and <op> patterns marked as intervals:
-//
-//    abxxxxxxxxxxxx
-//    [------]           src
-//      [------]         op
-//
-// a single eight-byte copy from <src> to <op> will repeat the pattern once,
-// after which we can move <op> two bytes without moving <src>:
-//
-//    ababxxxxxxxxxx
-//    [------]           src
-//        [------]       op
-//
-// and repeat the exercise until the two no longer overlap.
-//
-// This allows us to do very well in the special case of one single byte
-// repeated many times, without taking a big hit for more general cases.
-//
-// The worst case of extra writing past the end of the match occurs when
-// op - src == 1 and len == 1; the last copy will read from byte positions
-// [0..7] and write to [4..11], whereas it was only supposed to write to
-// position 1. Thus, ten excess bytes.
-
 namespace {
 
-const int kMaxIncrementCopyOverflow = 10;
+void UnalignedCopy64(const void* src, void* dst) {
+  memcpy(dst, src, 8);
+}
 
-inline void IncrementalCopyFastPath(const char* src, char* op, ssize_t len) {
-  while (PREDICT_FALSE(op - src < 8)) {
-    UnalignedCopy64(src, op);
-    len -= op - src;
-    op += op - src;
+void UnalignedCopy128(const void* src, void* dst) {
+  // TODO(alkis): Remove this when we upgrade to a recent compiler that emits
+  // SSE2 moves for memcpy(dst, src, 16).
+#ifdef __SSE2__
+  __m128i x = _mm_loadu_si128(static_cast<const __m128i*>(src));
+  _mm_storeu_si128(static_cast<__m128i*>(dst), x);
+#else
+  memcpy(dst, src, 16);
+#endif
+}
+
+// Copy [src, src+(op_limit-op)) to [op, (op_limit-op)) a byte at a time. Used
+// for handling COPY operations where the input and output regions may overlap.
+// For example, suppose:
+//    src       == "ab"
+//    op        == src + 2
+//    op_limit  == op + 20
+// After IncrementalCopySlow(src, op, op_limit), the result will have eleven
+// copies of "ab"
+//    ababababababababababab
+// Note that this does not match the semantics of either memcpy() or memmove().
+inline char* IncrementalCopySlow(const char* src, char* op,
+                                 char* const op_limit) {
+  while (op < op_limit) {
+    *op++ = *src++;
   }
-  while (len > 0) {
+  return op_limit;
+}
+
+// Copy [src, src+(op_limit-op)) to [op, (op_limit-op)) but faster than
+// IncrementalCopySlow. buf_limit is the address past the end of the writable
+// region of the buffer.
+inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
+                             char* const buf_limit) {
+  // Terminology:
+  //
+  // slop = buf_limit - op
+  // pat  = op - src
+  // len  = limit - op
+  assert(src < op);
+  assert(op_limit <= buf_limit);
+  // NOTE: The compressor always emits 4 <= len <= 64. It is ok to assume that
+  // to optimize this function but we have to also handle these cases in case
+  // the input does not satisfy these conditions.
+
+  size_t pattern_size = op - src;
+  // The cases are split into different branches to allow the branch predictor,
+  // FDO, and static prediction hints to work better. For each input we list the
+  // ratio of invocations that match each condition.
+  //
+  // input        slop < 16   pat < 8  len > 16
+  // ------------------------------------------
+  // html|html4|cp   0%         1.01%    27.73%
+  // urls            0%         0.88%    14.79%
+  // jpg             0%        64.29%     7.14%
+  // pdf             0%         2.56%    58.06%
+  // txt[1-4]        0%         0.23%     0.97%
+  // pb              0%         0.96%    13.88%
+  // bin             0.01%     22.27%    41.17%
+  //
+  // It is very rare that we don't have enough slop for doing block copies. It
+  // is also rare that we need to expand a pattern. Small patterns are common
+  // for incompressible formats and for those we are plenty fast already.
+  // Lengths are normally not greater than 16 but they vary depending on the
+  // input. In general if we always predict len <= 16 it would be an ok
+  // prediction.
+  //
+  // In order to be fast we want a pattern >= 8 bytes and an unrolled loop
+  // copying 2x 8 bytes at a time.
+
+  // Handle the uncommon case where pattern is less than 8 bytes.
+  if (PREDICT_FALSE(pattern_size < 8)) {
+    // Expand pattern to at least 8 bytes. The worse case scenario in terms of
+    // buffer usage is when the pattern is size 3. ^ is the original position
+    // of op. x are irrelevant bytes copied by the last UnalignedCopy64.
+    //
+    // abc
+    // abcabcxxxxx
+    // abcabcabcabcxxxxx
+    //    ^
+    // The last x is 14 bytes after ^.
+    if (PREDICT_TRUE(op <= buf_limit - 14)) {
+      while (pattern_size < 8) {
+        UnalignedCopy64(src, op);
+        op += pattern_size;
+        pattern_size *= 2;
+      }
+      if (PREDICT_TRUE(op >= op_limit)) return op_limit;
+    } else {
+      return IncrementalCopySlow(src, op, op_limit);
+    }
+  }
+  assert(pattern_size >= 8);
+
+  // Copy 2x 8 bytes at a time. Because op - src can be < 16, a single
+  // UnalignedCopy128 might overwrite data in op. UnalignedCopy64 is safe
+  // because expanding the pattern to at least 8 bytes guarantees that
+  // op - src >= 8.
+  while (op <= buf_limit - 16) {
+    UnalignedCopy64(src, op);
+    UnalignedCopy64(src + 8, op + 8);
+    src += 16;
+    op += 16;
+    if (PREDICT_TRUE(op >= op_limit)) return op_limit;
+  }
+  // We only take this branch if we didn't have enough slop and we can do a
+  // single 8 byte copy.
+  if (PREDICT_FALSE(op <= buf_limit - 8)) {
     UnalignedCopy64(src, op);
     src += 8;
     op += 8;
-    len -= 8;
   }
+  return IncrementalCopySlow(src, op, op_limit);
 }
 
 }  // namespace
@@ -172,8 +229,7 @@ static inline char* EmitLiteral(char* op,
     // Fits in tag byte
     *op++ = LITERAL | (n << 2);
 
-    UnalignedCopy64(literal, op);
-    UnalignedCopy64(literal + 8, op + 8);
+    UnalignedCopy128(literal, op);
     return op + len;
   }
 
@@ -599,7 +655,19 @@ class SnappyDecompressor {
     for ( ;; ) {
       const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip++));
 
-      if ((c & 0x3) == LITERAL) {
+      // Ratio of iterations that have LITERAL vs non-LITERAL for different
+      // inputs.
+      //
+      // input          LITERAL  NON_LITERAL
+      // -----------------------------------
+      // html|html4|cp   23%        77%
+      // urls            36%        64%
+      // jpg             47%        53%
+      // pdf             19%        81%
+      // txt[1-4]        25%        75%
+      // pb              24%        76%
+      // bin             24%        76%
+      if (PREDICT_FALSE((c & 0x3) == LITERAL)) {
         size_t literal_length = (c >> 2) + 1u;
         if (writer->TryFastAppend(ip, ip_limit_ - ip, literal_length)) {
           assert(literal_length < 61);
@@ -663,10 +731,8 @@ bool SnappyDecompressor::RefillTag() {
     size_t n;
     ip = reader_->Peek(&n);
     peeked_ = n;
-    if (n == 0) {
-      eof_ = true;
-      return false;
-    }
+    eof_ = (n == 0);
+    if (eof_) return false;
     ip_limit_ = ip + n;
   }
 
@@ -906,8 +972,7 @@ class SnappyIOVecWriter {
         output_iov_[curr_iov_index_].iov_len - curr_iov_written_ >= 16) {
       // Fast path, used for the majority (about 95%) of invocations.
       char* ptr = GetIOVecPointer(curr_iov_index_, curr_iov_written_);
-      UnalignedCopy64(ip, ptr);
-      UnalignedCopy64(ip + 8, ptr + 8);
+      UnalignedCopy128(ip, ptr);
       curr_iov_written_ += len;
       total_written_ += len;
       return true;
@@ -971,9 +1036,10 @@ class SnappyIOVecWriter {
         if (to_copy > len) {
           to_copy = len;
         }
-        IncrementalCopy(GetIOVecPointer(from_iov_index, from_iov_offset),
-                        GetIOVecPointer(curr_iov_index_, curr_iov_written_),
-                        to_copy);
+        IncrementalCopySlow(
+            GetIOVecPointer(from_iov_index, from_iov_offset),
+            GetIOVecPointer(curr_iov_index_, curr_iov_written_),
+            GetIOVecPointer(curr_iov_index_, curr_iov_written_) + to_copy);
         curr_iov_written_ += to_copy;
         from_iov_offset += to_copy;
         total_written_ += to_copy;
@@ -1043,8 +1109,7 @@ class SnappyArrayWriter {
     const size_t space_left = op_limit_ - op;
     if (len <= 16 && available >= 16 + kMaximumTagLength && space_left >= 16) {
       // Fast path, used for the majority (about 95%) of invocations.
-      UnalignedCopy64(ip, op);
-      UnalignedCopy64(ip + 8, op + 8);
+      UnalignedCopy128(ip, op);
       op_ = op + len;
       return true;
     } else {
@@ -1053,8 +1118,7 @@ class SnappyArrayWriter {
   }
 
   inline bool AppendFromSelf(size_t offset, size_t len) {
-    char* op = op_;
-    const size_t space_left = op_limit_ - op;
+    char* const op_end = op_ + len;
 
     // Check if we try to append from before the start of the buffer.
     // Normally this would just be a check for "produced < offset",
@@ -1063,52 +1127,13 @@ class SnappyArrayWriter {
     // to a very big number. This is convenient, as offset==0 is another
     // invalid case that we also want to catch, so that we do not go
     // into an infinite loop.
-    assert(op >= base_);
-    size_t produced = op - base_;
-    if (produced <= offset - 1u) {
-      return false;
-    }
-    if (offset >= 8 && space_left >= 16) {
-      UnalignedCopy64(op - offset, op);
-      UnalignedCopy64(op - offset + 8, op + 8);
-      if (PREDICT_TRUE(len <= 16)) {
-        // Fast path, used for the majority (70-80%) of dynamic invocations.
-        op_ = op + len;
-        return true;
-      }
-      op += 16;
-      // Copy 8 bytes at a time.  This will write as many as 7 bytes more
-      // than necessary, so we check if space_left >= len + 7.
-      if (space_left >= len + 7) {
-        const char* src = op - offset;
-        ssize_t l = len - 16;  // 16 bytes were already handled, above.
-        do {
-          UnalignedCopy64(src, op);
-          src += 8;
-          op += 8;
-          l -= 8;
-        } while (l > 0);
-        // l is now negative if we wrote extra bytes; adjust op_ accordingly.
-        op_ = op + l;
-        return true;
-      } else if (space_left < len) {
-        return false;
-      } else {
-        len -= 16;
-        IncrementalCopy(op - offset, op, len);
-      }
-    } else if (space_left >= len + kMaxIncrementCopyOverflow) {
-      IncrementalCopyFastPath(op - offset, op, len);
-    } else if (space_left < len) {
-      return false;
-    } else {
-      IncrementalCopy(op - offset, op, len);
-    }
+    if (Produced() <= offset - 1u || op_end > op_limit_) return false;
+    op_ = IncrementalCopy(op_ - offset, op_, op_end, op_limit_);
 
-    op_ = op + len;
     return true;
   }
   inline size_t Produced() const {
+    assert(op_ >= base_);
     return op_ - base_;
   }
   inline void Flush() {}
@@ -1276,8 +1301,7 @@ class SnappyScatteredWriter {
     if (length <= 16 && available >= 16 + kMaximumTagLength &&
         space_left >= 16) {
       // Fast path, used for the majority (about 95%) of invocations.
-      UNALIGNED_STORE64(op, UNALIGNED_LOAD64(ip));
-      UNALIGNED_STORE64(op + 8, UNALIGNED_LOAD64(ip + 8));
+      UnalignedCopy128(ip, op);
       op_ptr_ = op + length;
       return true;
     } else {
@@ -1286,16 +1310,13 @@ class SnappyScatteredWriter {
   }
 
   inline bool AppendFromSelf(size_t offset, size_t len) {
+    char* const op_end = op_ptr_ + len;
     // See SnappyArrayWriter::AppendFromSelf for an explanation of
     // the "offset - 1u" trick.
-    if (offset - 1u < op_ptr_ - op_base_) {
-      const size_t space_left = op_limit_ - op_ptr_;
-      if (space_left >= len + kMaxIncrementCopyOverflow) {
-        // Fast path: src and dst in current block.
-        IncrementalCopyFastPath(op_ptr_ - offset, op_ptr_, len);
-        op_ptr_ += len;
-        return true;
-      }
+    if (PREDICT_TRUE(offset - 1u < op_ptr_ - op_base_ && op_end <= op_limit_)) {
+      // Fast path: src and dst in current block.
+      op_ptr_ = IncrementalCopy(op_ptr_ - offset, op_ptr_, op_end, op_limit_);
+      return true;
     }
     return SlowAppendFromSelf(offset, len);
   }
