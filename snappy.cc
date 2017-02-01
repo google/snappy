@@ -527,6 +527,10 @@ char* CompressFragment(const char* input,
 }
 }  // end namespace internal
 
+// Called back at avery compression call to trace parameters and sizes.
+static inline void Report(const char *algorithm, size_t compressed_size,
+                          size_t uncompressed_size) {}
+
 // Signature of output types needed by decompression code.
 // The decompression code is templatized on a type that obeys this
 // signature so that we do not pay virtual function call overhead in
@@ -786,13 +790,18 @@ static bool InternalUncompress(Source* r, Writer* writer) {
   SnappyDecompressor decompressor(r);
   uint32 uncompressed_len = 0;
   if (!decompressor.ReadUncompressedLength(&uncompressed_len)) return false;
-  return InternalUncompressAllTags(&decompressor, writer, uncompressed_len);
+
+  return InternalUncompressAllTags(&decompressor, writer, r->Available(),
+                                   uncompressed_len);
 }
 
 template <typename Writer>
 static bool InternalUncompressAllTags(SnappyDecompressor* decompressor,
                                       Writer* writer,
+                                      uint32 compressed_len,
                                       uint32 uncompressed_len) {
+  Report("snappy_uncompress", compressed_len, uncompressed_len);
+
   writer->SetExpectedLength(uncompressed_len);
 
   // Process the entire input
@@ -809,6 +818,7 @@ bool GetUncompressedLength(Source* source, uint32* result) {
 size_t Compress(Source* reader, Sink* writer) {
   size_t written = 0;
   size_t N = reader->Available();
+  const size_t uncompressed_size = N;
   char ulength[Varint::kMax32];
   char* p = Varint::Encode32(ulength, N);
   writer->Append(ulength, p-ulength);
@@ -880,6 +890,8 @@ size_t Compress(Source* reader, Sink* writer) {
     N -= num_to_read;
     reader->Skip(pending_advance);
   }
+
+  Report("snappy_compress", written, uncompressed_size);
 
   delete[] scratch;
   delete[] scratch_output;
@@ -1446,18 +1458,20 @@ bool Uncompress(Source* compressed, Sink* uncompressed) {
   char* buf = uncompressed->GetAppendBufferVariable(
       1, uncompressed_len, &c, 1, &allocated_size);
 
+  const size_t compressed_len = compressed->Available();
   // If we can get a flat buffer, then use it, otherwise do block by block
   // uncompression
   if (allocated_size >= uncompressed_len) {
     SnappyArrayWriter writer(buf);
-    bool result = InternalUncompressAllTags(
-        &decompressor, &writer, uncompressed_len);
+    bool result = InternalUncompressAllTags(&decompressor, &writer,
+                                            compressed_len, uncompressed_len);
     uncompressed->Append(buf, writer.Produced());
     return result;
   } else {
     SnappySinkAllocator allocator(uncompressed);
     SnappyScatteredWriter<SnappySinkAllocator> writer(allocator);
-    return InternalUncompressAllTags(&decompressor, &writer, uncompressed_len);
+    return InternalUncompressAllTags(&decompressor, &writer, compressed_len,
+                                     uncompressed_len);
   }
 }
 
