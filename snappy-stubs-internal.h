@@ -47,8 +47,8 @@
 
 #include "snappy-stubs-public.h"
 
-#if defined(__x86_64__)
-
+#if defined(__x86_64__) || \
+    (defined(__powerpc64__) && (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__))
 // Enable 64-bit optimized versions of some routines.
 #define ARCH_K8 1
 
