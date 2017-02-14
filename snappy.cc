@@ -89,7 +89,9 @@ size_t MaxCompressedLength(size_t source_len) {
 namespace {
 
 void UnalignedCopy64(const void* src, void* dst) {
-  memcpy(dst, src, 8);
+  char tmp[8];
+  memcpy(tmp, src, 8);
+  memcpy(dst, tmp, 8);
 }
 
 void UnalignedCopy128(const void* src, void* dst) {
@@ -99,7 +101,9 @@ void UnalignedCopy128(const void* src, void* dst) {
   __m128i x = _mm_loadu_si128(static_cast<const __m128i*>(src));
   _mm_storeu_si128(static_cast<__m128i*>(dst), x);
 #else
-  memcpy(dst, src, 16);
+  char tmp[16];
+  memcpy(tmp, src, 16);
+  memcpy(dst, tmp, 16);
 #endif
 }
 
