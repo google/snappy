@@ -454,8 +454,8 @@ static void Measure(const char* data,
     }
   }
 
-  sort(ctime, ctime + kRuns);
-  sort(utime, utime + kRuns);
+  std::sort(ctime, ctime + kRuns);
+  std::sort(utime, utime + kRuns);
   const int med = kRuns/2;
 
   float comp_rate = (length / ctime[med]) * repeats / 1048576.0;
