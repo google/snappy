@@ -225,20 +225,6 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 
 #endif
 
-// This can be more efficient than UNALIGNED_LOAD64 + UNALIGNED_STORE64
-// on some platforms, in particular ARM.
-inline void UnalignedCopy64(const void *src, void *dst) {
-  if (sizeof(void *) == 8) {
-    UNALIGNED_STORE64(dst, UNALIGNED_LOAD64(src));
-  } else {
-    const char *src_char = reinterpret_cast<const char *>(src);
-    char *dst_char = reinterpret_cast<char *>(dst);
-
-    UNALIGNED_STORE32(dst_char, UNALIGNED_LOAD32(src_char));
-    UNALIGNED_STORE32(dst_char + 4, UNALIGNED_LOAD32(src_char + 4));
-  }
-}
-
 // The following guarantees declaration of the byte swap functions.
 #ifdef WORDS_BIGENDIAN
 
