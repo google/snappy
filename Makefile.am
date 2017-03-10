@@ -24,3 +24,8 @@ nodist_pkgconfig_DATA = snappy.pc
 
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
+
+# Needed by autoconf because we use README.md instead of README.
+# See http://stackoverflow.com/q/15013672/
+README: README.md
+	cat $< > $@.tmp

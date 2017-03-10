@@ -1,0 +1,12 @@
+language: cpp
+compiler:
+- clang
+- gcc
+os:
+- linux
+sudo: false
+before_install:
+- echo $LANG
+- echo $LC_ALL
+script:
+- ./autogen.sh && ./configure && make -j 4 check
