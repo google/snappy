@@ -765,7 +765,7 @@ bool SnappyDecompressor::RefillTag() {
       size_t length;
       const char* src = reader_->Peek(&length);
       if (length == 0) return false;
-      uint32 to_add = min<uint32>(needed - nbuf, length);
+      uint32 to_add = std::min<uint32>(needed - nbuf, length);
       memcpy(scratch_ + nbuf, src, to_add);
       nbuf += to_add;
       reader_->Skip(to_add);
@@ -837,7 +837,7 @@ size_t Compress(Source* reader, Sink* writer) {
     size_t fragment_size;
     const char* fragment = reader->Peek(&fragment_size);
     assert(fragment_size != 0);  // premature end of input
-    const size_t num_to_read = min(N, kBlockSize);
+    const size_t num_to_read = std::min(N, kBlockSize);
     size_t bytes_read = fragment_size;
 
     size_t pending_advance = 0;
@@ -858,7 +858,7 @@ size_t Compress(Source* reader, Sink* writer) {
 
       while (bytes_read < num_to_read) {
         fragment = reader->Peek(&fragment_size);
-        size_t n = min<size_t>(fragment_size, num_to_read - bytes_read);
+        size_t n = std::min<size_t>(fragment_size, num_to_read - bytes_read);
         memcpy(scratch + bytes_read, fragment, n);
         bytes_read += n;
         reader->Skip(n);
@@ -1360,7 +1360,7 @@ bool SnappyScatteredWriter<Allocator>::SlowAppend(const char* ip, size_t len) {
     }
 
     // Make new block
-    size_t bsize = min<size_t>(kBlockSize, expected_ - full_size_);
+    size_t bsize = std::min<size_t>(kBlockSize, expected_ - full_size_);
     op_base_ = allocator_.Allocate(bsize);
     op_ptr_ = op_base_;
     op_limit_ = op_base_ + bsize;
@@ -1417,7 +1417,7 @@ class SnappySinkAllocator {
     size_t size_written = 0;
     size_t block_size;
     for (int i = 0; i < blocks_.size(); ++i) {
-      block_size = min<size_t>(blocks_[i].size, size - size_written);
+      block_size = std::min<size_t>(blocks_[i].size, size - size_written);
       dest_->AppendAndTakeOwnership(blocks_[i].data, block_size,
                                     &SnappySinkAllocator::Deleter, NULL);
       size_written += block_size;

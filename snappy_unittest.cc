@@ -399,7 +399,7 @@ static void Measure(const char* data,
     std::vector<string> output(num_blocks);
     for (int b = 0; b < num_blocks; b++) {
       int input_start = b * block_size;
-      int input_limit = min<int>((b+1)*block_size, length);
+      int input_limit = std::min<int>((b+1)*block_size, length);
       input[b] = data+input_start;
       input_length[b] = input_limit-input_start;
 
@@ -470,7 +470,7 @@ static void Measure(const char* data,
          x.c_str(),
          block_size/(1<<20),
          static_cast<int>(length), static_cast<uint32>(compressed_size),
-         (compressed_size * 100.0) / max<int>(1, length),
+         (compressed_size * 100.0) / std::max<int>(1, length),
          comp_rate,
          urate.c_str());
 }
@@ -1307,7 +1307,7 @@ static void MeasureFile(const char* fname) {
   int start_len = (FLAGS_start_len < 0) ? fullinput.size() : FLAGS_start_len;
   int end_len = fullinput.size();
   if (FLAGS_end_len >= 0) {
-    end_len = min<int>(fullinput.size(), FLAGS_end_len);
+    end_len = std::min<int>(fullinput.size(), FLAGS_end_len);
   }
   for (int len = start_len; len <= end_len; len++) {
     const char* const input = fullinput.data();

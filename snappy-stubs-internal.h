@@ -59,10 +59,6 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-// Pull in std::min, std::ostream, and the likes. This is safe because this
-// header file is never used from any public header files.
-using namespace std;
-
 // The size of an array, if known at compile-time.
 // Will give unexpected results if used on a pointer.
 // We undefine it first, since some compilers already have a definition.

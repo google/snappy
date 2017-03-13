@@ -138,7 +138,8 @@ namespace file {
     void CheckSuccess() { }
   };
 
-  DummyStatus GetContents(const string& filename, string* data, int unused) {
+  DummyStatus GetContents(
+      const std::string& filename, std::string* data, int unused) {
     FILE* fp = fopen(filename.c_str(), "rb");
     if (fp == NULL) {
       perror(filename.c_str());
@@ -153,7 +154,7 @@ namespace file {
         perror("fread");
         exit(1);
       }
-      data->append(string(buf, ret));
+      data->append(std::string(buf, ret));
     }
 
     fclose(fp);
@@ -161,8 +162,8 @@ namespace file {
     return DummyStatus();
   }
 
-  DummyStatus SetContents(const string& filename,
-                          const string& str,
+  DummyStatus SetContents(const std::string& filename,
+                          const std::string& str,
                           int unused) {
     FILE* fp = fopen(filename.c_str(), "wb");
     if (fp == NULL) {
@@ -529,15 +530,15 @@ class LogMessage {
  public:
   LogMessage() { }
   ~LogMessage() {
-    cerr << endl;
+    std::cerr << std::endl;
   }
 
   LogMessage& operator<<(const std::string& msg) {
-    cerr << msg;
+    std::cerr << msg;
     return *this;
   }
   LogMessage& operator<<(int x) {
-    cerr << x;
+    std::cerr << x;
     return *this;
   }
 };
@@ -560,7 +561,7 @@ class LogMessageCrash : public LogMessage {
  public:
   LogMessageCrash() { }
   ~LogMessageCrash() {
-    cerr << endl;
+    std::cerr << std::endl;
     abort();
   }
 };

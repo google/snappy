@@ -201,7 +201,7 @@ void Benchmark::Run() {
     if (benchmark_real_time_us > 0) {
       num_iterations = 200000 * kCalibrateIterations / benchmark_real_time_us;
     }
-    num_iterations = max(num_iterations, kCalibrateIterations);
+    num_iterations = std::max(num_iterations, kCalibrateIterations);
     BenchmarkRun benchmark_runs[kNumRuns];
 
     for (int run = 0; run < kNumRuns; ++run) {
@@ -217,10 +217,10 @@ void Benchmark::Run() {
     string heading = StringPrintf("%s/%d", name_.c_str(), test_case_num);
     string human_readable_speed;
 
-    nth_element(benchmark_runs,
-                benchmark_runs + kMedianPos,
-                benchmark_runs + kNumRuns,
-                BenchmarkCompareCPUTime());
+    std::nth_element(benchmark_runs,
+                     benchmark_runs + kMedianPos,
+                     benchmark_runs + kNumRuns,
+                     BenchmarkCompareCPUTime());
     int64 real_time_us = benchmark_runs[kMedianPos].real_time_us;
     int64 cpu_time_us = benchmark_runs[kMedianPos].cpu_time_us;
     if (cpu_time_us <= 0) {
@@ -523,8 +523,8 @@ int ZLib::UncompressAtMostOrAll(Bytef *dest, uLongf *destLen,
     LOG(WARNING)
       << "UncompressChunkOrAll: Received some extra data, bytes total: "
       << uncomp_stream_.avail_in << " bytes: "
-      << string(reinterpret_cast<const char *>(uncomp_stream_.next_in),
-                min(int(uncomp_stream_.avail_in), 20));
+      << std::string(reinterpret_cast<const char *>(uncomp_stream_.next_in),
+                     std::min(int(uncomp_stream_.avail_in), 20));
     UncompressErrorInit();
     return Z_DATA_ERROR;       // what's the extra data for?
   } else if (err != Z_OK && err != Z_STREAM_END && err != Z_BUF_ERROR) {
