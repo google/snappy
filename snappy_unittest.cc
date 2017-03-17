@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "snappy.h"
@@ -68,7 +69,6 @@ DEFINE_bool(snappy_dump_decompression_table, false,
             "If true, we print the decompression table during tests.");
 
 namespace snappy {
-
 
 #ifdef HAVE_FUNC_MMAP
 
@@ -1197,7 +1197,6 @@ TEST(Snappy, VerifyCharTable) {
   using snappy::internal::COPY_2_BYTE_OFFSET;
   using snappy::internal::COPY_4_BYTE_OFFSET;
   using snappy::internal::char_table;
-  using snappy::internal::wordmask;
 
   uint16 dst[256];
 
@@ -1509,7 +1508,6 @@ BENCHMARK(BM_ZFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
 
 }  // namespace snappy
 
-
 int main(int argc, char** argv) {
   InitGoogle(argv[0], &argc, &argv, true);
   RunSpecifiedBenchmarks();
@@ -1517,11 +1515,11 @@ int main(int argc, char** argv) {
   if (argc >= 2) {
     for (int arg = 1; arg < argc; arg++) {
       if (FLAGS_write_compressed) {
-        CompressFile(argv[arg]);
+        snappy::CompressFile(argv[arg]);
       } else if (FLAGS_write_uncompressed) {
-        UncompressFile(argv[arg]);
+        snappy::UncompressFile(argv[arg]);
       } else {
-        MeasureFile(argv[arg]);
+        snappy::MeasureFile(argv[arg]);
       }
     }
     return 0;

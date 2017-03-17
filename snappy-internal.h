@@ -170,11 +170,6 @@ enum {
 };
 static const int kMaximumTagLength = 5;  // COPY_4_BYTE_OFFSET plus the actual offset.
 
-// Mapping from i in range [0,4] to a mask to extract the bottom 8*i bits
-static const uint32 wordmask[] = {
-  0u, 0xffu, 0xffffu, 0xffffffu, 0xffffffffu
-};
-
 // Data stored per entry in lookup table:
 //      Range   Bits-used       Description
 //      ------------------------------------

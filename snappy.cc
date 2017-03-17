@@ -47,7 +47,6 @@ using internal::COPY_2_BYTE_OFFSET;
 using internal::LITERAL;
 using internal::char_table;
 using internal::kMaximumTagLength;
-using internal::wordmask;
 
 // Any hash function will produce a valid compressed bitstream, but a good
 // hash function reduces the number of collisions and thus yields better
@@ -575,6 +574,14 @@ static inline void Report(const char *algorithm, size_t compressed_size,
 //   bool TryFastAppend(const char* ip, size_t available, size_t length);
 // };
 
+namespace internal {
+
+// Mapping from i in range [0,4] to a mask to extract the bottom 8*i bits
+static const uint32 wordmask[] = {
+  0u, 0xffu, 0xffffu, 0xffffffu, 0xffffffffu
+};
+
+}  // end namespace internal
 
 // Helper class for decompression
 class SnappyDecompressor {
