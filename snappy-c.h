@@ -38,6 +38,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include "snappy-visibility.h"
 
 /*
  * Return values; see the documentation for each function to know
@@ -68,6 +69,7 @@ typedef enum {
  *   }
  *   free(output);
  */
+SNAPPY_PUBLIC_API
 snappy_status snappy_compress(const char* input,
                               size_t input_length,
                               char* compressed,
@@ -100,6 +102,7 @@ snappy_status snappy_compress(const char* input,
  *   }
  *   free(output);
  */
+SNAPPY_PUBLIC_API
 snappy_status snappy_uncompress(const char* compressed,
                                 size_t compressed_length,
                                 char* uncompressed,
@@ -109,6 +112,7 @@ snappy_status snappy_uncompress(const char* compressed,
  * Returns the maximal size of the compressed representation of
  * input data that is "source_length" bytes in length.
  */
+SNAPPY_PUBLIC_API
 size_t snappy_max_compressed_length(size_t source_length);
 
 /*
@@ -117,6 +121,7 @@ size_t snappy_max_compressed_length(size_t source_length);
  * *result normally. Returns SNAPPY_INVALID_INPUT on parsing error.
  * This operation takes O(1) time.
  */
+SNAPPY_PUBLIC_API
 snappy_status snappy_uncompressed_length(const char* compressed,
                                          size_t compressed_length,
                                          size_t* result);
@@ -128,6 +133,7 @@ snappy_status snappy_uncompressed_length(const char* compressed,
  * Takes time proportional to compressed_length, but is usually at least a
  * factor of four faster than actual decompression.
  */
+SNAPPY_PUBLIC_API
 snappy_status snappy_validate_compressed_buffer(const char* compressed,
                                                 size_t compressed_length);
 

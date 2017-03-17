@@ -32,11 +32,12 @@
 #define THIRD_PARTY_SNAPPY_SNAPPY_INTERNAL_H_
 
 #include "snappy-stubs-internal.h"
+#include "snappy-visibility.h"
 
 namespace snappy {
 namespace internal {
 
-class WorkingMemory {
+class SNAPPY_PUBLIC_API WorkingMemory {
  public:
   WorkingMemory() : large_table_(NULL) { }
   ~WorkingMemory() { delete[] large_table_; }
@@ -64,6 +65,7 @@ class WorkingMemory {
 //
 // Returns an "end" pointer into "op" buffer.
 // "end - op" is the compressed size of "input".
+SNAPPY_PUBLIC_API
 char* CompressFragment(const char* input,
                        size_t input_length,
                        char* op,
