@@ -505,6 +505,9 @@ inline char* string_as_array(string* str) {
   return str->empty() ? NULL : &*str->begin();
 }
 
+// Windows doesn't have ssize_t, so create one in the namespace snappy
+typedef std::make_signed<size_t>::type ssize_t;
+
 }  // namespace snappy
 
 #endif  // THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_STUBS_INTERNAL_H_
