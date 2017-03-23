@@ -1,1 +1,5 @@
-include("${CMAKE_CURRENT_LIST_DIR}/SnappyTargets.cmake")
+if ((NOT DEFINED BUILD_SHARED_LIBS OR BUILD_SHARED_LIBS) AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/SnappySharedTargets.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/SnappySharedTargets.cmake")
+else()
+    include("${CMAKE_CURRENT_LIST_DIR}/SnappyStaticTargets.cmake")
+endif()
