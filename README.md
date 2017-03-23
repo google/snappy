@@ -62,6 +62,16 @@ Performance optimizations, whether for 64-bit x86 or other platforms,
 are of course most welcome; see "Contact", below.
 
 
+Building
+========
+
+CMake is supported and autotools will soon be deprecated.
+You need CMake 3.4 or above to build:
+
+  mkdir build
+  cd build && cmake ../ && make
+
+
 Usage
 =====
 
