@@ -349,7 +349,45 @@ class Bits {
   DISALLOW_COPY_AND_ASSIGN(Bits);
 };
 
-#ifdef HAVE_BUILTIN_CTZ
+// Built-in _BitScan intrinsics
+#if _MSC_VER 
+
+#include <intrin.h>
+
+inline int Bits::Log2Floor(uint32 n) {
+  if (n == 0) {
+    return -1;
+  }
+  else {
+    unsigned long where;
+    _BitScanReverse(&where, n);
+    return 31 ^ static_cast<int>(31 - where);
+  }
+}
+
+inline int Bits::FindLSBSetNonZero(uint32 n) {
+  unsigned long where;
+  if (_BitScanForward(&where, n))
+    return static_cast<int>(where);
+  return 32;
+}
+
+inline int Bits::FindLSBSetNonZero64(uint64 n) {
+  unsigned long where;
+#if defined(_M_AMD64) || defined(__x86_64__)
+  if (_BitScanForward64(&where, n))
+    return static_cast<int>(where);
+#else
+  // Win32 doesn't have _BitScanForward64 so emulate it with two 32 bit calls.
+  if (_BitScanForward(&where, static_cast<unsigned long>(n)))
+    return static_cast<int>(where);
+  if (_BitScanForward(&where, static_cast<unsigned long>(n >> 32)))
+    return static_cast<int>(where + 32);
+#endif
+  return 64;
+}
+
+#elif defined(HAVE_BUILTIN_CTZ)
 
 inline int Bits::Log2Floor(uint32 n) {
   return n == 0 ? -1 : 31 ^ __builtin_clz(n);
