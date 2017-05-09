@@ -51,11 +51,6 @@ DEFINE_bool(zlib, false,
             "Run zlib compression (http://www.zlib.net)");
 DEFINE_bool(lzo, false,
             "Run LZO compression (http://www.oberhumer.com/opensource/lzo/)");
-DEFINE_bool(quicklz, false,
-            "Run quickLZ compression (http://www.quicklz.com/)");
-DEFINE_bool(liblzf, false,
-            "Run libLZF compression "
-            "(http://www.goof.com/pcg/marc/liblzf.html)");
 DEFINE_bool(fastlz, false,
             "Run FastLZ compression (http://www.fastlz.org/");
 DEFINE_bool(snappy, true, "Run snappy compression");
@@ -123,11 +118,11 @@ typedef string DataEndingAtUnreadablePage;
 #endif
 
 enum CompressorType {
-  ZLIB, LZO, LIBLZF, QUICKLZ, FASTLZ, SNAPPY
+  ZLIB, LZO, FASTLZ, SNAPPY
 };
 
 const char* names[] = {
-  "ZLIB", "LZO", "LIBLZF", "QUICKLZ", "FASTLZ", "SNAPPY"
+  "ZLIB", "LZO", "FASTLZ", "SNAPPY"
 };
 
 static size_t MinimumRequiredOutputSpace(size_t input_size,
@@ -142,16 +137,6 @@ static size_t MinimumRequiredOutputSpace(size_t input_size,
     case LZO:
       return input_size + input_size/64 + 16 + 3;
 #endif  // LZO_VERSION
-
-#ifdef LZF_VERSION
-    case LIBLZF:
-      return input_size;
-#endif  // LZF_VERSION
-
-#ifdef QLZ_VERSION_MAJOR
-    case QUICKLZ:
-      return input_size + 36000;  // 36000 is used for scratch.
-#endif  // QLZ_VERSION_MAJOR
 
 #ifdef FASTLZ_VERSION
     case FASTLZ:
@@ -216,42 +201,6 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
       break;
     }
 #endif  // LZO_VERSION
-
-#ifdef LZF_VERSION
-    case LIBLZF: {
-      int destlen = lzf_compress(input,
-                                 input_size,
-                                 string_as_array(compressed),
-                                 input_size);
-      if (destlen == 0) {
-        // lzf *can* cause lots of blowup when compressing, so they
-        // recommend to limit outsize to insize, and just not compress
-        // if it's bigger.  Ideally, we'd just swap input and output.
-        compressed->assign(input, input_size);
-        destlen = input_size;
-      }
-      if (!compressed_is_preallocated) {
-        compressed->resize(destlen);
-      }
-      break;
-    }
-#endif  // LZF_VERSION
-
-#ifdef QLZ_VERSION_MAJOR
-    case QUICKLZ: {
-      qlz_state_compress *state_compress = new qlz_state_compress;
-      int destlen = qlz_compress(input,
-                                 string_as_array(compressed),
-                                 input_size,
-                                 state_compress);
-      delete state_compress;
-      CHECK_NE(0, destlen);
-      if (!compressed_is_preallocated) {
-        compressed->resize(destlen);
-      }
-      break;
-    }
-#endif  // QLZ_VERSION_MAJOR
 
 #ifdef FASTLZ_VERSION
     case FASTLZ: {
@@ -322,37 +271,6 @@ static bool Uncompress(const string& compressed, CompressorType comp,
       break;
     }
 #endif  // LZO_VERSION
-
-#ifdef LZF_VERSION
-    case LIBLZF: {
-      output->resize(size);
-      int destlen = lzf_decompress(compressed.data(),
-                                   compressed.size(),
-                                   string_as_array(output),
-                                   output->size());
-      if (destlen == 0) {
-        // This error probably means we had decided not to compress,
-        // and thus have stored input in output directly.
-        output->assign(compressed.data(), compressed.size());
-        destlen = compressed.size();
-      }
-      CHECK_EQ(destlen, size);
-      break;
-    }
-#endif  // LZF_VERSION
-
-#ifdef QLZ_VERSION_MAJOR
-    case QUICKLZ: {
-      output->resize(size);
-      qlz_state_decompress *state_decompress = new qlz_state_decompress;
-      int destlen = qlz_decompress(compressed.data(),
-                                   string_as_array(output),
-                                   state_decompress);
-      delete state_decompress;
-      CHECK_EQ(destlen, size);
-      break;
-    }
-#endif  // QLZ_VERSION_MAJOR
 
 #ifdef FASTLZ_VERSION
     case FASTLZ: {
@@ -1313,8 +1231,6 @@ static void MeasureFile(const char* fname) {
     int repeats = (FLAGS_bytes + len) / (len + 1);
     if (FLAGS_zlib)     Measure(input, len, ZLIB, repeats, 1024<<10);
     if (FLAGS_lzo)      Measure(input, len, LZO, repeats, 1024<<10);
-    if (FLAGS_liblzf)   Measure(input, len, LIBLZF, repeats, 1024<<10);
-    if (FLAGS_quicklz)  Measure(input, len, QUICKLZ, repeats, 1024<<10);
     if (FLAGS_fastlz)   Measure(input, len, FASTLZ, repeats, 1024<<10);
     if (FLAGS_snappy)    Measure(input, len, SNAPPY, repeats, 4096<<10);
 

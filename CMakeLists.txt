@@ -49,9 +49,7 @@ ENDIF (NOT HAVE_STDDEF_H)
 
 CHECK_LIBRARY_EXISTS(z zlibVersion "" HAVE_LIBZ)
 CHECK_LIBRARY_EXISTS(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
-CHECK_LIBRARY_EXISTS(lzf lzf_compress "" HAVE_LIBLZF)
 CHECK_LIBRARY_EXISTS(fastlz fastlz_compress "" HAVE_LIBFASTLZ)
-CHECK_LIBRARY_EXISTS(quicklz qlz_compress "" HAVE_LIBQUICKLZ)
 
 CHECK_CXX_SOURCE_COMPILES("int main(void) { return __builtin_expect(0, 1); }"
         HAVE_BUILTIN_EXPECT)

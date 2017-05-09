@@ -25,14 +25,8 @@
 /* Define to 1 if you have the `fastlz' library (-lfastlz). */
 #cmakedefine HAVE_LIBFASTLZ ${HAVE_LIBFASTLZ}
 
-/* Define to 1 if you have the `lzf' library (-llzf). */
-#cmakedefine HAVE_LIBLZF ${HAVE_LIBLZF}
-
 /* Define to 1 if you have the `lzo2' library (-llzo2). */
 #cmakedefine HAVE_LIBLZO2 ${HAVE_LIBLZO2}
-
-/* Define to 1 if you have the `quicklz' library (-lquicklz). */
-#cmakedefine HAVE_LIBQUICKLZ ${HAVE_LIBQUICKLZ}
 
 /* Define to 1 if you have the `z' library (-lz). */
 #cmakedefine HAVE_LIBZ ${HAVE_LIBZ}

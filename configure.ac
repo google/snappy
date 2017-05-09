@@ -97,9 +97,7 @@ AC_DEFUN([CHECK_EXT_COMPRESSION_LIB], [
 ])
 CHECK_EXT_COMPRESSION_LIB([z], [zlibVersion])
 CHECK_EXT_COMPRESSION_LIB([lzo2], [lzo1x_1_15_compress])
-CHECK_EXT_COMPRESSION_LIB([lzf], [lzf_compress])
 CHECK_EXT_COMPRESSION_LIB([fastlz], [fastlz_compress])
-CHECK_EXT_COMPRESSION_LIB([quicklz], [qlz_compress])
 AC_SUBST([UNITTEST_LIBS])
 
 # These are used by snappy-stubs-public.h.in.
