@@ -47,12 +47,12 @@
 
 #include "snappy-stubs-public.h"
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__aarch64__)
 
 // Enable 64-bit optimized versions of some routines.
 #define ARCH_K8 1
 
-#endif
+#endif //__x86_64__ || __aarch64__
 
 // Needed by OS X, among others.
 #ifndef MAP_ANONYMOUS
@@ -92,9 +92,10 @@ static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
 
 // Potentially unaligned loads and stores.
 
-// x86 and PowerPC can simply do these loads and stores native.
+// x86, ARM64 and PowerPC can simply do these loads and stores native.
 
-#if defined(__i386__) || defined(__x86_64__) || defined(__powerpc__)
+#if defined(__i386__) || defined(__x86_64__) || defined(__powerpc__) \
+    || defined(__aarch64__)
 
 #define UNALIGNED_LOAD16(_p) (*reinterpret_cast<const uint16 *>(_p))
 #define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32 *>(_p))
