@@ -94,6 +94,7 @@ target_compile_definitions(Snappy PRIVATE -DHAVE_CONFIG_H)
 
 set_target_properties(Snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON OUTPUT_NAME snappy)
 
+target_include_directories(Snappy INTERFACE $<INSTALL_INTERFACE:include>)
 install(FILES snappy.h
         snappy-c.h
         snappy-sinksource.h
@@ -114,12 +115,7 @@ set(INCLUDE_INSTALL_DIR include)
 set(LIBRARY_INSTALL_DIR lib)
 set(BINARY_INSTALL_DIR bin)
 
-configure_package_config_file(cmake/SnappyConfig.cmake.in
-        ${Snappy_BINARY_DIR}/SnappyConfig.cmake
-        INSTALL_DESTINATION lib/cmake/Snappy
-        PATH_VARS INCLUDE_INSTALL_DIR LIBRARY_INSTALL_DIR BINARY_INSTALL_DIR
-        )
-
+configure_file(cmake/SnappyConfig.cmake.in ${Snappy_BINARY_DIR}/SnappyConfig.cmake @ONLY)
 write_basic_package_version_file(${Snappy_BINARY_DIR}/SnappyConfigVersion.cmake
         COMPATIBILITY SameMajorVersion)
 install(FILES ${Snappy_BINARY_DIR}/SnappyConfig.cmake
