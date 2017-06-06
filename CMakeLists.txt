@@ -116,7 +116,7 @@ set(BINARY_INSTALL_DIR bin)
 
 configure_package_config_file(cmake/SnappyConfig.cmake.in
         ${Snappy_BINARY_DIR}/SnappyConfig.cmake
-        INSTALL_DESTINATION lib/Snappy/cmake
+        INSTALL_DESTINATION lib/cmake/Snappy
         PATH_VARS INCLUDE_INSTALL_DIR LIBRARY_INSTALL_DIR BINARY_INSTALL_DIR
         )
 
@@ -124,7 +124,7 @@ write_basic_package_version_file(${Snappy_BINARY_DIR}/SnappyConfigVersion.cmake
         COMPATIBILITY SameMajorVersion)
 install(FILES ${Snappy_BINARY_DIR}/SnappyConfig.cmake
         ${Snappy_BINARY_DIR}/SnappyConfigVersion.cmake
-        DESTINATION lib/cmake)
+        DESTINATION lib/cmake/Snappy)
 
 enable_testing()
 
