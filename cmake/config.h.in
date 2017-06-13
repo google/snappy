@@ -22,9 +22,6 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #cmakedefine HAVE_INTTYPES_H ${HAVE_INTTYPES_H}
 
-/* Define to 1 if you have the `fastlz' library (-lfastlz). */
-#cmakedefine HAVE_LIBFASTLZ ${HAVE_LIBFASTLZ}
-
 /* Define to 1 if you have the `lzo2' library (-llzo2). */
 #cmakedefine HAVE_LIBLZO2 ${HAVE_LIBLZO2}
 

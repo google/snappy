@@ -116,10 +116,6 @@ extern "C" {
 }
 #endif
 
-#ifdef HAVE_LIBFASTLZ
-#include "fastlz.h"
-#endif
-
 #ifdef HAVE_LIBQUICKLZ
 #include "quicklz.h"
 #endif

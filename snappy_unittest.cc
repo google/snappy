@@ -51,8 +51,6 @@ DEFINE_bool(zlib, false,
             "Run zlib compression (http://www.zlib.net)");
 DEFINE_bool(lzo, false,
             "Run LZO compression (http://www.oberhumer.com/opensource/lzo/)");
-DEFINE_bool(fastlz, false,
-            "Run FastLZ compression (http://www.fastlz.org/");
 DEFINE_bool(snappy, true, "Run snappy compression");
 
 DEFINE_bool(write_compressed, false,
@@ -118,11 +116,11 @@ typedef string DataEndingAtUnreadablePage;
 #endif
 
 enum CompressorType {
-  ZLIB, LZO, FASTLZ, SNAPPY
+  ZLIB, LZO, SNAPPY
 };
 
 const char* names[] = {
-  "ZLIB", "LZO", "FASTLZ", "SNAPPY"
+  "ZLIB", "LZO", "SNAPPY"
 };
 
 static size_t MinimumRequiredOutputSpace(size_t input_size,
@@ -137,11 +135,6 @@ static size_t MinimumRequiredOutputSpace(size_t input_size,
     case LZO:
       return input_size + input_size/64 + 16 + 3;
 #endif  // LZO_VERSION
-
-#ifdef FASTLZ_VERSION
-    case FASTLZ:
-      return max(static_cast<int>(ceil(input_size * 1.05)), 66);
-#endif  // FASTLZ_VERSION
 
     case SNAPPY:
       return snappy::MaxCompressedLength(input_size);
@@ -202,22 +195,6 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
     }
 #endif  // LZO_VERSION
 
-#ifdef FASTLZ_VERSION
-    case FASTLZ: {
-      // Use level 1 compression since we mostly care about speed.
-      int destlen = fastlz_compress_level(
-          1,
-          input,
-          input_size,
-          string_as_array(compressed));
-      if (!compressed_is_preallocated) {
-        compressed->resize(destlen);
-      }
-      CHECK_NE(destlen, 0);
-      break;
-    }
-#endif  // FASTLZ_VERSION
-
     case SNAPPY: {
       size_t destlen;
       snappy::RawCompress(input, input_size,
@@ -271,18 +248,6 @@ static bool Uncompress(const string& compressed, CompressorType comp,
       break;
     }
 #endif  // LZO_VERSION
-
-#ifdef FASTLZ_VERSION
-    case FASTLZ: {
-      output->resize(size);
-      int destlen = fastlz_decompress(compressed.data(),
-                                      compressed.length(),
-                                      string_as_array(output),
-                                      size);
-      CHECK_EQ(destlen, size);
-      break;
-    }
-#endif  // FASTLZ_VERSION
 
     case SNAPPY: {
       snappy::RawUncompress(compressed.data(), compressed.size(),
@@ -1231,7 +1196,6 @@ static void MeasureFile(const char* fname) {
     int repeats = (FLAGS_bytes + len) / (len + 1);
     if (FLAGS_zlib)     Measure(input, len, ZLIB, repeats, 1024<<10);
     if (FLAGS_lzo)      Measure(input, len, LZO, repeats, 1024<<10);
-    if (FLAGS_fastlz)   Measure(input, len, FASTLZ, repeats, 1024<<10);
     if (FLAGS_snappy)    Measure(input, len, SNAPPY, repeats, 4096<<10);
 
     // For block-size based measurements

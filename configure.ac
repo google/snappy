@@ -49,7 +49,7 @@ fi
 # See if we have __builtin_expect.
 # TODO: Use AC_CACHE.
 AC_MSG_CHECKING([if the compiler supports __builtin_expect])
- 
+
 AC_TRY_COMPILE(, [
     return __builtin_expect(1, 1) ? 1 : 0
 ], [
@@ -97,7 +97,6 @@ AC_DEFUN([CHECK_EXT_COMPRESSION_LIB], [
 ])
 CHECK_EXT_COMPRESSION_LIB([z], [zlibVersion])
 CHECK_EXT_COMPRESSION_LIB([lzo2], [lzo1x_1_15_compress])
-CHECK_EXT_COMPRESSION_LIB([fastlz], [fastlz_compress])
 AC_SUBST([UNITTEST_LIBS])
 
 # These are used by snappy-stubs-public.h.in.
