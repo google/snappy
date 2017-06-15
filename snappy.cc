@@ -662,7 +662,16 @@ class SnappyDecompressor {
     // For position-independent executables, accessing global arrays can be
     // slow.  Move wordmask array onto the stack to mitigate this.
     uint32 wordmask[sizeof(internal::wordmask)/sizeof(uint32)];
-    memcpy(wordmask, internal::wordmask, sizeof(wordmask));
+    // Do not use memcpy to copy internal::wordmask to
+    // wordmask.  LLVM converts stack arrays to global arrays if it detects
+    // const stack arrays and this hurts the performance of position
+    // independent code. This change is temporary and can be reverted when
+    // https://reviews.llvm.org/D30759 is approved.
+    wordmask[0] = internal::wordmask[0];
+    wordmask[1] = internal::wordmask[1];
+    wordmask[2] = internal::wordmask[2];
+    wordmask[3] = internal::wordmask[3];
+    wordmask[4] = internal::wordmask[4];
 
     // We could have put this refill fragment only at the beginning of the loop.
     // However, duplicating it at the end of each branch gives the compiler more
