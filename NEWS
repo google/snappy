@@ -1,3 +1,16 @@
+Snappy v1.1.5, June 28th 2017:
+
+  * Add CMake build support. The autoconf build support is now deprecated, and
+    will be removed in the next release.
+
+  * Add AppVeyor configuration, for Windows CI coverage.
+
+  * Small performance improvement on little-endian PowerPC.
+
+  * Small performance improvement on LLVM with position-independent executables.
+
+  * Fix a few issues with various build environments.
+
 Snappy v1.1.4, January 25th 2017:
 
   * Fix a 1% performance regression when snappy is used in PIE executables.

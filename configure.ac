@@ -1,11 +1,11 @@
 m4_define([snappy_major], [1])
 m4_define([snappy_minor], [1])
-m4_define([snappy_patchlevel], [4])
+m4_define([snappy_patchlevel], [5])
 
 # Libtool shared library interface versions (current:revision:age)
 # Update this value for every release!  (A:B:C will map to foo.so.(A-C).C.B)
 # http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
-m4_define([snappy_ltversion], [4:1:3])
+m4_define([snappy_ltversion], [4:1:4])
 
 AC_INIT([snappy], [snappy_major.snappy_minor.snappy_patchlevel])
 AC_CONFIG_MACRO_DIR([m4])
