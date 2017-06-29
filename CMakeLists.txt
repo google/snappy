@@ -146,7 +146,7 @@ ENDIF (HAVE_LIBQUICKLZ)
 ADD_EXECUTABLE(snappy-unittest snappy_unittest.cc snappy-test.cc)
 TARGET_COMPILE_DEFINITIONS(snappy-unittest PRIVATE -DHAVE_CONFIG_H)
 TARGET_LINK_LIBRARIES(snappy-unittest snappy ${COMPRESSION_LIBS}
-                      ${GFLAGS_LIBRARIES})
+                      ${GFLAGS_LIBRARIES} ${GTEST_LIBRARIES})
 TARGET_INCLUDE_DIRECTORIES(snappy-unittest BEFORE PRIVATE ${Snappy_SOURCE_DIR}
                            ${GTEST_INCLUDE_DIRS} ${GFLAGS_INCLUDE_DIRS})
 
