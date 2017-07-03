@@ -56,12 +56,12 @@ CHECK_CXX_SOURCE_COMPILES("int main(void) { return __builtin_expect(0, 1); }"
 CHECK_CXX_SOURCE_COMPILES("int main(void) { return __builtin_ctzll(0); }"
         HAVE_BUILTIN_CTZ)
 
-FIND_PACKAGE(GTest QUIET)
+FIND_PACKAGE(GTest)
 IF(GTEST_FOUND)
     SET(HAVE_GTEST 1)
 ENDIF()
 
-FIND_PACKAGE(Gflags QUIET)
+FIND_PACKAGE(Gflags)
 IF(GFLAGS_FOUND)
     SET(HAVE_GFLAGS 1)
 ENDIF()
@@ -146,7 +146,7 @@ ENDIF (HAVE_LIBQUICKLZ)
 ADD_EXECUTABLE(snappy-unittest snappy_unittest.cc snappy-test.cc)
 TARGET_COMPILE_DEFINITIONS(snappy-unittest PRIVATE -DHAVE_CONFIG_H)
 TARGET_LINK_LIBRARIES(snappy-unittest snappy ${COMPRESSION_LIBS}
-                      ${GFLAGS_LIBRARIES})
+                      ${GFLAGS_LIBRARIES} ${GTEST_BOTH_LIBRARIES})
 TARGET_INCLUDE_DIRECTORIES(snappy-unittest BEFORE PRIVATE ${Snappy_SOURCE_DIR}
                            ${GTEST_INCLUDE_DIRS} ${GFLAGS_INCLUDE_DIRS})
 
