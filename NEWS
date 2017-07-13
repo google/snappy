@@ -1,4 +1,15 @@
+Snappy v1.1.6, July 12th 2017:
+
+This is a re-release of v1.1.5 with proper SONAME / SOVERSION values.
+
 Snappy v1.1.5, June 28th 2017:
+
+This release has broken SONAME / SOVERSION values. Users of snappy as a shared
+library should avoid 1.1.5 and use 1.1.6 instead. SONAME / SOVERSION errors will
+manifest as the dynamic library loader complaining that it cannot find snappy's
+shared library file (libsnappy.so / libsnappy.dylib), or that the library it
+found does not have the required version. 1.1.6 has the same code as 1.1.5, but
+carries build configuration fixes for the issues above.
 
   * Add CMake build support. The autoconf build support is now deprecated, and
     will be removed in the next release.
