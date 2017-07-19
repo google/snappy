@@ -1,9 +1,5 @@
-set(SNAPPY_VERSION @SNAPPY_MAJOR@.@SNAPPY_MINOR@.@SNAPPY_PATCHLEVEL@)
-
-@PACKAGE_INIT@
-
-set_and_check(SNAPPY_INCLUDE_DIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
-set_and_check(SNAPPY_LIBRARY_DIR "@PACKAGE_LIBRARY_INSTALL_DIR@")
-set_and_check(SNAPPY_BINARY_DIR "@PACKAGE_BINARY_INSTALL_DIR@")
-
-check_required_components(SNAPPY)
+if ((NOT DEFINED BUILD_SHARED_LIBS OR BUILD_SHARED_LIBS) AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/SnappySharedTargets.cmake")
+    include("${CMAKE_CURRENT_LIST_DIR}/SnappySharedTargets.cmake")
+else()
+    include("${CMAKE_CURRENT_LIST_DIR}/SnappyStaticTargets.cmake")
+endif()

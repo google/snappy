@@ -1,86 +1,88 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
-PROJECT(Snappy VERSION 1.1.6 LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.1)
+project(Snappy VERSION 1.1.6 LANGUAGES C CXX)
 
-SET(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-INCLUDE(CheckIncludeFiles)
-INCLUDE(CheckLibraryExists)
-INCLUDE(CheckCXXSourceCompiles)
-INCLUDE(TestBigEndian)
-INCLUDE(CMakePackageConfigHelpers)
+option(BUILD_SHARED_LIBS "Enable to build the shared version of the library or disable to build the static version" ON)
 
-TEST_BIG_ENDIAN(WORDS_BIG_ENDIAN)
-IF (WORDS_BIG_ENDIAN)
-    MESSAGE(STATUS "Building on big endian system")
-    ADD_DEFINITIONS(-DWORDS_BIGENDIAN=1)
-ENDIF (WORDS_BIG_ENDIAN)
+include(CheckIncludeFiles)
+include(CheckLibraryExists)
+include(CheckCXXSourceCompiles)
+include(TestBigEndian)
+include(CMakePackageConfigHelpers)
 
-CHECK_INCLUDE_FILES("byteswap.h" HAVE_BYTESWAP_H)
-CHECK_INCLUDE_FILES("dlfcn.h" HAVE_DLFCN_H)
-CHECK_INCLUDE_FILES("inttypes.h" HAVE_INTTYPES_H)
-CHECK_INCLUDE_FILES("memory.h" HAVE_MEMORY_H)
-CHECK_INCLUDE_FILES("stddef.h" HAVE_STDDEF_H)
-CHECK_INCLUDE_FILES("stdint.h" HAVE_STDINT_H)
-CHECK_INCLUDE_FILES("stdlib.h" HAVE_STDLIB_H)
-CHECK_INCLUDE_FILES("strings.h" HAVE_STRINGS_H)
-CHECK_INCLUDE_FILES("string.h" HAVE_STRING_H)
-CHECK_INCLUDE_FILES("sys/byteswap.h" HAVE_SYS_BYTESWAP_H)
-CHECK_INCLUDE_FILES("sys/endian.h" HAVE_SYS_ENDIAN_H)
-CHECK_INCLUDE_FILES("sys/mman.h" HAVE_SYS_MMAN_H)
-CHECK_INCLUDE_FILES("sys/resource.h" HAVE_SYS_RESOURCE_H)
-CHECK_INCLUDE_FILES("sys/stat.h" HAVE_SYS_STAT_H)
-CHECK_INCLUDE_FILES("sys/time.h" HAVE_SYS_TIME_H)
-CHECK_INCLUDE_FILES("sys/types.h" HAVE_SYS_TYPES_H)
-CHECK_INCLUDE_FILES("sys/uio.h" HAVE_SYS_UIO_H)
-CHECK_INCLUDE_FILES("unistd.h" HAVE_UNISTD_H)
-CHECK_INCLUDE_FILES("windows.h" HAVE_WINDOWS_H)
+test_big_endian(WORDS_BIG_ENDIAN)
+if (WORDS_BIG_ENDIAN)
+    message(STATUS "Building on big endian system")
+    add_definitions(-DWORDS_BIGENDIAN=1)
+endif (WORDS_BIG_ENDIAN)
 
-IF (NOT HAVE_SYS_UIO_H)
-    SET(HAVE_SYS_UIO_H 0)
-ENDIF (NOT HAVE_SYS_UIO_H)
+check_include_files("byteswap.h" HAVE_BYTESWAP_H)
+check_include_files("dlfcn.h" HAVE_DLFCN_H)
+check_include_files("inttypes.h" HAVE_INTTYPES_H)
+check_include_files("memory.h" HAVE_MEMORY_H)
+check_include_files("stddef.h" HAVE_STDDEF_H)
+check_include_files("stdint.h" HAVE_STDINT_H)
+check_include_files("stdlib.h" HAVE_STDLIB_H)
+check_include_files("strings.h" HAVE_STRINGS_H)
+check_include_files("string.h" HAVE_STRING_H)
+check_include_files("sys/byteswap.h" HAVE_SYS_BYTESWAP_H)
+check_include_files("sys/endian.h" HAVE_SYS_ENDIAN_H)
+check_include_files("sys/mman.h" HAVE_SYS_MMAN_H)
+check_include_files("sys/resource.h" HAVE_SYS_RESOURCE_H)
+check_include_files("sys/stat.h" HAVE_SYS_STAT_H)
+check_include_files("sys/time.h" HAVE_SYS_TIME_H)
+check_include_files("sys/types.h" HAVE_SYS_TYPES_H)
+check_include_files("sys/uio.h" HAVE_SYS_UIO_H)
+check_include_files("unistd.h" HAVE_UNISTD_H)
+check_include_files("windows.h" HAVE_WINDOWS_H)
 
-IF (NOT HAVE_STDINT_H)
-    SET(HAVE_STDINT_H 0)
-ENDIF (NOT HAVE_STDINT_H)
+if (NOT HAVE_SYS_UIO_H)
+    set(HAVE_SYS_UIO_H 0)
+endif (NOT HAVE_SYS_UIO_H)
 
-IF (NOT HAVE_STDDEF_H)
-    SET(HAVE_STDDEF_H 0)
-ENDIF (NOT HAVE_STDDEF_H)
+if (NOT HAVE_STDINT_H)
+    set(HAVE_STDINT_H 0)
+endif (NOT HAVE_STDINT_H)
 
-CHECK_LIBRARY_EXISTS(z zlibVersion "" HAVE_LIBZ)
-CHECK_LIBRARY_EXISTS(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
+if (NOT HAVE_STDDEF_H)
+    set(HAVE_STDDEF_H 0)
+endif (NOT HAVE_STDDEF_H)
 
-CHECK_CXX_SOURCE_COMPILES("int main(void) { return __builtin_expect(0, 1); }"
+check_library_exists(z zlibVersion "" HAVE_LIBZ)
+check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
+
+check_cxx_source_compiles("int main(void) { return __builtin_expect(0, 1); }"
         HAVE_BUILTIN_EXPECT)
 
-CHECK_CXX_SOURCE_COMPILES("int main(void) { return __builtin_ctzll(0); }"
+check_cxx_source_compiles("int main(void) { return __builtin_ctzll(0); }"
         HAVE_BUILTIN_CTZ)
 
-FIND_PACKAGE(GTest QUIET)
-IF(GTEST_FOUND)
-    SET(HAVE_GTEST 1)
-ENDIF()
+find_package(GTest QUIET)
+if(GTEST_FOUND)
+    set(HAVE_GTEST 1)
+endif()
 
-FIND_PACKAGE(Gflags QUIET)
-IF(GFLAGS_FOUND)
-    SET(HAVE_GFLAGS 1)
-ENDIF()
+find_package(Gflags QUIET)
+if(GFLAGS_FOUND)
+    set(HAVE_GFLAGS 1)
+endif()
 
-CONFIGURE_FILE(${Snappy_SOURCE_DIR}/cmake/config.h.in config.h)
+configure_file(${Snappy_SOURCE_DIR}/cmake/config.h.in config.h)
 
 # Configure snappy-stubs-public.h.in
-SET(ac_cv_have_stdint_h ${HAVE_STDINT_H})
-SET(ac_cv_have_stddef_h ${HAVE_STDDEF_H})
-SET(ac_cv_have_sys_uio_h ${HAVE_SYS_UIO_H})
-CONFIGURE_FILE(${Snappy_SOURCE_DIR}/snappy-stubs-public.h.in
+set(ac_cv_have_stdint_h ${HAVE_STDINT_H})
+set(ac_cv_have_stddef_h ${HAVE_STDDEF_H})
+set(ac_cv_have_sys_uio_h ${HAVE_SYS_UIO_H})
+configure_file(${Snappy_SOURCE_DIR}/snappy-stubs-public.h.in
                snappy-stubs-public.h)
 
-IF (WIN32)
-    ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
-ENDIF (WIN32)
+if (WIN32)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif (WIN32)
 
 # Define the main library.
-ADD_LIBRARY(snappy SHARED
+add_library(Snappy
         snappy-c.cc
         snappy-c.h
         snappy-sinksource.cc
@@ -90,67 +92,68 @@ ADD_LIBRARY(snappy SHARED
         snappy.cc
         snappy.h)
 
-TARGET_COMPILE_DEFINITIONS(snappy PRIVATE -DHAVE_CONFIG_H)
+target_compile_definitions(Snappy PRIVATE -DHAVE_CONFIG_H)
 
-SET_TARGET_PROPERTIES(snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+set_target_properties(Snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON OUTPUT_NAME snappy)
 
-INSTALL(FILES snappy.h
+target_include_directories(Snappy INTERFACE $<INSTALL_INTERFACE:include>)
+install(FILES snappy.h
         snappy-c.h
         snappy-sinksource.h
         ${Snappy_BINARY_DIR}/snappy-stubs-public.h
         DESTINATION include)
 
-INSTALL(TARGETS snappy
-        EXPORT SnappyTargets
+if (BUILD_SHARED_LIBS)
+    set(ExportSet SnappySharedTargets)
+else()
+    set(ExportSet SnappyStaticTargets)
+endif()
+install(TARGETS Snappy
+        EXPORT ${ExportSet}
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
-INSTALL(EXPORT SnappyTargets NAMESPACE Snappy:: DESTINATION lib/cmake/Snappy)
+install(EXPORT ${ExportSet} NAMESPACE Snappy:: DESTINATION lib/cmake/Snappy)
 
-SET_TARGET_PROPERTIES(snappy PROPERTIES VERSION ${PROJECT_VERSION}
+set_target_properties(Snappy PROPERTIES VERSION ${PROJECT_VERSION}
                       SOVERSION ${PROJECT_VERSION_MAJOR})
 
-SET(INCLUDE_INSTALL_DIR include)
-SET(LIBRARY_INSTALL_DIR lib)
-SET(BINARY_INSTALL_DIR bin)
+set(INCLUDE_INSTALL_DIR include)
+set(LIBRARY_INSTALL_DIR lib)
+set(BINARY_INSTALL_DIR bin)
 
-CONFIGURE_PACKAGE_CONFIG_FILE(cmake/SnappyConfig.cmake.in
-        ${Snappy_BINARY_DIR}/SnappyConfig.cmake
-        INSTALL_DESTINATION lib/Snappy/cmake
-        PATH_VARS INCLUDE_INSTALL_DIR LIBRARY_INSTALL_DIR BINARY_INSTALL_DIR
-        )
-
-WRITE_BASIC_PACKAGE_VERSION_FILE(${Snappy_BINARY_DIR}/SnappyConfigVersion.cmake
+configure_file(cmake/SnappyConfig.cmake.in ${Snappy_BINARY_DIR}/SnappyConfig.cmake @ONLY)
+write_basic_package_version_file(${Snappy_BINARY_DIR}/SnappyConfigVersion.cmake
         COMPATIBILITY SameMajorVersion)
-INSTALL(FILES ${Snappy_BINARY_DIR}/SnappyConfig.cmake
+install(FILES ${Snappy_BINARY_DIR}/SnappyConfig.cmake
         ${Snappy_BINARY_DIR}/SnappyConfigVersion.cmake
-        DESTINATION lib/cmake)
+        DESTINATION lib/cmake/Snappy)
 
-ENABLE_TESTING()
+enable_testing()
 
-IF (HAVE_LIBZ)
-    LIST(APPEND COMPRESSION_LIBS z)
-ENDIF (HAVE_LIBZ)
+if (HAVE_LIBZ)
+    list(APPEND COMPRESSION_LIBS z)
+endif (HAVE_LIBZ)
 
-IF (HAVE_LIBLZO2)
-    LIST(APPEND COMPRESSION_LIBS lzo2)
-ENDIF (HAVE_LIBLZO2)
+if (HAVE_LIBLZO2)
+    list(APPEND COMPRESSION_LIBS lzo2)
+endif (HAVE_LIBLZO2)
 
-IF (HAVE_LIBLZF)
-    LIST(APPEND COMPRESSION_LIBS lzf)
-ENDIF (HAVE_LIBLZF)
+if (HAVE_LIBLZF)
+    list(APPEND COMPRESSION_LIBS lzf)
+endif (HAVE_LIBLZF)
 
-IF (HAVE_LIBQUICKLZ)
-    LIST(APPEND COMPRESSION_LIBS quicklz)
-ENDIF (HAVE_LIBQUICKLZ)
+if (HAVE_LIBQUICKLZ)
+    list(APPEND COMPRESSION_LIBS quicklz)
+endif (HAVE_LIBQUICKLZ)
 
-ADD_EXECUTABLE(snappy-unittest snappy_unittest.cc snappy-test.cc)
-TARGET_COMPILE_DEFINITIONS(snappy-unittest PRIVATE -DHAVE_CONFIG_H)
-TARGET_LINK_LIBRARIES(snappy-unittest snappy ${COMPRESSION_LIBS}
+add_executable(snappy-unittest snappy_unittest.cc snappy-test.cc)
+target_compile_definitions(snappy-unittest PRIVATE -DHAVE_CONFIG_H)
+target_link_libraries(snappy-unittest Snappy ${COMPRESSION_LIBS}
                       ${GFLAGS_LIBRARIES})
-TARGET_INCLUDE_DIRECTORIES(snappy-unittest BEFORE PRIVATE ${Snappy_SOURCE_DIR}
+target_include_directories(snappy-unittest BEFORE PRIVATE ${Snappy_SOURCE_DIR}
                            ${GTEST_INCLUDE_DIRS} ${GFLAGS_INCLUDE_DIRS})
 
-ADD_TEST(NAME snappy-unittest
+add_test(NAME snappy-unittest
          WORKING_DIRECTORY ${Snappy_SOURCE_DIR}
          COMMAND ${Snappy_BINARY_DIR}/snappy-unittest)
