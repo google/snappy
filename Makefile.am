@@ -28,4 +28,4 @@ libtool: $(LIBTOOL_DEPS)
 # Needed by autoconf because we use README.md instead of README.
 # See http://stackoverflow.com/q/15013672/
 README: README.md
-	cat $< > $@.tmp
+	cp $< $@
