@@ -79,9 +79,7 @@ IF (WIN32)
     ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS)
 ENDIF (WIN32)
 
-# Define the main library.
-ADD_LIBRARY(snappy SHARED
-        snappy-c.cc
+set(SNAPPY_SRCS snappy-c.cc
         snappy-c.h
         snappy-sinksource.cc
         snappy-sinksource.h
@@ -90,7 +88,18 @@ ADD_LIBRARY(snappy SHARED
         snappy.cc
         snappy.h)
 
+# Define the main library.
+ADD_LIBRARY(snappy SHARED ${SNAPPY_SRCS})
+ADD_LIBRARY(snappy-static STATIC ${SNAPPY_SRCS})
+
 TARGET_COMPILE_DEFINITIONS(snappy PRIVATE -DHAVE_CONFIG_H)
+TARGET_COMPILE_DEFINITIONS(snappy-static PRIVATE -DHAVE_CONFIG_H)
+
+if (MSVC)
+    SET_TARGET_PROPERTIES(snappy-static PROPERTIES OUTPUT_NAME snappy_static)
+else()
+    SET_TARGET_PROPERTIES(snappy-static PROPERTIES OUTPUT_NAME snappy)
+endif()
 
 SET_TARGET_PROPERTIES(snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
@@ -100,7 +109,7 @@ INSTALL(FILES snappy.h
         ${Snappy_BINARY_DIR}/snappy-stubs-public.h
         DESTINATION include)
 
-INSTALL(TARGETS snappy
+INSTALL(TARGETS snappy snappy-static
         EXPORT SnappyTargets
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
