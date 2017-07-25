@@ -110,16 +110,6 @@
 #include "lzo/lzo1x.h"
 #endif
 
-#ifdef HAVE_LIBLZF
-extern "C" {
-#include "lzf.h"
-}
-#endif
-
-#ifdef HAVE_LIBQUICKLZ
-#include "quicklz.h"
-#endif
-
 namespace {
 
 namespace file {
