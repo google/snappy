@@ -350,7 +350,9 @@ class Bits {
   static int FindLSBSetNonZero64(uint64 n);
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(Bits);
+  // No copying
+  Bits(const Bits&);
+  void operator=(const Bits&);
 };
 
 #ifdef HAVE_BUILTIN_CTZ

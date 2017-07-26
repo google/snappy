@@ -50,7 +50,9 @@ class WorkingMemory {
   uint16 small_table_[1<<10];    // 2KB
   uint16* large_table_;          // Allocated only when needed
 
-  DISALLOW_COPY_AND_ASSIGN(WorkingMemory);
+  // No copying
+  WorkingMemory(const WorkingMemory&);
+  void operator=(const WorkingMemory&);
 };
 
 // Flat array compression that does not emit the "uncompressed length"
