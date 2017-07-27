@@ -1,6 +1,10 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.1)
 PROJECT(Snappy VERSION 1.1.6 LANGUAGES C CXX)
 
+# BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to make
+# it prominent in the GUI.
+OPTION (BUILD_SHARED_LIBS "Build shared libraries (DLLs)." OFF)
+
 SET(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 INCLUDE(CheckIncludeFiles)
@@ -73,7 +77,7 @@ IF (WIN32)
 ENDIF (WIN32)
 
 # Define the main library.
-ADD_LIBRARY(snappy SHARED
+ADD_LIBRARY(snappy
         snappy-c.cc
         snappy-c.h
         snappy-sinksource.cc
@@ -85,7 +89,9 @@ ADD_LIBRARY(snappy SHARED
 
 TARGET_COMPILE_DEFINITIONS(snappy PRIVATE -DHAVE_CONFIG_H)
 
-SET_TARGET_PROPERTIES(snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+IF (BUILD_SHARED_LIBS)
+    SET_TARGET_PROPERTIES(snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+ENDIF (BUILD_SHARED_LIBS)
 
 INSTALL(FILES snappy.h
         snappy-c.h
