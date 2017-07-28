@@ -73,11 +73,11 @@
 
 // Static prediction hints.
 #ifdef HAVE_BUILTIN_EXPECT
-#define PREDICT_FALSE(x) (__builtin_expect(x, 0))
-#define PREDICT_TRUE(x) (__builtin_expect(!!(x), 1))
+#define SNAPPY_PREDICT_FALSE(x) (__builtin_expect(x, 0))
+#define SNAPPY_PREDICT_TRUE(x) (__builtin_expect(!!(x), 1))
 #else
-#define PREDICT_FALSE(x) x
-#define PREDICT_TRUE(x) x
+#define SNAPPY_PREDICT_FALSE(x) x
+#define SNAPPY_PREDICT_TRUE(x) x
 #endif
 
 // This is only used for recomputing the tag byte table used during
