@@ -31,11 +31,11 @@ build_script:
   - mkdir out
   - cd out
   - if "%platform%"=="x64" set CMAKE_GENERATOR=%CMAKE_GENERATOR% Win64
+  - cmake --version
   - cmake .. -G "%CMAKE_GENERATOR%"
       -DCMAKE_CONFIGURATION_TYPES="%CONFIGURATION%"
   - cmake --build . --config %CONFIGURATION%
   - cd ..
-  - cmake --version
 
 test_script:
-  - out\%CONFIGURATION%\snappy-unittest
+  - out\%CONFIGURATION%\snappy_unittest

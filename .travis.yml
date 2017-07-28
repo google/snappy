@@ -47,13 +47,13 @@ install:
 - echo ${CC}
 - echo ${CXX}
 - ${CXX} --version
+- cmake --version
 
 before_script:
 - mkdir -p build && cd build
 - cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 - cmake --build .
 - cd ..
-- cmake --version
 
 script:
-- build/snappy-unittest
+- build/snappy_unittest
