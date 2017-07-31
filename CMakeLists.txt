@@ -56,12 +56,12 @@ CHECK_CXX_SOURCE_COMPILES("int main(void) { return __builtin_expect(0, 1); }"
 CHECK_CXX_SOURCE_COMPILES("int main(void) { return __builtin_ctzll(0); }"
         HAVE_BUILTIN_CTZ)
 
-FIND_PACKAGE(GTest)
+FIND_PACKAGE(GTest QUIET)
 IF(GTEST_FOUND)
     SET(HAVE_GTEST 1)
 ENDIF()
 
-FIND_PACKAGE(Gflags)
+FIND_PACKAGE(Gflags QUIET)
 IF(GFLAGS_FOUND)
     SET(HAVE_GFLAGS 1)
 ENDIF()
