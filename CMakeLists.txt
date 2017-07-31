@@ -141,14 +141,15 @@ if(SNAPPY_BUILD_TESTS)
     COMMAND "${PROJECT_BINARY_DIR}/snappy_unittest")
 endif(SNAPPY_BUILD_TESTS)
 
-install(TARGETS snappy EXPORT SnappyTargets DESTINATION lib)
+include(GNUInstallDirs)
+install(TARGETS snappy EXPORT SnappyTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(
   FILES
     "${PROJECT_SOURCE_DIR}/snappy-c.h"
     "${PROJECT_SOURCE_DIR}/snappy-sinksource.h"
     "${PROJECT_SOURCE_DIR}/snappy.h"
     "${PROJECT_BINARY_DIR}/snappy-stubs-public.h"
-  DESTINATION include
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 include(CMakePackageConfigHelpers)
@@ -156,10 +157,10 @@ write_basic_package_version_file(
     "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
     COMPATIBILITY SameMajorVersion
 )
-install(EXPORT SnappyTargets NAMESPACE Snappy:: DESTINATION lib/cmake/Snappy)
+install(EXPORT SnappyTargets NAMESPACE Snappy:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Snappy)
 install(
   FILES
     "${PROJECT_SOURCE_DIR}/cmake/SnappyConfig.cmake"
     "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
-  DESTINATION lib/cmake/Snappy
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Snappy
 )
