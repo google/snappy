@@ -119,7 +119,10 @@ if(SNAPPY_BUILD_TESTS)
       "${PROJECT_SOURCE_DIR}/snappy-test.cc"
   )
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES})
+  target_link_libraries(snappy_unittest
+    snappy
+    ${GFLAGS_LIBRARIES}
+    ${GTEST_LIBRARIES})
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_unittest z)
