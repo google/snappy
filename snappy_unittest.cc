@@ -63,7 +63,7 @@ DEFINE_bool(snappy_dump_decompression_table, false,
 
 namespace snappy {
 
-#ifdef HAVE_FUNC_MMAP
+#if defined(HAVE_FUNC_MMAP) && defined(HAVE_FUNC_SYSCONF)
 
 // To test against code that reads beyond its input, this class copies a
 // string to a newly allocated group of pages, the last of which
@@ -74,7 +74,7 @@ namespace snappy {
 class DataEndingAtUnreadablePage {
  public:
   explicit DataEndingAtUnreadablePage(const string& s) {
-    const size_t page_size = getpagesize();
+    const size_t page_size = sysconf(_SC_PAGESIZE);
     const size_t size = s.size();
     // Round up space for string to a multiple of page_size.
     size_t space_for_string = (size + page_size - 1) & ~(page_size - 1);
@@ -92,8 +92,9 @@ class DataEndingAtUnreadablePage {
   }
 
   ~DataEndingAtUnreadablePage() {
+    const size_t page_size = sysconf(_SC_PAGESIZE);
     // Undo the mprotect.
-    CHECK_EQ(0, mprotect(protected_page_, getpagesize(), PROT_READ|PROT_WRITE));
+    CHECK_EQ(0, mprotect(protected_page_, page_size, PROT_READ|PROT_WRITE));
     CHECK_EQ(0, munmap(mem_, alloc_size_));
   }
 
@@ -108,7 +109,7 @@ class DataEndingAtUnreadablePage {
   size_t size_;
 };
 
-#else  // HAVE_FUNC_MMAP
+#else  // defined(HAVE_FUNC_MMAP) && defined(HAVE_FUNC_SYSCONF)
 
 // Fallback for systems without mmap.
 typedef string DataEndingAtUnreadablePage;
