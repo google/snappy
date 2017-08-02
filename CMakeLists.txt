@@ -22,6 +22,7 @@ check_include_file("sys/mman.h" HAVE_SYS_MMAN_H)
 check_include_file("sys/resource.h" HAVE_SYS_RESOURCE_H)
 check_include_file("sys/time.h" HAVE_SYS_TIME_H)
 check_include_file("sys/uio.h" HAVE_SYS_UIO_H)
+check_include_file("unistd.h" HAVE_UNISTD_H)
 check_include_file("windows.h" HAVE_WINDOWS_H)
 
 include(CheckLibraryExists)
@@ -37,6 +38,7 @@ check_cxx_source_compiles(
 
 include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
+check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
 
 find_package(GTest QUIET)
 if(GTEST_FOUND)

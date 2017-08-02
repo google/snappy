@@ -45,6 +45,10 @@
 #include <sys/mman.h>
 #endif
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 #if defined(_MSC_VER)
 #include <intrin.h>
 #endif  // defined(_MSC_VER)
