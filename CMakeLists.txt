@@ -54,11 +54,6 @@ configure_file(
   "${PROJECT_SOURCE_DIR}/cmake/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"
 )
-configure_file(
-  "${PROJECT_SOURCE_DIR}/cmake/snappy.pc.in"
-  "${PROJECT_BINARY_DIR}/snappy.pc"
-  @ONLY
-)
 
 # We don't want to define HAVE_ macros in public headers. Instead, we use
 # CMake's variable substitution with 0/1 variables, which will be seen by the
@@ -170,4 +165,12 @@ install(
     "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
   DESTINATION lib/cmake/Snappy
 )
-install(FILES "${PROJECT_BINARY_DIR}/snappy.pc" DESTINATION lib/pkgconfig)
+
+if(UNIX)
+  configure_file(
+    "${PROJECT_SOURCE_DIR}/cmake/snappy.pc.in"
+    "${PROJECT_BINARY_DIR}/snappy.pc"
+    @ONLY
+  )
+  install(FILES "${PROJECT_BINARY_DIR}/snappy.pc" DESTINATION lib/pkgconfig)
+endif(UNIX)
