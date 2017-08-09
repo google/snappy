@@ -25,10 +25,6 @@ check_include_file("sys/uio.h" HAVE_SYS_UIO_H)
 check_include_file("unistd.h" HAVE_UNISTD_H)
 check_include_file("windows.h" HAVE_WINDOWS_H)
 
-include(CheckLibraryExists)
-check_library_exists(z zlibVersion "" HAVE_LIBZ)
-check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
-
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles(
     "int main(void) { return __builtin_expect(0, 1); }" HAVE_BUILTIN_EXPECT)
@@ -122,6 +118,10 @@ if(SNAPPY_BUILD_TESTS)
   )
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
   target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES})
+
+  include(CheckLibraryExists)
+  check_library_exists(z zlibVersion "" HAVE_LIBZ)
+  check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_unittest z)
