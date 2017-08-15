@@ -104,7 +104,9 @@ target_include_directories(snappy
     $<INSTALL_INTERFACE:include>
 )
 set_target_properties(snappy
-  PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
+  PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR}
+  EXPORT_NAME Snappy
+)
 
 target_compile_definitions(snappy PRIVATE -DHAVE_CONFIG_H)
 if(BUILD_SHARED_LIBS)
