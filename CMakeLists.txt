@@ -4,7 +4,12 @@ project(Snappy VERSION 1.1.6 LANGUAGES C CXX)
 # BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to make
 # it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
-
+if(BUILD_SHARED_LIBS)
+    set(Flavor Shared)
+else()
+    set(Flavor Static)
+endif()
+set(ExportSet Snappy${Flavor}Targets)
 option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
 
 include(TestBigEndian)
@@ -104,7 +109,9 @@ target_include_directories(snappy
     $<INSTALL_INTERFACE:include>
 )
 set_target_properties(snappy
-  PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
+  PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR}
+  EXPORT_NAME Snappy
+)
 
 target_compile_definitions(snappy PRIVATE -DHAVE_CONFIG_H)
 if(BUILD_SHARED_LIBS)
@@ -143,14 +150,19 @@ if(SNAPPY_BUILD_TESTS)
     COMMAND "${PROJECT_BINARY_DIR}/snappy_unittest")
 endif(SNAPPY_BUILD_TESTS)
 
-install(TARGETS snappy EXPORT SnappyTargets DESTINATION lib)
+include(GNUInstallDirs)
+install(TARGETS snappy EXPORT ${ExportSet}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
 install(
   FILES
     "${PROJECT_SOURCE_DIR}/snappy-c.h"
     "${PROJECT_SOURCE_DIR}/snappy-sinksource.h"
     "${PROJECT_SOURCE_DIR}/snappy.h"
     "${PROJECT_BINARY_DIR}/snappy-stubs-public.h"
-  DESTINATION include
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 include(CMakePackageConfigHelpers)
@@ -158,10 +170,10 @@ write_basic_package_version_file(
     "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
     COMPATIBILITY SameMajorVersion
 )
-install(EXPORT SnappyTargets NAMESPACE Snappy:: DESTINATION lib/cmake/Snappy)
+install(EXPORT ${ExportSet} NAMESPACE Snappy:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Snappy)
 install(
   FILES
     "${PROJECT_SOURCE_DIR}/cmake/SnappyConfig.cmake"
     "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
-  DESTINATION lib/cmake/Snappy
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Snappy
 )
