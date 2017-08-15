@@ -4,7 +4,12 @@ project(Snappy VERSION 1.1.6 LANGUAGES C CXX)
 # BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to make
 # it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
-
+if(BUILD_SHARED_LIBS)
+    set(Flavor Shared)
+else()
+    set(Flavor Static)
+endif()
+set(ExportSet Snappy${Flavor}Targets)
 option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
 
 include(TestBigEndian)
@@ -146,7 +151,7 @@ if(SNAPPY_BUILD_TESTS)
 endif(SNAPPY_BUILD_TESTS)
 
 include(GNUInstallDirs)
-install(TARGETS snappy EXPORT SnappyTargets
+install(TARGETS snappy EXPORT ${ExportSet}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -165,7 +170,7 @@ write_basic_package_version_file(
     "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
     COMPATIBILITY SameMajorVersion
 )
-install(EXPORT SnappyTargets NAMESPACE Snappy:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Snappy)
+install(EXPORT ${ExportSet} NAMESPACE Snappy:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/Snappy)
 install(
   FILES
     "${PROJECT_SOURCE_DIR}/cmake/SnappyConfig.cmake"
