@@ -8,10 +8,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
 
 include(TestBigEndian)
-test_big_endian(WORDS_BIG_ENDIAN)
-if(WORDS_BIG_ENDIAN)
-  add_definitions(-DWORDS_BIGENDIAN=1)
-endif(WORDS_BIG_ENDIAN)
+test_big_endian(SNAPPY_IS_BIG_ENDIAN)
 
 include(CheckIncludeFile)
 check_include_file("byteswap.h" HAVE_BYTESWAP_H)
