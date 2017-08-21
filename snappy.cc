@@ -685,6 +685,13 @@ class SnappyDecompressor {
         }
 
     MAYBE_REFILL();
+    // Add loop alignment directive. Without this directive, we observed
+    // significant performance degradation on several intel architectures
+    // in snappy benchmark built with LLVM. The degradation was caused by
+    // increased branch miss prediction.
+#if defined(__clang__) && defined(__x86_64__)
+    asm volatile (".p2align 5");
+#endif
     for ( ;; ) {
       const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip++));
 
