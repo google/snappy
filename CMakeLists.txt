@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.1)
-project(Snappy VERSION 1.1.6 LANGUAGES C CXX)
+project(Snappy VERSION 1.1.7 LANGUAGES C CXX)
 
 # BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to make
 # it prominent in the GUI.
