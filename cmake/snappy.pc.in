@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@CMAKE_INSTALL_PREFIX@/lib
+includedir=$@CMAKE_INSTALL_PREFIX@/include
+
+Name: snappy
+Description: Fast compressor/decompressor library.
+Version: @SNAPPY_VER@
+Libs: -L@CMAKE_INSTALL_PREFIX@/lib -lsnappy
+Cflags: -I$@CMAKE_INSTALL_PREFIX@/include

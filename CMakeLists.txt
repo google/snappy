@@ -1,11 +1,16 @@
 cmake_minimum_required(VERSION 3.1)
-project(Snappy VERSION 1.1.7 LANGUAGES C CXX)
+
+set(SNAPPY_VER 1.1.7)
+
+project(Snappy VERSION ${SNAPPY_VER} LANGUAGES C CXX)
 
 # BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to make
 # it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
 option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
+
+set(INSTALL_PKGCONFIG_DIR "${CMAKE_INSTALL_PREFIX}/share/pkgconfig" CACHE PATH "Installation directory for pkgconfig (.pc) files")
 
 include(TestBigEndian)
 test_big_endian(SNAPPY_IS_BIG_ENDIAN)
@@ -51,6 +56,10 @@ configure_file(
   "${PROJECT_SOURCE_DIR}/cmake/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"
 )
+
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/snappy.pc.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/snappy.pc")
 
 # We don't want to define HAVE_ macros in public headers. Instead, we use
 # CMake's variable substitution with 0/1 variables, which will be seen by the
@@ -172,3 +181,6 @@ install(
     "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Snappy"
 )
+
+install(FILES ${PROJECT_BINARY_DIR}/snappy.pc
+        DESTINATION ${INSTALL_PKGCONFIG_DIR})
