@@ -106,6 +106,8 @@ set_target_properties(snappy
 target_compile_definitions(snappy PRIVATE -DHAVE_CONFIG_H)
 if(BUILD_SHARED_LIBS)
   set_target_properties(snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+elseif(MSVC)
+  set_target_properties(snappy PROPERTIES OUTPUT_NAME snappy_static)
 endif(BUILD_SHARED_LIBS)
 
 if(SNAPPY_BUILD_TESTS)
