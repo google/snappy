@@ -120,6 +120,12 @@ if(SNAPPY_BUILD_TESTS)
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
   target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES})
 
+  # We need to link gtest when found as snappy-test.h uses HAVE_GTEST
+  # to determine whether to use gtest or snappy's own stub
+  if(HAVE_GTEST)
+    target_link_libraries(snappy_unittest ${GTEST_LIBRARIES})
+  endif(HAVE_GTEST)
+
   if(HAVE_LIBZ)
     target_link_libraries(snappy_unittest z)
   endif(HAVE_LIBZ)
