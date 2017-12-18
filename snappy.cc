@@ -1433,7 +1433,6 @@ bool SnappyScatteredWriter<Allocator>::SlowAppendFromSelf(size_t offset,
 class SnappySinkAllocator {
  public:
   explicit SnappySinkAllocator(Sink* dest): dest_(dest) {}
-  ~SnappySinkAllocator() {}
 
   char* Allocate(int size) {
     Datablock block(new char[size], size);
