@@ -139,7 +139,7 @@ test.)
 Contact
 =======
 
-Snappy is distributed through GitHub. For the latest version, a bug tracker,
+Snappy is distributed through GitHub. For the latest version
 and other information, see
 
   http://google.github.io/snappy/
