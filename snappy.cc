@@ -127,6 +127,11 @@ void UnalignedCopy128(const void* src, void* dst) {
 // Note that this does not match the semantics of either memcpy() or memmove().
 inline char* IncrementalCopySlow(const char* src, char* op,
                                  char* const op_limit) {
+  // TODO: Remove pragma when LLVM is aware this function is only called in
+  // cold regions and when cold regions don't get vectorized or unrolled.
+#ifdef __clang__
+#pragma clang loop unroll(disable)
+#endif
   while (op < op_limit) {
     *op++ = *src++;
   }
@@ -144,6 +149,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
   // pat  = op - src
   // len  = limit - op
   assert(src < op);
+  assert(op <= op_limit);
   assert(op_limit <= buf_limit);
   // NOTE: The compressor always emits 4 <= len <= 64. It is ok to assume that
   // to optimize this function but we have to also handle these cases in case
@@ -202,13 +208,52 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
   // UnalignedCopy128 might overwrite data in op. UnalignedCopy64 is safe
   // because expanding the pattern to at least 8 bytes guarantees that
   // op - src >= 8.
-  while (op <= buf_limit - 16) {
+  //
+  // Typically, the op_limit is the gating factor so try to simplify the loop
+  // based on that.
+  if (SNAPPY_PREDICT_TRUE(op_limit <= buf_limit - 16)) {
+    // Factor the displacement from op to the source into a variable. This helps
+    // simplify the loop below by only varying the op pointer which we need to
+    // test for the end. Note that this was done after carefully examining the
+    // generated code to allow the addressing modes in the loop below to
+    // maximize micro-op fusion where possible on modern Intel processors. The
+    // generated code should be checked carefully for new processors or with
+    // major changes to the compiler.
+    // TODO: Simplify this code when the compiler reliably produces the correct
+    // x86 instruction sequence.
+    ptrdiff_t op_to_src = src - op;
+
+    // The trip count of this loop is not large and so unrolling will only hurt
+    // code size without helping performance.
+    //
+    // TODO: Replace with loop trip count hint.
+#ifdef __clang__
+#pragma clang loop unroll(disable)
+#endif
+    do {
+      UnalignedCopy64(op + op_to_src, op);
+      UnalignedCopy64(op + op_to_src + 8, op + 8);
+      op += 16;
+    } while (op < op_limit);
+    return op_limit;
+  }
+
+  // Fall back to doing as much as we can with the available slop in the
+  // buffer. This code path is relatively cold however so we save code size by
+  // avoiding unrolling and vectorizing.
+  //
+  // TODO: Remove pragma when when cold regions don't get vectorized or
+  // unrolled.
+#ifdef __clang__
+#pragma clang loop unroll(disable)
+#endif
+  for (char *op_end = buf_limit - 16; op < op_end; op += 16, src += 16) {
     UnalignedCopy64(src, op);
     UnalignedCopy64(src + 8, op + 8);
-    src += 16;
-    op += 16;
-    if (SNAPPY_PREDICT_TRUE(op >= op_limit)) return op_limit;
   }
+  if (op >= op_limit)
+    return op_limit;
+
   // We only take this branch if we didn't have enough slop and we can do a
   // single 8 byte copy.
   if (SNAPPY_PREDICT_FALSE(op <= buf_limit - 8)) {
@@ -685,13 +730,6 @@ class SnappyDecompressor {
         }
 
     MAYBE_REFILL();
-    // Add loop alignment directive. Without this directive, we observed
-    // significant performance degradation on several intel architectures
-    // in snappy benchmark built with LLVM. The degradation was caused by
-    // increased branch miss prediction.
-#if defined(__clang__) && defined(__x86_64__)
-    asm volatile (".p2align 5");
-#endif
     for ( ;; ) {
       const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip++));
 
