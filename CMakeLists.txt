@@ -37,6 +37,11 @@ include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
 
+find_package(Threads REQUIRED)
+if(THREADS_FOUND)
+  set(HAVE_THREADS 1)
+endif(THREADS_FOUND)
+
 find_package(GTest QUIET)
 if(GTEST_FOUND)
   set(HAVE_GTEST 1)
@@ -118,7 +123,7 @@ if(SNAPPY_BUILD_TESTS)
       "${PROJECT_SOURCE_DIR}/snappy-test.cc"
   )
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES})
+  target_link_libraries(snappy_unittest snappy ${GTEST_BOTH_LIBRARIES})
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_unittest z)
@@ -126,6 +131,9 @@ if(SNAPPY_BUILD_TESTS)
   if(HAVE_LIBLZO2)
     target_link_libraries(snappy_unittest lzo2)
   endif(HAVE_LIBLZO2)
+  if(HAVE_THREADS)
+    target_link_libraries(snappy_unittest ${CMAKE_THREAD_LIBS_INIT})
+  endif(HAVE_THREADS)
 
   target_include_directories(snappy_unittest
     BEFORE PRIVATE
