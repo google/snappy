@@ -38,10 +38,17 @@ addons:
     - clang-4.0
 
 install:
-# Travis doesn't have a nice way to install homebrew packages yet.
-# https://github.com/travis-ci/travis-ci/issues/5377
-- if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew update; fi
-- if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install gcc@6; fi
+# Travis doesn't have a DSL for installing homebrew packages yet. Status tracked
+# in https://github.com/travis-ci/travis-ci/issues/5377
+# The Travis VM image for Mac already has a link at /usr/local/include/c++,
+# causing Homebrew's gcc@6 installation to error out. This was reported to
+# Homebrew maintainers at https://github.com/Homebrew/brew/issues/1742 and
+# removing the link emerged as a workaround.
+- if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+    brew update;
+    if [ -L /usr/local/include/c++ ]; then rm /usr/local/include/c++; fi;
+    brew install gcc@6;
+  fi
 # /usr/bin/gcc is stuck to old versions by on both Linux and OSX.
 - if [ "$CXX" = "g++" ]; then export CXX="g++-6" CC="gcc-6"; fi
 - echo ${CC}
