@@ -37,16 +37,6 @@ include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
 
-find_package(GTest QUIET)
-if(GTEST_FOUND)
-  set(HAVE_GTEST 1)
-endif(GTEST_FOUND)
-
-find_package(Gflags QUIET)
-if(GFLAGS_FOUND)
-  set(HAVE_GFLAGS 1)
-endif(GFLAGS_FOUND)
-
 configure_file(
   "${PROJECT_SOURCE_DIR}/cmake/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"
@@ -109,6 +99,10 @@ if(BUILD_SHARED_LIBS)
 endif(BUILD_SHARED_LIBS)
 
 if(SNAPPY_BUILD_TESTS)
+  find_package(GTest REQUIRED)
+  find_package(Gflags REQUIRED)
+  find_package(Threads REQUIRED)
+
   enable_testing()
 
   add_executable(snappy_unittest "")
@@ -118,7 +112,7 @@ if(SNAPPY_BUILD_TESTS)
       "${PROJECT_SOURCE_DIR}/snappy-test.cc"
   )
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES})
+  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES} ${GTEST_BOTH_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_unittest z)
