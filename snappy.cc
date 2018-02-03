@@ -699,7 +699,26 @@ class SnappyDecompressor {
   // Process the next item found in the input.
   // Returns true if successful, false on error or end of input.
   template <class Writer>
+#if defined(__GNUC__) && defined(__x86_64__)
+  __attribute__((aligned(32)))
+#endif
   void DecompressAllTags(Writer* writer) {
+    // In x86, pad the function body to start 16 bytes later. This function has
+    // a couple of hotspots that are highly sensitive to alignment: we have
+    // observed regressions by more than 20% in some metrics just by moving the
+    // exact same code to a different position in the benchmark binary.
+    //
+    // Putting this code on a 32-byte-aligned boundary + 16 bytes makes us hit
+    // the "lucky" case consistently. Unfortunately, this is a very brittle
+    // workaround, and future differences in code generation may reintroduce
+    // this regression. If you experience a big, difficult to explain, benchmark
+    // performance regression here, first try removing this hack.
+#if defined(__GNUC__) && defined(__x86_64__)
+    // Two 8-byte "NOP DWORD ptr [EAX + EAX*1 + 00000000H]" instructions.
+    asm(".byte 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00");
+    asm(".byte 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00");
+#endif
+
     const char* ip = ip_;
     // For position-independent executables, accessing global arrays can be
     // slow.  Move wordmask array onto the stack to mitigate this.
