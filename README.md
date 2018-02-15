@@ -68,8 +68,7 @@ Building
 CMake is supported and autotools will soon be deprecated.
 You need CMake 3.4 or above to build:
 
-  mkdir build
-  cd build && cmake ../ && make
+  mkdir build && cd build && cmake ../ && make
 
 
 Usage
