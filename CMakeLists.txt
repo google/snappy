@@ -23,8 +23,17 @@ check_include_file("unistd.h" HAVE_UNISTD_H)
 check_include_file("windows.h" HAVE_WINDOWS_H)
 
 include(CheckLibraryExists)
-check_library_exists(z zlibVersion "" HAVE_LIBZ)
-check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
+if(UNIX)
+  link_directories(/opt/local/lib /usr/local/lib)
+  find_package(Zlib)
+  if(Zlib_FOUND)
+    set(HAVE_LIBZ ON)
+  endif(Zlib_FOUND)
+  check_library_exists(lzo2 lzo1x_1_15_compress "/opt/local/lib" HAVE_LIBLZO2)
+else(UNIX)
+  check_library_exists(z zlibVersion "" HAVE_LIBZ)
+  check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
+endif(UNIX)
 
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles(
@@ -37,15 +46,10 @@ include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
 
-find_package(GTest QUIET)
-if(GTEST_FOUND)
-  set(HAVE_GTEST 1)
-endif(GTEST_FOUND)
 
-find_package(Gflags QUIET)
-if(GFLAGS_FOUND)
-  set(HAVE_GFLAGS 1)
-endif(GFLAGS_FOUND)
+# set debug postfix a la boost
+set(CMAKE_DEBUG_POSTFIX "-d")
+
 
 configure_file(
   "${PROJECT_SOURCE_DIR}/cmake/config.h.in"
@@ -109,6 +113,10 @@ if(BUILD_SHARED_LIBS)
 endif(BUILD_SHARED_LIBS)
 
 if(SNAPPY_BUILD_TESTS)
+  find_package(GTest REQUIRED)
+  find_package(Gflags)
+  ##TBD find_package(Threads)
+
   enable_testing()
 
   add_executable(snappy_unittest "")
@@ -118,7 +126,8 @@ if(SNAPPY_BUILD_TESTS)
       "${PROJECT_SOURCE_DIR}/snappy-test.cc"
   )
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES})
+  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES} ${GTEST_LIBRARIES})
+  ##TBD target_link_libraries(snappy_unittest snappy ${THREADS_LIBRARIES})
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_unittest z)
