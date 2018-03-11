@@ -5,7 +5,7 @@ project(Snappy VERSION 1.1.7 LANGUAGES C CXX)
 # it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
-option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
+option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." OFF)
 
 include(TestBigEndian)
 test_big_endian(SNAPPY_IS_BIG_ENDIAN)
@@ -115,7 +115,7 @@ endif(BUILD_SHARED_LIBS)
 if(SNAPPY_BUILD_TESTS)
   find_package(GTest REQUIRED)
   find_package(Gflags)
-  find_package(Threads)
+  ##TBD find_package(Threads)
 
   enable_testing()
 
@@ -126,7 +126,8 @@ if(SNAPPY_BUILD_TESTS)
       "${PROJECT_SOURCE_DIR}/snappy-test.cc"
   )
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES} ${GTEST_LIBRARIES} ${THREADS_LIBRARIES})
+  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES} ${GTEST_LIBRARIES})
+  ##TBD target_link_libraries(snappy_unittest snappy ${THREADS_LIBRARIES})
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_unittest z)
