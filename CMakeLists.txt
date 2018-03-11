@@ -50,17 +50,6 @@ check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
 # set debug postfix a la boost
 set(CMAKE_DEBUG_POSTFIX "-d")
 
-if(SNAPPY_BUILD_TESTS)
-  find_package(GTest)
-  if(GTEST_FOUND)
-    set(HAVE_GTEST 1)
-  endif(GTEST_FOUND)
-
-  find_package(Gflags)
-  if(GFLAGS_FOUND)
-    set(HAVE_GFLAGS 1)
-  endif(GFLAGS_FOUND)
-endif(SNAPPY_BUILD_TESTS)
 
 configure_file(
   "${PROJECT_SOURCE_DIR}/cmake/config.h.in"
@@ -123,40 +112,41 @@ if(BUILD_SHARED_LIBS)
   set_target_properties(snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif(BUILD_SHARED_LIBS)
 
-if(GTEST_FOUND OR GFLAGS_FOUND)
-  if(SNAPPY_BUILD_TESTS)
-    enable_testing()
+if(SNAPPY_BUILD_TESTS)
+  find_package(GTest REQUIRED)
+  find_package(Gflags)
+  find_package(Threads)
 
-    add_executable(snappy_unittest "")
-    target_sources(snappy_unittest
-      PRIVATE
-        "${PROJECT_SOURCE_DIR}/snappy_unittest.cc"
-        "${PROJECT_SOURCE_DIR}/snappy-test.cc"
-    )
-    target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-    target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES} ${GTEST_LIBRARIES})
+  enable_testing()
 
-    if(HAVE_LIBZ)
-      target_link_libraries(snappy_unittest z)
-    endif(HAVE_LIBZ)
-    if(HAVE_LIBLZO2)
-      target_link_libraries(snappy_unittest lzo2.a)
-    endif(HAVE_LIBLZO2)
+  add_executable(snappy_unittest "")
+  target_sources(snappy_unittest
+    PRIVATE
+      "${PROJECT_SOURCE_DIR}/snappy_unittest.cc"
+      "${PROJECT_SOURCE_DIR}/snappy-test.cc"
+  )
+  target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
+  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES} ${GTEST_LIBRARIES} ${THREADS_LIBRARIES})
 
-    target_include_directories(snappy_unittest
-      BEFORE PRIVATE
-        "${PROJECT_SOURCE_DIR}"
-        "${GTEST_INCLUDE_DIRS}"
-        "${GFLAGS_INCLUDE_DIRS}"
-    )
+  if(HAVE_LIBZ)
+    target_link_libraries(snappy_unittest z)
+  endif(HAVE_LIBZ)
+  if(HAVE_LIBLZO2)
+    target_link_libraries(snappy_unittest lzo2)
+  endif(HAVE_LIBLZO2)
 
-    add_test(
-      NAME snappy_unittest
-      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-      COMMAND "${PROJECT_BINARY_DIR}/snappy_unittest")
-  endif(SNAPPY_BUILD_TESTS)
-endif(GTEST_FOUND OR GFLAGS_FOUND)
+  target_include_directories(snappy_unittest
+    BEFORE PRIVATE
+      "${PROJECT_SOURCE_DIR}"
+      "${GTEST_INCLUDE_DIRS}"
+      "${GFLAGS_INCLUDE_DIRS}"
+  )
 
+  add_test(
+    NAME snappy_unittest
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    COMMAND "${PROJECT_BINARY_DIR}/snappy_unittest")
+endif(SNAPPY_BUILD_TESTS)
 
 include(GNUInstallDirs)
 install(TARGETS snappy
