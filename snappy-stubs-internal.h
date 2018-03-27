@@ -53,6 +53,18 @@
 #include <intrin.h>
 #endif  // defined(_MSC_VER)
 
+#ifndef __has_feature
+#define __has_feature(x) 0
+#endif
+
+#if __has_feature(memory_sanitizer)
+#include <sanitizer/msan_interface.h>
+#define SNAPPY_ANNOTATE_MEMORY_IS_INITIALIZED(address, size) \
+    __msan_unpoison((address), (size))
+#else
+#define SNAPPY_ANNOTATE_MEMORY_IS_INITIALIZED(address, size) /* empty */
+#endif  // __has_feature(memory_sanitizer)
+
 #include "snappy-stubs-public.h"
 
 #if defined(__x86_64__)

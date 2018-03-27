@@ -40,7 +40,7 @@
 #endif
 
 #if SNAPPY_HAVE_SSE2
-#include <emmintrin.h>
+#include <x86intrin.h>
 #endif
 #include <stdio.h>
 
@@ -56,6 +56,7 @@ using internal::COPY_2_BYTE_OFFSET;
 using internal::LITERAL;
 using internal::char_table;
 using internal::kMaximumTagLength;
+using internal::pshufb_fill_patterns;
 
 // Any hash function will produce a valid compressed bitstream, but a good
 // hash function reduces the number of collisions and thus yields better
@@ -182,6 +183,36 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
 
   // Handle the uncommon case where pattern is less than 8 bytes.
   if (SNAPPY_PREDICT_FALSE(pattern_size < 8)) {
+#if SNAPPY_HAVE_SSE2
+    // Load the first eight bytes into an 128-bit XMM register, then use PSHUFB
+    // to permute the register's contents in-place into a repeating sequence of
+    // the first "pattern_size" bytes.
+    // For example, suppose:
+    //    src       == "abc"
+    //    op        == op + 3
+    // After _mm_shuffle_epi8(), "pattern" will have five copies of "abc"
+    // followed by one byte of slop: abcabcabcabcabca.
+    //
+    // The non-SSE fallback implementation suffers from store-forwarding stalls
+    // because its loads and stores partly overlap. By expanding the pattern
+    // in-place, we avoid the penalty.
+    if (SNAPPY_PREDICT_TRUE(op <= buf_limit - 16)) {
+      const __m128i shuffle_mask = _mm_load_si128(
+          reinterpret_cast<const __m128i*>(pshufb_fill_patterns)
+          + pattern_size - 1);
+      const __m128i pattern = _mm_shuffle_epi8(
+          _mm_loadl_epi64(reinterpret_cast<const __m128i*>(src)), shuffle_mask);
+      // Uninitialized bytes are masked out by the shuffle mask.
+      SNAPPY_ANNOTATE_MEMORY_IS_INITIALIZED(&pattern, sizeof(pattern));
+      pattern_size *= 16 / pattern_size;
+      while (op < op_limit && op <= buf_limit - 16) {
+        _mm_storeu_si128(reinterpret_cast<__m128i*>(op), pattern);
+        op += pattern_size;
+      }
+      if (SNAPPY_PREDICT_TRUE(op >= op_limit)) return op_limit;
+    }
+    return IncrementalCopySlow(src, op, op_limit);
+#else
     // If plenty of buffer space remains, expand the pattern to at least 8
     // bytes. The way the following loop is written, we need 8 bytes of buffer
     // space if pattern_size >= 4, 11 bytes if pattern_size is 1 or 3, and 10
@@ -198,6 +229,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     } else {
       return IncrementalCopySlow(src, op, op_limit);
     }
+#endif
   }
   assert(pattern_size >= 8);
 
