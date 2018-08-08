@@ -30,9 +30,23 @@
 #include "snappy-internal.h"
 #include "snappy-sinksource.h"
 
-#if defined(__SSSE3__)
-#include <x86intrin.h>
+#if !defined(SNAPPY_HAVE_SSSE3)
+// __SSSE3__ is defined by GCC and Clang. Visual Studio doesn't target SIMD
+// support between SSE2 and AVX (so SSSE3 instructions require AVX support), and
+// defines __AVX__ when AVX support is available.
+#if defined(__SSSE3__) || defined(__AVX__)
+#define SNAPPY_HAVE_SSSE3 1
+#else
+#define SNAPPY_HAVE_SSSE3 0
 #endif
+#endif  // !defined(SNAPPY_HAVE_SSSE3)
+
+#if SNAPPY_HAVE_SSSE3
+// Please do not replace with <x86intrin.h>. or with headers that assume more
+// advanced SSE versions without checking with all the OWNERS.
+#include <tmmintrin.h>
+#endif
+
 #include <stdio.h>
 
 #include <algorithm>
@@ -95,6 +109,9 @@ void UnalignedCopy64(const void* src, void* dst) {
 }
 
 void UnalignedCopy128(const void* src, void* dst) {
+  // memcpy gets vectorized when the appropriate compiler options are used.
+  // For example, x86 compilers targeting SSE2+ will optimize to an SSE2 load
+  // and store.
   char tmp[16];
   memcpy(tmp, src, 16);
   memcpy(dst, tmp, 16);
@@ -167,7 +184,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
 
   // Handle the uncommon case where pattern is less than 8 bytes.
   if (SNAPPY_PREDICT_FALSE(pattern_size < 8)) {
-#if defined(__SSSE3__)
+#if SNAPPY_HAVE_SSSE3
     // Load the first eight bytes into an 128-bit XMM register, then use PSHUFB
     // to permute the register's contents in-place into a repeating sequence of
     // the first "pattern_size" bytes.
@@ -197,7 +214,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       if (SNAPPY_PREDICT_TRUE(op >= op_limit)) return op_limit;
     }
     return IncrementalCopySlow(src, op, op_limit);
-#else
+#else  // !SNAPPY_HAVE_SSSE3
     // If plenty of buffer space remains, expand the pattern to at least 8
     // bytes. The way the following loop is written, we need 8 bytes of buffer
     // space if pattern_size >= 4, 11 bytes if pattern_size is 1 or 3, and 10
@@ -214,7 +231,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     } else {
       return IncrementalCopySlow(src, op, op_limit);
     }
-#endif
+#endif  // SNAPPY_HAVE_SSSE3
   }
   assert(pattern_size >= 8);
 

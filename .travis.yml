@@ -58,7 +58,7 @@ install:
 
 before_script:
 - mkdir -p build && cd build
-- cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+- cmake .. -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DSNAPPY_REQUIRE_AVX=ON
 - cmake --build .
 - cd ..
 

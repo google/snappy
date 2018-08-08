@@ -1,11 +1,18 @@
 cmake_minimum_required(VERSION 3.1)
 project(Snappy VERSION 1.1.7 LANGUAGES C CXX)
 
+# This project requires C++11.
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 # BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to make
 # it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
 option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
+
+option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
 
 include(TestBigEndian)
 test_big_endian(SNAPPY_IS_BIG_ENDIAN)
@@ -26,12 +33,40 @@ include(CheckLibraryExists)
 check_library_exists(z zlibVersion "" HAVE_LIBZ)
 check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
 
-include(CheckCXXSourceCompiles)
-check_cxx_source_compiles(
-    "int main(void) { return __builtin_expect(0, 1); }" HAVE_BUILTIN_EXPECT)
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("/arch:AVX" HAVE_VISUAL_STUDIO_ARCH_AVX)
+CHECK_CXX_COMPILER_FLAG("-mavx" HAVE_CLANG_MAVX)
+if (SNAPPY_REQUIRE_AVX)
+  if(HAVE_VISUAL_STUDIO_ARCH_AVX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX")
+  endif(HAVE_VISUAL_STUDIO_ARCH_AVX)
+  if(HAVE_CLANG_MAVX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
+  endif(HAVE_CLANG_MAVX)
+endif(SNAPPY_REQUIRE_AVX)
 
-check_cxx_source_compiles(
-    "int main(void) { return __builtin_ctzll(0); }" HAVE_BUILTIN_CTZ)
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles("
+int main() {
+  return __builtin_expect(0, 1);
+}" HAVE_BUILTIN_EXPECT)
+
+check_cxx_source_compiles("
+int main() {
+  return __builtin_ctzll(0);
+}" HAVE_BUILTIN_CTZ)
+
+check_cxx_source_compiles("
+#include <tmmintrin.h>
+
+int main() {
+  const __m128i *src = 0;
+  __m128i dest;
+  const __m128i shuffle_mask = _mm_load_si128(src);
+  const __m128i pattern = _mm_shuffle_epi8(_mm_loadl_epi64(src), shuffle_mask);
+  _mm_storeu_si128(&dest, pattern);
+  return 0;
+}" SNAPPY_HAVE_SSSE3)
 
 include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
