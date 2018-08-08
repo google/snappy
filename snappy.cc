@@ -30,16 +30,7 @@
 #include "snappy-internal.h"
 #include "snappy-sinksource.h"
 
-#ifndef SNAPPY_HAVE_SSE2
-#if defined(__SSE2__) || defined(_M_X64) || \
-    (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
-#define SNAPPY_HAVE_SSE2 1
-#else
-#define SNAPPY_HAVE_SSE2 0
-#endif
-#endif
-
-#if SNAPPY_HAVE_SSE2
+#if defined(__SSSE3__)
 #include <x86intrin.h>
 #endif
 #include <stdio.h>
@@ -104,16 +95,9 @@ void UnalignedCopy64(const void* src, void* dst) {
 }
 
 void UnalignedCopy128(const void* src, void* dst) {
-  // TODO(alkis): Remove this when we upgrade to a recent compiler that emits
-  // SSE2 moves for memcpy(dst, src, 16).
-#if SNAPPY_HAVE_SSE2
-  __m128i x = _mm_loadu_si128(static_cast<const __m128i*>(src));
-  _mm_storeu_si128(static_cast<__m128i*>(dst), x);
-#else
   char tmp[16];
   memcpy(tmp, src, 16);
   memcpy(dst, tmp, 16);
-#endif
 }
 
 // Copy [src, src+(op_limit-op)) to [op, (op_limit-op)) a byte at a time. Used
@@ -183,7 +167,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
 
   // Handle the uncommon case where pattern is less than 8 bytes.
   if (SNAPPY_PREDICT_FALSE(pattern_size < 8)) {
-#if defined __SSSE3__
+#if defined(__SSSE3__)
     // Load the first eight bytes into an 128-bit XMM register, then use PSHUFB
     // to permute the register's contents in-place into a repeating sequence of
     // the first "pattern_size" bytes.
@@ -205,7 +189,8 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       // Uninitialized bytes are masked out by the shuffle mask.
       SNAPPY_ANNOTATE_MEMORY_IS_INITIALIZED(&pattern, sizeof(pattern));
       pattern_size *= 16 / pattern_size;
-      while (op < op_limit && op <= buf_limit - 16) {
+      char* op_end = std::min(op_limit, buf_limit - 15);
+      while (op < op_end) {
         _mm_storeu_si128(reinterpret_cast<__m128i*>(op), pattern);
         op += pattern_size;
       }
@@ -1031,13 +1016,19 @@ size_t Compress(Source* reader, Sink* writer) {
 class SnappyIOVecWriter {
  private:
   const struct iovec* output_iov_;
-  const size_t output_iov_count_;
 
-  // We are currently writing into output_iov_[curr_iov_index_].
-  size_t curr_iov_index_;
+  // output_iov_end_ is set to iov + count and used to determine when
+  // the end of the iovs is reached.
+  const struct iovec* output_iov_end_;
 
-  // Bytes written to output_iov_[curr_iov_index_] so far.
-  size_t curr_iov_written_;
+  // Current iov that is being written into.
+  const struct iovec* curr_iov_;
+
+  // Pointer to current iov's write location.
+  char* curr_iov_output_;
+
+  // Remaining bytes to write into curr_iov_output.
+  size_t curr_iov_remaining_;
 
   // Total bytes decompressed into output_iov_ so far.
   size_t total_written_;
@@ -1045,9 +1036,8 @@ class SnappyIOVecWriter {
   // Maximum number of bytes that will be decompressed into output_iov_.
   size_t output_limit_;
 
-  inline char* GetIOVecPointer(size_t index, size_t offset) {
-    return reinterpret_cast<char*>(output_iov_[index].iov_base) +
-        offset;
+  static inline char* GetIOVecPointer(const struct iovec* iov, size_t offset) {
+    return reinterpret_cast<char*>(iov->iov_base) + offset;
   }
 
  public:
@@ -1055,12 +1045,13 @@ class SnappyIOVecWriter {
   // entire lifetime of the SnappyIOVecWriter.
   inline SnappyIOVecWriter(const struct iovec* iov, size_t iov_count)
       : output_iov_(iov),
-        output_iov_count_(iov_count),
-        curr_iov_index_(0),
-        curr_iov_written_(0),
+        output_iov_end_(iov + iov_count),
+        curr_iov_(iov),
+        curr_iov_output_(iov_count ? reinterpret_cast<char*>(iov->iov_base)
+                                   : nullptr),
+        curr_iov_remaining_(iov_count ? iov->iov_len : 0),
         total_written_(0),
-        output_limit_(-1) {
-  }
+        output_limit_(-1) {}
 
   inline void SetExpectedLength(size_t len) {
     output_limit_ = len;
@@ -1075,23 +1066,25 @@ class SnappyIOVecWriter {
       return false;
     }
 
+    return AppendNoCheck(ip, len);
+  }
+
+  inline bool AppendNoCheck(const char* ip, size_t len) {
     while (len > 0) {
-      assert(curr_iov_written_ <= output_iov_[curr_iov_index_].iov_len);
-      if (curr_iov_written_ >= output_iov_[curr_iov_index_].iov_len) {
+      if (curr_iov_remaining_ == 0) {
         // This iovec is full. Go to the next one.
-        if (curr_iov_index_ + 1 >= output_iov_count_) {
+        if (curr_iov_ + 1 >= output_iov_end_) {
           return false;
         }
-        curr_iov_written_ = 0;
-        ++curr_iov_index_;
+        ++curr_iov_;
+        curr_iov_output_ = reinterpret_cast<char*>(curr_iov_->iov_base);
+        curr_iov_remaining_ = curr_iov_->iov_len;
       }
 
-      const size_t to_write = std::min(
-          len, output_iov_[curr_iov_index_].iov_len - curr_iov_written_);
-      memcpy(GetIOVecPointer(curr_iov_index_, curr_iov_written_),
-             ip,
-             to_write);
-      curr_iov_written_ += to_write;
+      const size_t to_write = std::min(len, curr_iov_remaining_);
+      memcpy(curr_iov_output_, ip, to_write);
+      curr_iov_output_ += to_write;
+      curr_iov_remaining_ -= to_write;
       total_written_ += to_write;
       ip += to_write;
       len -= to_write;
@@ -1103,11 +1096,11 @@ class SnappyIOVecWriter {
   inline bool TryFastAppend(const char* ip, size_t available, size_t len) {
     const size_t space_left = output_limit_ - total_written_;
     if (len <= 16 && available >= 16 + kMaximumTagLength && space_left >= 16 &&
-        output_iov_[curr_iov_index_].iov_len - curr_iov_written_ >= 16) {
+        curr_iov_remaining_ >= 16) {
       // Fast path, used for the majority (about 95%) of invocations.
-      char* ptr = GetIOVecPointer(curr_iov_index_, curr_iov_written_);
-      UnalignedCopy128(ip, ptr);
-      curr_iov_written_ += len;
+      UnalignedCopy128(ip, curr_iov_output_);
+      curr_iov_output_ += len;
+      curr_iov_remaining_ -= len;
       total_written_ += len;
       return true;
     }
@@ -1116,7 +1109,9 @@ class SnappyIOVecWriter {
   }
 
   inline bool AppendFromSelf(size_t offset, size_t len) {
-    if (offset > total_written_ || offset == 0) {
+    // See SnappyArrayWriter::AppendFromSelf for an explanation of
+    // the "offset - 1u" trick.
+    if (offset - 1u >= total_written_) {
       return false;
     }
     const size_t space_left = output_limit_ - total_written_;
@@ -1125,8 +1120,8 @@ class SnappyIOVecWriter {
     }
 
     // Locate the iovec from which we need to start the copy.
-    size_t from_iov_index = curr_iov_index_;
-    size_t from_iov_offset = curr_iov_written_;
+    const iovec* from_iov = curr_iov_;
+    size_t from_iov_offset = curr_iov_->iov_len - curr_iov_remaining_;
     while (offset > 0) {
       if (from_iov_offset >= offset) {
         from_iov_offset -= offset;
@@ -1134,47 +1129,45 @@ class SnappyIOVecWriter {
       }
 
       offset -= from_iov_offset;
-      assert(from_iov_index > 0);
-      --from_iov_index;
-      from_iov_offset = output_iov_[from_iov_index].iov_len;
+      --from_iov;
+      assert(from_iov >= output_iov_);
+      from_iov_offset = from_iov->iov_len;
     }
 
     // Copy <len> bytes starting from the iovec pointed to by from_iov_index to
     // the current iovec.
     while (len > 0) {
-      assert(from_iov_index <= curr_iov_index_);
-      if (from_iov_index != curr_iov_index_) {
-        const size_t to_copy = std::min(
-            output_iov_[from_iov_index].iov_len - from_iov_offset,
-            len);
-        Append(GetIOVecPointer(from_iov_index, from_iov_offset), to_copy);
+      assert(from_iov <= curr_iov_);
+      if (from_iov != curr_iov_) {
+        const size_t to_copy =
+            std::min(from_iov->iov_len - from_iov_offset, len);
+        AppendNoCheck(GetIOVecPointer(from_iov, from_iov_offset), to_copy);
         len -= to_copy;
         if (len > 0) {
-          ++from_iov_index;
+          ++from_iov;
           from_iov_offset = 0;
         }
       } else {
-        assert(curr_iov_written_ <= output_iov_[curr_iov_index_].iov_len);
-        size_t to_copy = std::min(output_iov_[curr_iov_index_].iov_len -
-                                      curr_iov_written_,
-                                  len);
+        size_t to_copy = curr_iov_remaining_;
         if (to_copy == 0) {
           // This iovec is full. Go to the next one.
-          if (curr_iov_index_ + 1 >= output_iov_count_) {
+          if (curr_iov_ + 1 >= output_iov_end_) {
             return false;
           }
-          ++curr_iov_index_;
-          curr_iov_written_ = 0;
+          ++curr_iov_;
+          curr_iov_output_ = reinterpret_cast<char*>(curr_iov_->iov_base);
+          curr_iov_remaining_ = curr_iov_->iov_len;
           continue;
         }
         if (to_copy > len) {
           to_copy = len;
         }
-        IncrementalCopySlow(
-            GetIOVecPointer(from_iov_index, from_iov_offset),
-            GetIOVecPointer(curr_iov_index_, curr_iov_written_),
-            GetIOVecPointer(curr_iov_index_, curr_iov_written_) + to_copy);
-        curr_iov_written_ += to_copy;
+
+        IncrementalCopy(GetIOVecPointer(from_iov, from_iov_offset),
+                        curr_iov_output_, curr_iov_output_ + to_copy,
+                        curr_iov_output_ + curr_iov_remaining_);
+        curr_iov_output_ += to_copy;
+        curr_iov_remaining_ -= to_copy;
         from_iov_offset += to_copy;
         total_written_ += to_copy;
         len -= to_copy;
