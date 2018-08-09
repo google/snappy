@@ -61,7 +61,6 @@ using internal::COPY_2_BYTE_OFFSET;
 using internal::LITERAL;
 using internal::char_table;
 using internal::kMaximumTagLength;
-using internal::pshufb_fill_patterns;
 
 // Any hash function will produce a valid compressed bitstream, but a good
 // hash function reduces the number of collisions and thus yields better
@@ -139,6 +138,23 @@ inline char* IncrementalCopySlow(const char* src, char* op,
   }
   return op_limit;
 }
+
+#if SNAPPY_HAVE_SSSE3
+
+// This is a table of shuffle control masks that can be used as the source
+// operand for PSHUFB to permute the contents of the destination XMM register
+// into a repeating byte pattern.
+alignas(16) const char pshufb_fill_patterns[7][16] = {
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  {0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1},
+  {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0},
+  {0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3},
+  {0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0},
+  {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3},
+  {0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1},
+};
+
+#endif  // SNAPPY_HAVE_SSSE3
 
 // Copy [src, src+(op_limit-op)) to [op, (op_limit-op)) but faster than
 // IncrementalCopySlow. buf_limit is the address past the end of the writable
