@@ -509,7 +509,7 @@ char* CompressFragment(const char* input,
   // "ip" is the input pointer, and "op" is the output pointer.
   const char* ip = input;
   assert(input_size <= kBlockSize);
-  assert((table_size & (table_size - 1)) == 0); // table must be power of two
+  assert((table_size & (table_size - 1)) == 0);  // table must be power of two
   const int shift = 32 - Bits::Log2Floor(table_size);
   assert(static_cast<int>(kuint32max >> shift) == table_size - 1);
   const char* ip_end = input + input_size;
@@ -721,7 +721,7 @@ class SnappyDecompressor {
   }
 
   // Read the uncompressed length stored at the start of the compressed data.
-  // On succcess, stores the length in *result and returns true.
+  // On success, stores the length in *result and returns true.
   // On failure, returns false.
   bool ReadUncompressedLength(uint32* result) {
     assert(ip_ == NULL);       // Must not have read anything yet
@@ -1624,4 +1624,4 @@ bool Uncompress(Source* compressed, Sink* uncompressed) {
   }
 }
 
-} // end namespace snappy
+}  // namespace snappy

@@ -28,12 +28,6 @@
 /* Define to 1 if you have the `z' library (-lz). */
 #cmakedefine HAVE_LIBZ 1
 
-/* Define to 1 if you have the <stddef.h> header file. */
-#cmakedefine HAVE_STDDEF_H 1
-
-/* Define to 1 if you have the <stdint.h> header file. */
-#cmakedefine HAVE_STDINT_H 1
-
 /* Define to 1 if you have the <sys/endian.h> header file. */
 #cmakedefine HAVE_SYS_ENDIAN_H 1
 

@@ -55,8 +55,6 @@
 #include <windows.h>
 #endif
 
-#include <string>
-
 #ifdef HAVE_GTEST
 
 #include <gtest/gtest.h>
