@@ -1048,11 +1048,13 @@ size_t Compress(Source* reader, Sink* writer) {
 // Writer template argument to SnappyDecompressor::DecompressAllTags().
 class SnappyIOVecWriter {
  private:
-  const struct iovec* output_iov_;
-
   // output_iov_end_ is set to iov + count and used to determine when
   // the end of the iovs is reached.
   const struct iovec* output_iov_end_;
+
+#if !defined(NDEBUG)
+  const struct iovec* output_iov_;
+#endif  // !defined(NDEBUG)
 
   // Current iov that is being written into.
   const struct iovec* curr_iov_;
@@ -1077,8 +1079,10 @@ class SnappyIOVecWriter {
   // Does not take ownership of iov. iov must be valid during the
   // entire lifetime of the SnappyIOVecWriter.
   inline SnappyIOVecWriter(const struct iovec* iov, size_t iov_count)
-      : output_iov_(iov),
-        output_iov_end_(iov + iov_count),
+      : output_iov_end_(iov + iov_count),
+#if !defined(NDEBUG)
+        output_iov_(iov),
+#endif  // !defined(NDEBUG)
         curr_iov_(iov),
         curr_iov_output_(iov_count ? reinterpret_cast<char*>(iov->iov_base)
                                    : nullptr),
@@ -1163,7 +1167,9 @@ class SnappyIOVecWriter {
 
       offset -= from_iov_offset;
       --from_iov;
+#if !defined(NDEBUG)
       assert(from_iov >= output_iov_);
+#endif  // !defined(NDEBUG)
       from_iov_offset = from_iov->iov_len;
     }
 
