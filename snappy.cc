@@ -102,9 +102,22 @@ size_t MaxCompressedLength(size_t source_len) {
 namespace {
 
 void UnalignedCopy64(const void* src, void* dst) {
+#if defined(__mips64)
+  __asm__ volatile (
+	".set noat \n\t"
+	"ldl $1, 0x7(%[src]) \n\t"
+	"ldr $1, 0x0(%[src]) \n\t"
+	"sdl $1, 0x7(%[dst]) \n\t"
+	"sdr $1, 0x0(%[dst]) \n\t"
+        :
+        :[src]"r"(src),[dst]"r"(dst)
+        :
+  );
+#else
   char tmp[8];
   memcpy(tmp, src, 8);
   memcpy(dst, tmp, 8);
+#endif
 }
 
 void UnalignedCopy128(const void* src, void* dst) {
@@ -459,7 +472,7 @@ uint16* WorkingMemory::GetHashTable(size_t input_size, int* table_size) {
 // is done when GetEightBytesAt() is called, whereas for 32-bit, the load is
 // done at GetUint32AtOffset() time.
 
-#ifdef ARCH_K8
+#if defined(ARCH_K8) || defined(ARCH_ARM) || defined(ARCH_MIPS)
 
 typedef uint64 EightBytesReference;
 
