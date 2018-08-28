@@ -675,14 +675,15 @@ static inline void Report(const char *algorithm, size_t compressed_size,
 //   bool TryFastAppend(const char* ip, size_t available, size_t length);
 // };
 
-namespace internal {
-
-// Mapping from i in range [0,4] to a mask to extract the bottom 8*i bits
-static const uint32 wordmask[] = {
-  0u, 0xffu, 0xffffu, 0xffffffu, 0xffffffffu
-};
-
-}  // end namespace internal
+// Mapping from n in range [0,4] to a mask to extract the bottom 8*n bits.
+static inline uint32 WordMask(int n) {
+  DCHECK_GE(n, 0);
+  DCHECK_LE(n, 4);
+  // This needs to be wider than uint32 otherwise `mask << 32` will be
+  // undefined.
+  uint64 mask = 0xffffffff;
+  return ~(mask << (8 * n));
+}
 
 // Helper class for decompression
 class SnappyDecompressor {
@@ -770,20 +771,6 @@ class SnappyDecompressor {
 #endif
 
     const char* ip = ip_;
-    // For position-independent executables, accessing global arrays can be
-    // slow.  Move wordmask array onto the stack to mitigate this.
-    uint32 wordmask[sizeof(internal::wordmask)/sizeof(uint32)];
-    // Do not use memcpy to copy internal::wordmask to
-    // wordmask.  LLVM converts stack arrays to global arrays if it detects
-    // const stack arrays and this hurts the performance of position
-    // independent code. This change is temporary and can be reverted when
-    // https://reviews.llvm.org/D30759 is approved.
-    wordmask[0] = internal::wordmask[0];
-    wordmask[1] = internal::wordmask[1];
-    wordmask[2] = internal::wordmask[2];
-    wordmask[3] = internal::wordmask[3];
-    wordmask[4] = internal::wordmask[4];
-
     // We could have put this refill fragment only at the beginning of the loop.
     // However, duplicating it at the end of each branch gives the compiler more
     // scope to optimize the <ip_limit_ - ip> expression based on the local
@@ -825,7 +812,7 @@ class SnappyDecompressor {
           // Long literal.
           const size_t literal_length_length = literal_length - 60;
           literal_length =
-              (LittleEndian::Load32(ip) & wordmask[literal_length_length]) + 1;
+              (LittleEndian::Load32(ip) & WordMask(literal_length_length)) + 1;
           ip += literal_length_length;
         }
 
@@ -848,7 +835,7 @@ class SnappyDecompressor {
         MAYBE_REFILL();
       } else {
         const size_t entry = char_table[c];
-        const size_t trailer = LittleEndian::Load32(ip) & wordmask[entry >> 11];
+        const size_t trailer = LittleEndian::Load32(ip) & WordMask(entry >> 11);
         const size_t length = entry & 0xff;
         ip += entry >> 11;
 
