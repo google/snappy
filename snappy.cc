@@ -942,6 +942,17 @@ bool GetUncompressedLength(Source* source, uint32* result) {
   return decompressor.ReadUncompressedLength(result);
 }
 
+struct Deleter {
+  Deleter() : size_(0) {}
+  explicit Deleter(size_t size) : size_(size) {}
+
+  void operator()(char* ptr) const {
+    std::allocator<char>().deallocate(ptr, size_);
+  }
+
+  size_t size_;
+};
+
 size_t Compress(Source* reader, Sink* writer) {
   size_t written = 0;
   size_t N = reader->Available();
@@ -952,8 +963,8 @@ size_t Compress(Source* reader, Sink* writer) {
   written += (p - ulength);
 
   internal::WorkingMemory wmem;
-  char* scratch = NULL;
-  char* scratch_output = NULL;
+  std::unique_ptr<char, Deleter> scratch;
+  std::unique_ptr<char, Deleter> scratch_output;
 
   while (N > 0) {
     // Get next block to compress (without copying if possible)
@@ -974,20 +985,21 @@ size_t Compress(Source* reader, Sink* writer) {
         // If this is the last iteration, we want to allocate N bytes
         // of space, otherwise the max possible kBlockSize space.
         // num_to_read contains exactly the correct value
-        scratch = new char[num_to_read];
+        scratch = {
+            std::allocator<char>().allocate(num_to_read), Deleter(num_to_read)};
       }
-      memcpy(scratch, fragment, bytes_read);
+      memcpy(scratch.get(), fragment, bytes_read);
       reader->Skip(bytes_read);
 
       while (bytes_read < num_to_read) {
         fragment = reader->Peek(&fragment_size);
         size_t n = std::min<size_t>(fragment_size, num_to_read - bytes_read);
-        memcpy(scratch + bytes_read, fragment, n);
+        memcpy(scratch.get() + bytes_read, fragment, n);
         bytes_read += n;
         reader->Skip(n);
       }
       assert(bytes_read == num_to_read);
-      fragment = scratch;
+      fragment = scratch.get();
       fragment_size = num_to_read;
     }
     assert(fragment_size == num_to_read);
@@ -1002,13 +1014,14 @@ size_t Compress(Source* reader, Sink* writer) {
     // Need a scratch buffer for the output, in case the byte sink doesn't
     // have room for us directly.
     if (scratch_output == NULL) {
-      scratch_output = new char[max_output];
+      scratch_output =
+          {std::allocator<char>().allocate(max_output), Deleter(max_output)};
     } else {
       // Since we encode kBlockSize regions followed by a region
       // which is <= kBlockSize in length, a previously allocated
       // scratch_output[] region is big enough for this iteration.
     }
-    char* dest = writer->GetAppendBuffer(max_output, scratch_output);
+    char* dest = writer->GetAppendBuffer(max_output, scratch_output.get());
     char* end = internal::CompressFragment(fragment, fragment_size,
                                            dest, table, table_size);
     writer->Append(dest, end - dest);
@@ -1019,9 +1032,6 @@ size_t Compress(Source* reader, Sink* writer) {
   }
 
   Report("snappy_compress", written, uncompressed_size);
-
-  delete[] scratch;
-  delete[] scratch_output;
 
   return written;
 }
