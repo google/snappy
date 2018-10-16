@@ -418,31 +418,41 @@ bool GetUncompressedLength(const char* start, size_t n, size_t* result) {
   }
 }
 
-namespace internal {
-uint16* WorkingMemory::GetHashTable(size_t input_size, int* table_size) {
-  // Use smaller hash table when input.size() is smaller, since we
-  // fill the table, incurring O(hash table size) overhead for
-  // compression, and if the input is short, we won't need that
-  // many hash table entries anyway.
+namespace {
+uint32 CalculateTableSize(uint32 input_size) {
   assert(kMaxHashTableSize >= 256);
-  size_t htsize = 256;
-  while (htsize < kMaxHashTableSize && htsize < input_size) {
-    htsize <<= 1;
+  if (input_size > kMaxHashTableSize) {
+    return kMaxHashTableSize;
   }
-
-  uint16* table;
-  if (htsize <= ARRAYSIZE(small_table_)) {
-    table = small_table_;
-  } else {
-    if (large_table_ == NULL) {
-      large_table_ = new uint16[kMaxHashTableSize];
-    }
-    table = large_table_;
+  if (input_size < 256) {
+    return 256;
   }
+  return 1u << (32 - __builtin_clz(input_size - 1));
+}
+}  // namespace
 
+namespace internal {
+WorkingMemory::WorkingMemory(size_t input_size) {
+  const size_t max_fragment_size = std::min(input_size, kBlockSize);
+  const size_t table_size = CalculateTableSize(max_fragment_size);
+  size_ = table_size * sizeof(*table_) + max_fragment_size +
+          MaxCompressedLength(max_fragment_size);
+  mem_ = std::allocator<char>().allocate(size_);
+  table_ = reinterpret_cast<uint16*>(mem_);
+  input_ = mem_ + table_size * sizeof(*table_);
+  output_ = input_ + max_fragment_size;
+}
+
+WorkingMemory::~WorkingMemory() {
+  std::allocator<char>().deallocate(mem_, size_);
+}
+
+uint16* WorkingMemory::GetHashTable(size_t fragment_size,
+                                    int* table_size) const {
+  const size_t htsize = CalculateTableSize(fragment_size);
+  memset(table_, 0, htsize * sizeof(*table_));
   *table_size = htsize;
-  memset(table, 0, htsize * sizeof(*table));
-  return table;
+  return table_;
 }
 }  // end namespace internal
 
@@ -942,17 +952,6 @@ bool GetUncompressedLength(Source* source, uint32* result) {
   return decompressor.ReadUncompressedLength(result);
 }
 
-struct Deleter {
-  Deleter() : size_(0) {}
-  explicit Deleter(size_t size) : size_(size) {}
-
-  void operator()(char* ptr) const {
-    std::allocator<char>().deallocate(ptr, size_);
-  }
-
-  size_t size_;
-};
-
 size_t Compress(Source* reader, Sink* writer) {
   size_t written = 0;
   size_t N = reader->Available();
@@ -962,9 +961,7 @@ size_t Compress(Source* reader, Sink* writer) {
   writer->Append(ulength, p-ulength);
   written += (p - ulength);
 
-  internal::WorkingMemory wmem;
-  std::unique_ptr<char, Deleter> scratch;
-  std::unique_ptr<char, Deleter> scratch_output;
+  internal::WorkingMemory wmem(N);
 
   while (N > 0) {
     // Get next block to compress (without copying if possible)
@@ -980,26 +977,19 @@ size_t Compress(Source* reader, Sink* writer) {
       pending_advance = num_to_read;
       fragment_size = num_to_read;
     } else {
-      // Read into scratch buffer
-      if (scratch == NULL) {
-        // If this is the last iteration, we want to allocate N bytes
-        // of space, otherwise the max possible kBlockSize space.
-        // num_to_read contains exactly the correct value
-        scratch = {
-            std::allocator<char>().allocate(num_to_read), Deleter(num_to_read)};
-      }
-      memcpy(scratch.get(), fragment, bytes_read);
+      char* scratch = wmem.GetScratchInput();
+      memcpy(scratch, fragment, bytes_read);
       reader->Skip(bytes_read);
 
       while (bytes_read < num_to_read) {
         fragment = reader->Peek(&fragment_size);
         size_t n = std::min<size_t>(fragment_size, num_to_read - bytes_read);
-        memcpy(scratch.get() + bytes_read, fragment, n);
+        memcpy(scratch + bytes_read, fragment, n);
         bytes_read += n;
         reader->Skip(n);
       }
       assert(bytes_read == num_to_read);
-      fragment = scratch.get();
+      fragment = scratch;
       fragment_size = num_to_read;
     }
     assert(fragment_size == num_to_read);
@@ -1013,17 +1003,13 @@ size_t Compress(Source* reader, Sink* writer) {
 
     // Need a scratch buffer for the output, in case the byte sink doesn't
     // have room for us directly.
-    if (scratch_output == NULL) {
-      scratch_output =
-          {std::allocator<char>().allocate(max_output), Deleter(max_output)};
-    } else {
-      // Since we encode kBlockSize regions followed by a region
-      // which is <= kBlockSize in length, a previously allocated
-      // scratch_output[] region is big enough for this iteration.
-    }
-    char* dest = writer->GetAppendBuffer(max_output, scratch_output.get());
-    char* end = internal::CompressFragment(fragment, fragment_size,
-                                           dest, table, table_size);
+
+    // Since we encode kBlockSize regions followed by a region
+    // which is <= kBlockSize in length, a previously allocated
+    // scratch_output[] region is big enough for this iteration.
+    char* dest = writer->GetAppendBuffer(max_output, wmem.GetScratchOutput());
+    char* end = internal::CompressFragment(fragment, fragment_size, dest, table,
+                                           table_size);
     writer->Append(dest, end - dest);
     written += (end - dest);
 

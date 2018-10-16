@@ -445,7 +445,7 @@ static void VerifyNonBlockedCompression(const string& input) {
   Varint::Append32(&prefix, input.size());
 
   // Setup compression table
-  snappy::internal::WorkingMemory wmem;
+  snappy::internal::WorkingMemory wmem(input.size());
   int table_size;
   uint16* table = wmem.GetHashTable(input.size(), &table_size);
 
