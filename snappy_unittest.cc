@@ -406,7 +406,7 @@ static void VerifyIOVec(const string& input) {
   // ranging from 1 to 10.
   char* buf = new char[input.size()];
   ACMRandom rnd(input.size());
-  size_t num = rnd.Next() % 10 + 1;
+  size_t num = absl::Uniform<uint32_t>(rnd) % 10 + 1;
   if (input.size() < num) {
     num = input.size();
   }
@@ -421,7 +421,8 @@ static void VerifyIOVec(const string& input) {
       if (rnd.OneIn(5)) {
         iov[i].iov_len = 0;
       } else {
-        iov[i].iov_len = rnd.Uniform(input.size() - used_so_far);
+        iov[i].iov_len =
+            absl::Uniform<uint32_t>(rnd, 0, input.size() - used_so_far);
       }
     }
     used_so_far += iov[i].iov_len;
@@ -667,12 +668,12 @@ TEST(Snappy, MaxBlowup) {
   string input;
   for (int i = 0; i < 20000; i++) {
     ACMRandom rnd(i);
-    uint32 bytes = static_cast<uint32>(rnd.Next());
+    uint32 bytes = static_cast<uint32>(absl::Uniform<uint32_t>(rnd));
     input.append(reinterpret_cast<char*>(&bytes), sizeof(bytes));
   }
   for (int i = 19999; i >= 0; i--) {
     ACMRandom rnd(i);
-    uint32 bytes = static_cast<uint32>(rnd.Next());
+    uint32 bytes = static_cast<uint32>(absl::Uniform<uint32_t>(rnd));
     input.append(reinterpret_cast<char*>(&bytes), sizeof(bytes));
   }
   Verify(input);
@@ -688,16 +689,16 @@ TEST(Snappy, RandomData) {
     }
 
     string x;
-    size_t len = rnd.Uniform(4096);
+    size_t len = absl::Uniform<uint32_t>(rnd, 0, 4096);
     if (i < 100) {
-      len = 65536 + rnd.Uniform(65536);
+      len = 65536 + absl::Uniform<uint32_t>(rnd, 0, 65536);
     }
     while (x.size() < len) {
       int run_len = 1;
       if (rnd.OneIn(10)) {
         run_len = rnd.Skewed(8);
       }
-      char c = (i < 100) ? rnd.Uniform(256) : rnd.Skewed(3);
+      char c = (i < 100) ? absl::Uniform<uint32_t>(rnd, 0, 256) : rnd.Skewed(3);
       while (run_len-- > 0 && x.size() < len) {
         x += c;
       }
@@ -1043,8 +1044,8 @@ TEST(Snappy, FindMatchLengthRandom) {
 
   for (int i = 0; i < kNumTrials; i++) {
     string s, t;
-    char a = rnd.Rand8();
-    char b = rnd.Rand8();
+    char a = absl::Uniform<uint8_t>(rnd);
+    char b = absl::Uniform<uint8_t>(rnd);
     while (!rnd.OneIn(kTypicalLength)) {
       s.push_back(rnd.OneIn(2) ? a : b);
       t.push_back(rnd.OneIn(2) ? a : b);
