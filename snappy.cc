@@ -313,10 +313,10 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
 
 }  // namespace
 
+template <bool allow_fast_path>
 static inline char* EmitLiteral(char* op,
                                 const char* literal,
-                                int len,
-                                bool allow_fast_path) {
+                                int len) {
   // The vast majority of copies are below 16 bytes, for which a
   // call to memcpy is overkill. This fast path can sometimes
   // copy up to 15 bytes too much, but that is okay in the
@@ -358,8 +358,8 @@ static inline char* EmitLiteral(char* op,
   return op + len;
 }
 
-static inline char* EmitCopyAtMost64(char* op, size_t offset, size_t len,
-                                     bool len_less_than_12) {
+template <bool len_less_than_12>
+static inline char* EmitCopyAtMost64(char* op, size_t offset, size_t len) {
   assert(len <= 64);
   assert(len >= 4);
   assert(offset < 65536);
@@ -380,29 +380,33 @@ static inline char* EmitCopyAtMost64(char* op, size_t offset, size_t len,
   return op;
 }
 
-static inline char* EmitCopy(char* op, size_t offset, size_t len,
-                             bool len_less_than_12) {
+template <bool len_less_than_12>
+static inline char* EmitCopy(char* op, size_t offset, size_t len) {
   assert(len_less_than_12 == (len < 12));
   if (len_less_than_12) {
-    return EmitCopyAtMost64(op, offset, len, true);
+    return EmitCopyAtMost64</*len_less_than_12=*/true>(op, offset, len);
   } else {
     // A special case for len <= 64 might help, but so far measurements suggest
     // it's in the noise.
 
     // Emit 64 byte copies but make sure to keep at least four bytes reserved.
     while (SNAPPY_PREDICT_FALSE(len >= 68)) {
-      op = EmitCopyAtMost64(op, offset, 64, false);
+      op = EmitCopyAtMost64</*len_less_than_12=*/false>(op, offset, 64);
       len -= 64;
     }
 
     // One or two copies will now finish the job.
     if (len > 64) {
-      op = EmitCopyAtMost64(op, offset, 60, false);
+      op = EmitCopyAtMost64</*len_less_than_12=*/false>(op, offset, 60);
       len -= 60;
     }
 
     // Emit remainder.
-    op = EmitCopyAtMost64(op, offset, len, len < 12);
+    if (len < 12) {
+      op = EmitCopyAtMost64</*len_less_than_12=*/true>(op, offset, len);
+    } else {
+      op = EmitCopyAtMost64</*len_less_than_12=*/false>(op, offset, len);
+    }
     return op;
   }
 }
@@ -586,7 +590,7 @@ char* CompressFragment(const char* input,
       // than 4 bytes match.  But, prior to the match, input
       // bytes [next_emit, ip) are unmatched.  Emit them as "literal bytes."
       assert(next_emit + 16 <= ip_end);
-      op = EmitLiteral(op, next_emit, ip - next_emit, true);
+      op = EmitLiteral</*allow_fast_path=*/true>(op, next_emit, ip - next_emit);
 
       // Step 3: Call EmitCopy, and then see if another EmitCopy could
       // be our next move.  Repeat until we find no match for the
@@ -609,7 +613,11 @@ char* CompressFragment(const char* input,
         ip += matched;
         size_t offset = base - candidate;
         assert(0 == memcmp(base, candidate, matched));
-        op = EmitCopy(op, offset, matched, p.second);
+        if (p.second) {
+          op = EmitCopy</*len_less_than_12=*/true>(op, offset, matched);
+        } else {
+          op = EmitCopy</*len_less_than_12=*/false>(op, offset, matched);
+        }
         next_emit = ip;
         if (SNAPPY_PREDICT_FALSE(ip >= ip_limit)) {
           goto emit_remainder;
@@ -634,7 +642,8 @@ char* CompressFragment(const char* input,
  emit_remainder:
   // Emit the remaining bytes as a literal
   if (next_emit < ip_end) {
-    op = EmitLiteral(op, next_emit, ip_end - next_emit, false);
+    op = EmitLiteral</*allow_fast_path=*/false>(op, next_emit,
+                                                ip_end - next_emit);
   }
 
   return op;
