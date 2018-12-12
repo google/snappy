@@ -42,9 +42,7 @@
 #endif  // !defined(SNAPPY_HAVE_SSSE3)
 
 #if SNAPPY_HAVE_SSSE3
-// Please do not replace with <x86intrin.h>. or with headers that assume more
-// advanced SSE versions without checking with all the OWNERS.
-#include <tmmintrin.h>
+#include <x86intrin.h>
 #endif
 
 #include <stdio.h>
@@ -694,14 +692,17 @@ static inline void Report(const char *algorithm, size_t compressed_size,
 //   bool TryFastAppend(const char* ip, size_t available, size_t length);
 // };
 
-// Mapping from n in range [0,4] to a mask to extract the bottom 8*n bits.
-static inline uint32 WordMask(int n) {
+static inline uint32 ExtractLowBytes(uint32 v, int n) {
   DCHECK_GE(n, 0);
   DCHECK_LE(n, 4);
+#ifdef __BMI2__
+  return _bzhi_u32(v, 8 * n);
+#else
   // This needs to be wider than uint32 otherwise `mask << 32` will be
   // undefined.
   uint64 mask = 0xffffffff;
-  return ~(mask << (8 * n));
+  return v & ~(mask << (8 * n));
+#endif
 }
 
 // Helper class for decompression
@@ -831,7 +832,8 @@ class SnappyDecompressor {
           // Long literal.
           const size_t literal_length_length = literal_length - 60;
           literal_length =
-              (LittleEndian::Load32(ip) & WordMask(literal_length_length)) + 1;
+              ExtractLowBytes(LittleEndian::Load32(ip), literal_length_length) +
+              1;
           ip += literal_length_length;
         }
 
@@ -854,7 +856,8 @@ class SnappyDecompressor {
         MAYBE_REFILL();
       } else {
         const size_t entry = char_table[c];
-        const size_t trailer = LittleEndian::Load32(ip) & WordMask(entry >> 11);
+        const size_t trailer =
+            ExtractLowBytes(LittleEndian::Load32(ip), entry >> 11);
         const size_t length = entry & 0xff;
         ip += entry >> 11;
 
