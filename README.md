@@ -77,7 +77,7 @@ Usage
 
 Note that Snappy, both the implementation and the main interface,
 is written in C++. However, several third-party bindings to other languages
-are available; see the home page at http://google.github.io/snappy/
+are available; see the home page at https://google.github.io/snappy/
 for more information. Also, if you want to use Snappy from C code, you can
 use the included C bindings in snappy-c.h.
 
@@ -112,12 +112,12 @@ tests to verify you have not broken anything. Note that if you have the
 Google Test library installed, unit test behavior (especially failures) will be
 significantly more user-friendly. You can find Google Test at
 
-  http://github.com/google/googletest
+  https://github.com/google/googletest
 
 You probably also want the gflags library for handling of command-line flags;
 you can find it at
 
-  http://gflags.github.io/gflags/
+  https://gflags.github.io/gflags/
 
 In addition to the unit tests, snappy contains microbenchmarks used to
 tune compression and decompression performance. These are automatically run
@@ -142,7 +142,7 @@ Contact
 Snappy is distributed through GitHub. For the latest version, a bug tracker,
 and other information, see
 
-  http://google.github.io/snappy/
+  https://google.github.io/snappy/
 
 or the repository at
 
