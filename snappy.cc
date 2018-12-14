@@ -695,7 +695,7 @@ static inline void Report(const char *algorithm, size_t compressed_size,
 static inline uint32 ExtractLowBytes(uint32 v, int n) {
   DCHECK_GE(n, 0);
   DCHECK_LE(n, 4);
-#ifdef __BMI2__
+#if defined(__BMI2__) && !defined(MEMORY_SANITIZER)
   return _bzhi_u32(v, 8 * n);
 #else
   // This needs to be wider than uint32 otherwise `mask << 32` will be
