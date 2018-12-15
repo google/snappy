@@ -695,6 +695,8 @@ static inline void Report(const char *algorithm, size_t compressed_size,
 static inline uint32 ExtractLowBytes(uint32 v, int n) {
   DCHECK_GE(n, 0);
   DCHECK_LE(n, 4);
+  // TODO(b/121042345): Remove !defined(MEMORY_SANITIZER) once MSan
+  // handles _bzhi_u32() correctly.
 #if defined(__BMI2__) && !defined(MEMORY_SANITIZER)
   return _bzhi_u32(v, 8 * n);
 #else
