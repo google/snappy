@@ -189,56 +189,6 @@ string ReadTestDataFile(const string& base);
 // Not safe for general use due to truncation issues.
 string StringPrintf(const char* format, ...);
 
-// A simple, non-cryptographically-secure random generator.
-class ACMRandom {
- public:
-  explicit ACMRandom(uint32 seed) : seed_(seed) {}
-
-  int32 Next();
-
-  int32 Uniform(int32 n) {
-    return Next() % n;
-  }
-  uint8 Rand8() {
-    return static_cast<uint8>((Next() >> 1) & 0x000000ff);
-  }
-  bool OneIn(int X) { return Uniform(X) == 0; }
-
-  // Skewed: pick "base" uniformly from range [0,max_log] and then
-  // return "base" random bits.  The effect is to pick a number in the
-  // range [0,2^max_log-1] with bias towards smaller numbers.
-  int32 Skewed(int max_log);
-
- private:
-  static const uint32 M = 2147483647L;   // 2^31-1
-  uint32 seed_;
-};
-
-inline int32 ACMRandom::Next() {
-  static const uint64 A = 16807;  // bits 14, 8, 7, 5, 2, 1, 0
-  // We are computing
-  //       seed_ = (seed_ * A) % M,    where M = 2^31-1
-  //
-  // seed_ must not be zero or M, or else all subsequent computed values
-  // will be zero or M respectively.  For all other values, seed_ will end
-  // up cycling through every number in [1,M-1]
-  uint64 product = seed_ * A;
-
-  // Compute (product % M) using the fact that ((x << 31) % M) == x.
-  seed_ = (product >> 31) + (product & M);
-  // The first reduction may overflow by 1 bit, so we may need to repeat.
-  // mod == M is not possible; using > allows the faster sign-bit-based test.
-  if (seed_ > M) {
-    seed_ -= M;
-  }
-  return seed_;
-}
-
-inline int32 ACMRandom::Skewed(int max_log) {
-  const int32 base = (Next() - 1) % (max_log+1);
-  return (Next() - 1) & ((1u << base)-1);
-}
-
 // A wall-time clock. This stub is not super-accurate, nor resistant to the
 // system time changing.
 class CycleTimer {

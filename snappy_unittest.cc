@@ -31,6 +31,7 @@
 
 
 #include <algorithm>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -405,24 +406,28 @@ static void VerifyIOVec(const string& input) {
   // Try uncompressing into an iovec containing a random number of entries
   // ranging from 1 to 10.
   char* buf = new char[input.size()];
-  ACMRandom rnd(input.size());
-  size_t num = absl::Uniform<uint32_t>(rnd) % 10 + 1;
+  std::minstd_rand0 rng(input.size());
+  std::uniform_int_distribution<size_t> uniform_1_to_10(1, 10);
+  size_t num = uniform_1_to_10(rng);
   if (input.size() < num) {
     num = input.size();
   }
   struct iovec* iov = new iovec[num];
   int used_so_far = 0;
+  std::bernoulli_distribution one_in_five(1.0 / 5);
   for (size_t i = 0; i < num; ++i) {
+    assert(used_so_far < input.size());
     iov[i].iov_base = buf + used_so_far;
     if (i == num - 1) {
       iov[i].iov_len = input.size() - used_so_far;
     } else {
       // Randomly choose to insert a 0 byte entry.
-      if (rnd.OneIn(5)) {
+      if (one_in_five(rng)) {
         iov[i].iov_len = 0;
       } else {
-        iov[i].iov_len =
-            absl::Uniform<uint32_t>(rnd, 0, input.size() - used_so_far);
+        std::uniform_int_distribution<size_t> uniform_not_used_so_far(
+            0, input.size() - used_so_far - 1);
+        iov[i].iov_len = uniform_not_used_so_far(rng);
       }
     }
     used_so_far += iov[i].iov_len;
@@ -665,42 +670,58 @@ TEST(Snappy, SimpleTests) {
 
 // Verify max blowup (lots of four-byte copies)
 TEST(Snappy, MaxBlowup) {
+  std::mt19937 rng;
+  std::uniform_int_distribution<uint8_t> random_byte;
   string input;
-  for (int i = 0; i < 20000; i++) {
-    ACMRandom rnd(i);
-    uint32 bytes = static_cast<uint32>(absl::Uniform<uint32_t>(rnd));
-    input.append(reinterpret_cast<char*>(&bytes), sizeof(bytes));
-  }
-  for (int i = 19999; i >= 0; i--) {
-    ACMRandom rnd(i);
-    uint32 bytes = static_cast<uint32>(absl::Uniform<uint32_t>(rnd));
-    input.append(reinterpret_cast<char*>(&bytes), sizeof(bytes));
+  for (int i = 0; i < 80000; ++i)
+    input.push_back(static_cast<char>(random_byte(rng)));
+
+  for (int i = 0; i < 80000; i += 4) {
+    string four_bytes(input.end() - i - 4, input.end() - i);
+    input.append(four_bytes);
   }
   Verify(input);
 }
 
 TEST(Snappy, RandomData) {
-  ACMRandom rnd(FLAGS_test_random_seed);
+  std::minstd_rand0 rng(FLAGS_test_random_seed);
+  std::uniform_int_distribution<int> uniform_0_to_3(0, 3);
+  std::uniform_int_distribution<int> uniform_0_to_8(0, 8);
+  std::uniform_int_distribution<uint8_t> uniform_byte;
+  std::uniform_int_distribution<size_t> uniform_4k(0, 4095);
+  std::uniform_int_distribution<size_t> uniform_64k(0, 65535);
+  std::bernoulli_distribution one_in_ten(1.0 / 10);
 
-  const int num_ops = 20000;
+  constexpr int num_ops = 20000;
   for (int i = 0; i < num_ops; i++) {
     if ((i % 1000) == 0) {
       VLOG(0) << "Random op " << i << " of " << num_ops;
     }
 
     string x;
-    size_t len = absl::Uniform<uint32_t>(rnd, 0, 4096);
+    size_t len = uniform_4k(rng);
     if (i < 100) {
-      len = 65536 + absl::Uniform<uint32_t>(rnd, 0, 65536);
+      len = 65536 + uniform_64k(rng);
     }
     while (x.size() < len) {
       int run_len = 1;
-      if (rnd.OneIn(10)) {
-        run_len = rnd.Skewed(8);
+      if (one_in_ten(rng)) {
+        int skewed_bits = uniform_0_to_8(rng);
+        // int is guaranteed to hold at least 16 bits, this uses at most 8 bits.
+        std::uniform_int_distribution<int> skewed_low(0,
+                                                      (1 << skewed_bits) - 1);
+        run_len = skewed_low(rng);
       }
-      char c = (i < 100) ? absl::Uniform<uint32_t>(rnd, 0, 256) : rnd.Skewed(3);
+      char c = static_cast<char>(uniform_byte(rng));
+      if (i >= 100) {
+        int skewed_bits = uniform_0_to_3(rng);
+        // int is guaranteed to hold at least 16 bits, this uses at most 3 bits.
+        std::uniform_int_distribution<int> skewed_low(0,
+                                                      (1 << skewed_bits) - 1);
+        c = static_cast<char>(skewed_low(rng));
+      }
       while (run_len-- > 0 && x.size() < len) {
-        x += c;
+        x.push_back(c);
       }
     }
 
@@ -1038,17 +1059,20 @@ TEST(Snappy, FindMatchLength) {
 }
 
 TEST(Snappy, FindMatchLengthRandom) {
-  const int kNumTrials = 10000;
-  const int kTypicalLength = 10;
-  ACMRandom rnd(FLAGS_test_random_seed);
+  constexpr int kNumTrials = 10000;
+  constexpr int kTypicalLength = 10;
+  std::minstd_rand0 rng(FLAGS_test_random_seed);
+  std::uniform_int_distribution<uint8_t> uniform_byte;
+  std::bernoulli_distribution one_in_two(1.0 / 2);
+  std::bernoulli_distribution one_in_typical_length(1.0 / kTypicalLength);
 
   for (int i = 0; i < kNumTrials; i++) {
     string s, t;
-    char a = absl::Uniform<uint8_t>(rnd);
-    char b = absl::Uniform<uint8_t>(rnd);
-    while (!rnd.OneIn(kTypicalLength)) {
-      s.push_back(rnd.OneIn(2) ? a : b);
-      t.push_back(rnd.OneIn(2) ? a : b);
+    char a = uniform_byte(rng);
+    char b = uniform_byte(rng);
+    while (!one_in_typical_length(rng)) {
+      s.push_back(one_in_two(rng) ? a : b);
+      t.push_back(one_in_two(rng) ? a : b);
     }
     DataEndingAtUnreadablePage u(s);
     DataEndingAtUnreadablePage v(t);
