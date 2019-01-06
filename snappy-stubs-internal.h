@@ -393,14 +393,14 @@ inline int Bits::Log2FloorNonZero(uint32 n) {
   // (31 ^ x) is equivalent to (31 - x) for x in [0, 31]. An easy proof
   // represents subtraction in base 2 and observes that there's no carry.
   //
-  // GCC and Clang reprenset __builtin_clz on x86 as 31 ^ _bit_scan_reverse(x).
+  // GCC and Clang represent __builtin_clz on x86 as 31 ^ _bit_scan_reverse(x).
   // Using "31 ^" here instead of "31 -" allows the optimizer to strip the
   // function body down to _bit_scan_reverse(x).
-  return 31 ^ __builtin_clz(arg);
+  return 31 ^ __builtin_clz(n);
 }
 
 inline int Bits::Log2Floor(uint32 n) {
-  return (n == 0) ? -1 : Bits::Log2FloorNonZero(arg);
+  return (n == 0) ? -1 : Bits::Log2FloorNonZero(n);
 }
 
 inline int Bits::FindLSBSetNonZero(uint32 n) {
