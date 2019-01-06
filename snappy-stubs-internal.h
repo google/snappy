@@ -365,6 +365,9 @@ class LittleEndian {
 // Some bit-manipulation functions.
 class Bits {
  public:
+  // Return floor(log2(n)) for positive integer n.
+  static int Log2FloorNonZero(uint32 n);
+
   // Return floor(log2(n)) for positive integer n.  Returns -1 iff n == 0.
   static int Log2Floor(uint32 n);
 
@@ -385,50 +388,72 @@ class Bits {
 
 #ifdef HAVE_BUILTIN_CTZ
 
+inline int Bits::Log2FloorNonZero(uint32 n) {
+  assert(n != 0);
+  // (31 ^ x) is equivalent to (31 - x) for x in [0, 31]. An easy proof
+  // represents subtraction in base 2 and observes that there's no carry.
+  //
+  // GCC and Clang reprenset __builtin_clz on x86 as 31 ^ _bit_scan_reverse(x).
+  // Using "31 ^" here instead of "31 -" allows the optimizer to strip the
+  // function body down to _bit_scan_reverse(x).
+  return 31 ^ __builtin_clz(arg);
+}
+
 inline int Bits::Log2Floor(uint32 n) {
-  return n == 0 ? -1 : 31 ^ __builtin_clz(n);
+  return (n == 0) ? -1 : Bits::Log2FloorNonZero(arg);
 }
 
 inline int Bits::FindLSBSetNonZero(uint32 n) {
+  assert(n != 0);
   return __builtin_ctz(n);
 }
 
 #if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 inline int Bits::FindLSBSetNonZero64(uint64 n) {
+  assert(n != 0);
   return __builtin_ctzll(n);
 }
 #endif  // defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 
 #elif defined(_MSC_VER)
 
+inline int Bits::Log2FloorNonZero(uint32 n) {
+  assert(n != 0);
+  unsigned long where;
+  _BitScanReverse(&where, n);
+  return static_cast<int>(where);
+}
+
 inline int Bits::Log2Floor(uint32 n) {
   unsigned long where;
-  if (_BitScanReverse(&where, n)) {
-    return where;
-  } else {
-    return -1;
-  }
+  if (_BitScanReverse(&where, n))
+    return static_cast<int>(where);
+  return -1;
 }
 
 inline int Bits::FindLSBSetNonZero(uint32 n) {
+  assert(n != 0);
   unsigned long where;
-  if (_BitScanForward(&where, n)) return static_cast<int>(where);
+  if (_BitScanForward(&where, n))
+    return static_cast<int>(where);
   return 32;
 }
 
 #if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 inline int Bits::FindLSBSetNonZero64(uint64 n) {
+  assert(n != 0);
   unsigned long where;
-  if (_BitScanForward64(&where, n)) return static_cast<int>(where);
+  if (_BitScanForward64(&where, n))
+    return static_cast<int>(where);
   return 64;
 }
 #endif  // defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 
 #else  // Portable versions.
 
-inline int Bits::Log2Floor(uint32 n) {
-  if (n == 0)
-    return -1;
+inline int Bits::Log2FloorNonZero(uint32 n) {
+  assert(n != 0);
+
   int log = 0;
   uint32 value = n;
   for (int i = 4; i >= 0; --i) {
@@ -443,7 +468,13 @@ inline int Bits::Log2Floor(uint32 n) {
   return log;
 }
 
+inline int Bits::Log2Floor(uint32 n) {
+  return (n == 0) ? -1 : Bits::Log2FloorNonZero(arg);
+}
+
 inline int Bits::FindLSBSetNonZero(uint32 n) {
+  assert(n != 0);
+
   int rc = 31;
   for (int i = 4, shift = 1 << 4; i >= 0; --i) {
     const uint32 x = n << shift;
@@ -459,6 +490,8 @@ inline int Bits::FindLSBSetNonZero(uint32 n) {
 #if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 // FindLSBSetNonZero64() is defined in terms of FindLSBSetNonZero().
 inline int Bits::FindLSBSetNonZero64(uint64 n) {
+  assert(n != 0);
+
   const uint32 bottombits = static_cast<uint32>(n);
   if (bottombits == 0) {
     // Bottom bits are zero, so scan in top bits

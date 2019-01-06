@@ -429,7 +429,9 @@ uint32 CalculateTableSize(uint32 input_size) {
   if (input_size < 256) {
     return 256;
   }
-  return 1u << (32 - __builtin_clz(input_size - 1));
+  // This is equivalent to Log2Ceiling(input_size), assuming input_size > 1.
+  // 2 << Log2Floor(x - 1) is equivalent to 1 << (1 + Log2Floor(x - 1)).
+  return 2u << Bits::Log2Floor(input_size - 1);
 }
 }  // namespace
 
