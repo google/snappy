@@ -671,10 +671,10 @@ TEST(Snappy, SimpleTests) {
 // Verify max blowup (lots of four-byte copies)
 TEST(Snappy, MaxBlowup) {
   std::mt19937 rng;
-  std::uniform_int_distribution<uint8_t> random_byte;
+  std::uniform_int_distribution<int> uniform_byte(0, 255);
   string input;
   for (int i = 0; i < 80000; ++i)
-    input.push_back(static_cast<char>(random_byte(rng)));
+    input.push_back(static_cast<char>(uniform_byte(rng)));
 
   for (int i = 0; i < 80000; i += 4) {
     string four_bytes(input.end() - i - 4, input.end() - i);
@@ -687,7 +687,7 @@ TEST(Snappy, RandomData) {
   std::minstd_rand0 rng(FLAGS_test_random_seed);
   std::uniform_int_distribution<int> uniform_0_to_3(0, 3);
   std::uniform_int_distribution<int> uniform_0_to_8(0, 8);
-  std::uniform_int_distribution<uint8_t> uniform_byte;
+  std::uniform_int_distribution<int> uniform_byte(0, 255);
   std::uniform_int_distribution<size_t> uniform_4k(0, 4095);
   std::uniform_int_distribution<size_t> uniform_64k(0, 65535);
   std::bernoulli_distribution one_in_ten(1.0 / 10);
@@ -1062,14 +1062,14 @@ TEST(Snappy, FindMatchLengthRandom) {
   constexpr int kNumTrials = 10000;
   constexpr int kTypicalLength = 10;
   std::minstd_rand0 rng(FLAGS_test_random_seed);
-  std::uniform_int_distribution<uint8_t> uniform_byte;
+  std::uniform_int_distribution<int> uniform_byte(0, 255);
   std::bernoulli_distribution one_in_two(1.0 / 2);
   std::bernoulli_distribution one_in_typical_length(1.0 / kTypicalLength);
 
   for (int i = 0; i < kNumTrials; i++) {
     string s, t;
-    char a = uniform_byte(rng);
-    char b = uniform_byte(rng);
+    char a = static_cast<char>(uniform_byte(rng));
+    char b = static_cast<char>(uniform_byte(rng));
     while (!one_in_typical_length(rng)) {
       s.push_back(one_in_two(rng) ? a : b);
       t.push_back(one_in_two(rng) ? a : b);
