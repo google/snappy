@@ -13,14 +13,22 @@ os:
   - osx
 
 env:
-  - BUILD_TYPE=Debug
-  - BUILD_TYPE=RelWithDebInfo
+  - BUILD_TYPE=Debug CPU_LEVEL=AVX
+  - BUILD_TYPE=Debug CPU_LEVEL=AVX2
+  - BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX
+  - BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
 
 matrix:
   exclude:
     # GCC fails on recent Travis OSX images.
     # https://github.com/travis-ci/travis-ci/issues/9640
     - compiler: gcc
+      os: osx
+    # Travis OSX servers seem to run on pre-Haswell CPUs. Attempting to use AVX2
+    # results in crashes.
+    - env: BUILD_TYPE=Debug CPU_LEVEL=AVX2
+      os: osx
+    - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
       os: osx
 
 addons:
@@ -61,7 +69,8 @@ install:
 
 before_script:
 - mkdir -p build && cd build
-- cmake .. -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DSNAPPY_REQUIRE_AVX=ON
+- cmake .. -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+    -DSNAPPY_REQUIRE_${CPU_LEVEL}=ON
 - cmake --build .
 - cd ..
 

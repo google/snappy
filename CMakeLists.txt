@@ -14,6 +14,8 @@ option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
 
 option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
 
+option(SNAPPY_REQUIRE_AVX2 "Target processors with AVX2 support." OFF)
+
 include(TestBigEndian)
 test_big_endian(SNAPPY_IS_BIG_ENDIAN)
 
@@ -33,15 +35,27 @@ check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
 
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("/arch:AVX" HAVE_VISUAL_STUDIO_ARCH_AVX)
+CHECK_CXX_COMPILER_FLAG("/arch:AVX2" HAVE_VISUAL_STUDIO_ARCH_AVX2)
 CHECK_CXX_COMPILER_FLAG("-mavx" HAVE_CLANG_MAVX)
-if (SNAPPY_REQUIRE_AVX)
+CHECK_CXX_COMPILER_FLAG("-mbmi2" HAVE_CLANG_MBMI2)
+if(SNAPPY_REQUIRE_AVX2)
+  if(HAVE_VISUAL_STUDIO_ARCH_AVX2)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
+  endif(HAVE_VISUAL_STUDIO_ARCH_AVX2)
+  if(HAVE_CLANG_MAVX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
+  endif(HAVE_CLANG_MAVX)
+  if(HAVE_CLANG_MBMI2)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mbmi2")
+  endif(HAVE_CLANG_MBMI2)
+elseif (SNAPPY_REQUIRE_AVX)
   if(HAVE_VISUAL_STUDIO_ARCH_AVX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX")
   endif(HAVE_VISUAL_STUDIO_ARCH_AVX)
   if(HAVE_CLANG_MAVX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
   endif(HAVE_CLANG_MAVX)
-endif(SNAPPY_REQUIRE_AVX)
+endif(SNAPPY_REQUIRE_AVX2)
 
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles("
@@ -65,6 +79,12 @@ int main() {
   _mm_storeu_si128(&dest, pattern);
   return 0;
 }" SNAPPY_HAVE_SSSE3)
+
+check_cxx_source_compiles("
+#include <immintrin.h>
+int main() {
+  return _bzhi_u32(0, 1);
+}" SNAPPY_HAVE_BMI2)
 
 include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)

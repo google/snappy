@@ -30,7 +30,7 @@ build_script:
   - if "%platform%"=="x64" set CMAKE_GENERATOR=%CMAKE_GENERATOR% Win64
   - cmake --version
   - cmake .. -G "%CMAKE_GENERATOR%"
-      -DCMAKE_CONFIGURATION_TYPES="%CONFIGURATION%" -DSNAPPY_REQUIRE_AVX=ON
+      -DCMAKE_CONFIGURATION_TYPES="%CONFIGURATION%" -DSNAPPY_REQUIRE_AVX2=ON
   - cmake --build . --config %CONFIGURATION%
   - cd ..
 
