@@ -732,17 +732,13 @@ static inline uint32 ExtractLowBytes(uint32 v, int n) {
 #endif
 }
 
-static inline bool LeftShiftOverflows(uint32 value, uint32 shift) {
+static inline bool LeftShiftOverflows(uint8 value, uint32 shift) {
   DCHECK_LT(shift, 32);
-  static const uint32 masks[] = {
-      0x00000000, 0x80000000, 0xc0000000, 0xe0000000,  //
-      0xf0000000, 0xf8000000, 0xfc000000, 0xfe000000,  //
-      0xff000000, 0xff800000, 0xffc00000, 0xffe00000,  //
-      0xfff00000, 0xfff80000, 0xfffc0000, 0xfffe0000,  //
-      0xffff0000, 0xffff8000, 0xffffc000, 0xffffe000,  //
-      0xfffff000, 0xfffff800, 0xfffffc00, 0xfffffe00,  //
-      0xffffff00, 0xffffff80, 0xffffffc0, 0xffffffe0,  //
-      0xfffffff0, 0xfffffff8, 0xfffffffc, 0xfffffffe};
+  static const uint8 masks[] = {
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
+      0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe};
   return (value & masks[shift]) != 0;
 }
 
@@ -798,7 +794,7 @@ class SnappyDecompressor {
       const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip));
       reader_->Skip(1);
       uint32 val = c & 0x7f;
-      if (LeftShiftOverflows(val, shift)) return false;
+      if (LeftShiftOverflows(static_cast<uint8>(val), shift)) return false;
       *result |= val << shift;
       if (c < 128) {
         break;
