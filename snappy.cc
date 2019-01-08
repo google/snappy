@@ -733,7 +733,7 @@ static inline uint32 ExtractLowBytes(uint32 v, int n) {
 }
 
 static inline bool LeftShiftOverflows(uint8 value, uint32 shift) {
-  DCHECK_LT(shift, 32);
+  assert(shift < 32);
   static const uint8 masks[] = {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  //
