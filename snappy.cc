@@ -362,18 +362,16 @@ static inline char* EmitLiteral(char* op,
     // Fits in tag byte
     *op++ = LITERAL | (n << 2);
   } else {
-    // Encode in upcoming bytes
-    char* base = op;
-    int count = 0;
-    op++;
-    while (n > 0) {
-      *op++ = n & 0xff;
-      n >>= 8;
-      count++;
-    }
+    int count = (Bits::Log2Floor(n) >> 3) + 1;
     assert(count >= 1);
     assert(count <= 4);
-    *base = LITERAL | ((59+count) << 2);
+    *op++ = LITERAL | ((59 + count) << 2);
+    // Encode in upcoming bytes.
+    // Write 4 bytes, though we may care about only 1 of them. The output buffer
+    // is guaranteed to have at least 3 more spaces left as 'len >= 61' holds
+    // here and there is a memcpy of size 'len' below.
+    LittleEndian::Store32(op, n);
+    op += count;
   }
   memcpy(op, literal, len);
   return op + len;
