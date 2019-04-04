@@ -718,9 +718,7 @@ static inline void Report(const char *algorithm, size_t compressed_size,
 static inline uint32 ExtractLowBytes(uint32 v, int n) {
   assert(n >= 0);
   assert(n <= 4);
-  // TODO(b/121042345): Remove !defined(MEMORY_SANITIZER) once MSan
-  // handles _bzhi_u32() correctly.
-#if SNAPPY_HAVE_BMI2 && !defined(MEMORY_SANITIZER)
+#if SNAPPY_HAVE_BMI2
   return _bzhi_u32(v, 8 * n);
 #else
   // This needs to be wider than uint32 otherwise `mask << 32` will be
