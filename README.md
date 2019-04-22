@@ -68,9 +68,10 @@ Building
 CMake is supported and autotools will soon be deprecated.
 You need CMake 3.4 or above to build:
 
-  mkdir build
-  cd build && cmake ../ && make
-
+```bash
+mkdir build
+cd build && cmake ../ && make
+```
 
 Usage
 =====
@@ -86,11 +87,15 @@ your calling file, and link against the compiled library.
 
 There are many ways to call Snappy, but the simplest possible is
 
-  snappy::Compress(input.data(), input.size(), &output);
+```c++
+snappy::Compress(input.data(), input.size(), &output);
+```
 
 and similarly
 
-  snappy::Uncompress(input.data(), input.size(), &output);
+```c++
+snappy::Uncompress(input.data(), input.size(), &output);
+```
 
 where "input" and "output" are both instances of std::string.
 
