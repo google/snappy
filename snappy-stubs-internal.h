@@ -469,7 +469,7 @@ inline int Bits::Log2FloorNonZero(uint32 n) {
 }
 
 inline int Bits::Log2Floor(uint32 n) {
-  return (n == 0) ? -1 : Bits::Log2FloorNonZero(arg);
+  return (n == 0) ? -1 : Bits::Log2FloorNonZero(n);
 }
 
 inline int Bits::FindLSBSetNonZero(uint32 n) {
