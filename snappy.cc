@@ -74,7 +74,6 @@
 #include <string>
 #include <vector>
 
-
 namespace snappy {
 
 using internal::COPY_1_BYTE_OFFSET;
@@ -149,8 +148,9 @@ void UnalignedCopy128(const void* src, void* dst) {
 // Note that this does not match the semantics of either memcpy() or memmove().
 inline char* IncrementalCopySlow(const char* src, char* op,
                                  char* const op_limit) {
-  // TODO: Remove pragma when LLVM is aware this function is only called in
-  // cold regions and when cold regions don't get vectorized or unrolled.
+  // TODO: Remove pragma when LLVM is aware this
+  // function is only called in cold regions and when cold regions don't get
+  // vectorized or unrolled.
 #ifdef __clang__
 #pragma clang loop unroll(disable)
 #endif
@@ -241,6 +241,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       const __m128i pattern = _mm_shuffle_epi8(
           _mm_loadl_epi64(reinterpret_cast<const __m128i*>(src)), shuffle_mask);
       // Uninitialized bytes are masked out by the shuffle mask.
+      // TODO: remove annotation and macro defs once MSan is fixed.
       SNAPPY_ANNOTATE_MEMORY_IS_INITIALIZED(&pattern, sizeof(pattern));
       pattern_size *= 16 / pattern_size;
       char* op_end = std::min(op_limit, buf_limit - 15);
@@ -287,8 +288,8 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     // maximize micro-op fusion where possible on modern Intel processors. The
     // generated code should be checked carefully for new processors or with
     // major changes to the compiler.
-    // TODO: Simplify this code when the compiler reliably produces the correct
-    // x86 instruction sequence.
+    // TODO: Simplify this code when the compiler reliably produces
+    // the correct x86 instruction sequence.
     ptrdiff_t op_to_src = src - op;
 
     // The trip count of this loop is not large and so unrolling will only hurt
@@ -310,8 +311,8 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
   // buffer. This code path is relatively cold however so we save code size by
   // avoiding unrolling and vectorizing.
   //
-  // TODO: Remove pragma when when cold regions don't get vectorized or
-  // unrolled.
+  // TODO: Remove pragma when when cold regions don't get vectorized
+  // or unrolled.
 #ifdef __clang__
 #pragma clang loop unroll(disable)
 #endif
@@ -856,7 +857,7 @@ class SnappyDecompressor {
         if (writer->TryFastAppend(ip, ip_limit_ - ip, literal_length)) {
           assert(literal_length < 61);
           ip += literal_length;
-          // NOTE(user): There is no MAYBE_REFILL() here, as TryFastAppend()
+          // NOTE: There is no MAYBE_REFILL() here, as TryFastAppend()
           // will not return true unless there's already at least five spare
           // bytes in addition to the literal.
           continue;

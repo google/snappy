@@ -29,7 +29,6 @@
 #include <math.h>
 #include <stdlib.h>
 
-
 #include <algorithm>
 #include <random>
 #include <string>
@@ -522,7 +521,6 @@ static int Verify(const string& input) {
 
   return result;
 }
-
 
 static bool IsValidCompressedBuffer(const string& c) {
   return snappy::IsValidCompressedBuffer(c.data(), c.size());
