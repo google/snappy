@@ -51,7 +51,7 @@ In particular:
 
  - Snappy uses 64-bit operations in several places to process more data at
    once than would otherwise be possible.
- - Snappy assumes unaligned 32- and 64-bit loads and stores are cheap.
+ - Snappy assumes unaligned 32 and 64-bit loads and stores are cheap.
    On some platforms, these must be emulated with single-byte loads
    and stores, which is much slower.
  - Snappy assumes little-endian throughout, and needs to byte-swap data in
