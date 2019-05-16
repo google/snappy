@@ -79,9 +79,9 @@ Usage
 
 Note that Snappy, both the implementation and the main interface,
 is written in C++. However, several third-party bindings to other languages
-are available; see the home page at https://google.github.io/snappy/
-for more information. Also, if you want to use Snappy from C code, you can
-use the included C bindings in snappy-c.h.
+are available; see the [home page](docs/README.md) for more information.
+Also, if you want to use Snappy from C code, you can use the included C
+bindings in snappy-c.h.
 
 To use Snappy from your own C++ program, include the file "snappy.h" from
 your calling file, and link against the compiled library.
@@ -146,10 +146,4 @@ Contact
 =======
 
 Snappy is distributed through GitHub. For the latest version, a bug tracker,
-and other information, see
-
-  https://google.github.io/snappy/
-
-or the repository at
-
-  https://github.com/google/snappy
+and other information, see https://github.com/google/snappy.
