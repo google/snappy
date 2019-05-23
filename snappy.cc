@@ -1483,7 +1483,8 @@ public:
     char *const op_end = op_ptr_ + len;
     // See SnappyArrayWriter::AppendFromSelf for an explanation of
     // the "offset - 1u" trick.
-    if (SNAPPY_PREDICT_TRUE(offset - 1u < size_t(op_ptr_ - op_base_) &&
+    if (SNAPPY_PREDICT_TRUE(offset - 1u <
+                                static_cast<size_t>(op_ptr_ - op_base_) &&
                             op_end <= op_limit_)) {
       // Fast path: src and dst in current block.
       op_ptr_ = IncrementalCopy(op_ptr_ - offset, op_ptr_, op_end, op_limit_);
