@@ -65,7 +65,6 @@ are of course most welcome; see "Contact", below.
 Building
 ========
 
-CMake is supported and autotools will soon be deprecated.
 You need the CMake version specified in [CMakeLists.txt](./CMakeLists.txt)
 or later to build:
 
