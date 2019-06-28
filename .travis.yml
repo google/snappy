@@ -72,8 +72,11 @@ before_script:
 - mkdir -p build && cd build
 - cmake .. -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE
     -DSNAPPY_REQUIRE_${CPU_LEVEL}=ON
+    -DSNAPPY_BUILD_FUZZERS=ON
 - cmake --build .
 - cd ..
 
 script:
 - build/snappy_unittest
+- build/snappy_compress_uncompress_fuzzer -runs=1000 -close_fd_mask=3
+- build/snappy_uncompress_fuzzer -runs=1000 -close_fd_mask=3

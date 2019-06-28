@@ -12,6 +12,8 @@ option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
 option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
 
+option(SNAPPY_BUILD_FUZZERS "Build Snappy's fuzzers." OFF)
+
 option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
 
 option(SNAPPY_REQUIRE_AVX2 "Target processors with AVX2 support." OFF)
@@ -184,6 +186,26 @@ if(SNAPPY_BUILD_TESTS)
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMAND "${PROJECT_BINARY_DIR}/snappy_unittest")
 endif(SNAPPY_BUILD_TESTS)
+
+if(SNAPPY_BUILD_FUZZERS)
+  add_executable(snappy_compress_uncompress_fuzzer "")
+  target_sources(snappy_compress_uncompress_fuzzer
+    PRIVATE "${PROJECT_SOURCE_DIR}/snappy-compress-uncompress-fuzzer.cc"
+  )
+  target_link_libraries(snappy_compress_uncompress_fuzzer snappy)
+  set_target_properties(snappy_compress_uncompress_fuzzer
+    PROPERTIES LINK_FLAGS "-fsanitize=fuzzer"
+  )
+
+  add_executable(snappy_uncompress_fuzzer "")
+  target_sources(snappy_uncompress_fuzzer
+    PRIVATE "${PROJECT_SOURCE_DIR}/snappy-uncompress-fuzzer.cc"
+  )
+  target_link_libraries(snappy_uncompress_fuzzer snappy)
+  set_target_properties(snappy_uncompress_fuzzer
+    PROPERTIES LINK_FLAGS "-fsanitize=fuzzer"
+  )
+endif(SNAPPY_BUILD_FUZZERS)
 
 include(GNUInstallDirs)
 install(TARGETS snappy
