@@ -1410,6 +1410,69 @@ static void BM_ZFlat(int iters, int arg) {
 }
 BENCHMARK(BM_ZFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
 
+static void BM_ZFlatAll(int iters) {
+  StopBenchmarkTiming();
+
+  const int num_files = ARRAYSIZE(files);
+
+  std::vector<std::string> contents(num_files);
+  std::vector<char*> dst(num_files);
+
+  for (int i = 0; i < num_files; ++i) {
+    contents[i] = ReadTestDataFile(files[i].filename, files[i].size_limit);
+    dst[i] = new char[snappy::MaxCompressedLength(contents[i].size())];
+  }
+
+  StartBenchmarkTiming();
+
+  size_t zsize = 0;
+  while (iters-- > 0) {
+    for (int i = 0; i < num_files; ++i) {
+      snappy::RawCompress(contents[i].data(), contents[i].size(), dst[i],
+                          &zsize);
+    }
+  }
+  StopBenchmarkTiming();
+
+  for (int i = 0; i < num_files; ++i) {
+    delete[] dst[i];
+  }
+}
+BENCHMARK(BM_ZFlatAll);
+
+static void BM_ZFlatIncreasingTableSize(int iters) {
+  StopBenchmarkTiming();
+
+  QCHECK_GT(ARRAYSIZE(files), 0);
+  const std::string base_content =
+      ReadTestDataFile(files[0].filename, files[0].size_limit);
+
+  std::vector<std::string> contents;
+  std::vector<char*> dst;
+  for (int table_bits = kMinHashTableBits; table_bits <= kMaxHashTableBits;
+       ++table_bits) {
+    std::string content = base_content;
+    content.resize(1 << table_bits);
+    dst.push_back(new char[snappy::MaxCompressedLength(content.size())]);
+    contents.push_back(std::move(content));
+  }
+
+  size_t zsize = 0;
+  StartBenchmarkTiming();
+  while (iters-- > 0) {
+    for (int i = 0; i < contents.size(); ++i) {
+      snappy::RawCompress(contents[i].data(), contents[i].size(), dst[i],
+                          &zsize);
+    }
+  }
+  StopBenchmarkTiming();
+
+  for (int i = 0; i < dst.size(); ++i) {
+    delete[] dst[i];
+  }
+}
+BENCHMARK(BM_ZFlatIncreasingTableSize);
+
 }  // namespace snappy
 
 int main(int argc, char** argv) {
