@@ -70,9 +70,16 @@ install:
 
 before_script:
 - mkdir -p build && cd build
-- cmake .. -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+- if [ "$CXX" = "clang++-8"; then
+    # Build UBSan binary
+    export CXXFLAGS="-fsanitize=undefined -fsanitize-coverage=bb,trace-pc-guard";
+    cmake .. -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE
     -DSNAPPY_REQUIRE_${CPU_LEVEL}=ON
-    -DSNAPPY_BUILD_FUZZERS=ON
+    -DSNAPPY_BUILD_FUZZERS=ON;
+  else
+    cmake .. -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+    -DSNAPPY_REQUIRE_${CPU_LEVEL}=ON;
+  fi
 - cmake --build .
 - cd ..
 
