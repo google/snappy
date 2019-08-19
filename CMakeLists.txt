@@ -12,6 +12,8 @@ option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
 option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
 
+option(SNAPPY_FUZZING_BUILD "Build Snappy for fuzzing." OFF)
+
 option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
 
 option(SNAPPY_REQUIRE_AVX2 "Target processors with AVX2 support." OFF)
@@ -113,6 +115,20 @@ if(NOT HAVE_SYS_UIO_H_01)
   set(HAVE_SYS_UIO_H_01 0)
 endif(NOT HAVE_SYS_UIO_H_01)
 
+if (SNAPPY_FUZZING_BUILD)
+  if (NOT "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+    message(WARNING "Fuzzing builds are only supported with Clang")
+  endif (NOT "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+
+  if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=address")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+  endif(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=address")
+
+  if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize-coverage=trace-pc-guard")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize-coverage=trace-pc-guard")
+  endif(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize-coverage=trace-pc-guard")
+endif (SNAPPY_FUZZING_BUILD)
+
 configure_file(
   "${PROJECT_SOURCE_DIR}/snappy-stubs-public.h.in"
   "${PROJECT_BINARY_DIR}/snappy-stubs-public.h")
@@ -184,6 +200,26 @@ if(SNAPPY_BUILD_TESTS)
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMAND "${PROJECT_BINARY_DIR}/snappy_unittest")
 endif(SNAPPY_BUILD_TESTS)
+
+if(SNAPPY_FUZZING_BUILD)
+  add_executable(snappy_compress_fuzzer "")
+  target_sources(snappy_compress_fuzzer
+    PRIVATE "${PROJECT_SOURCE_DIR}/snappy_compress_fuzzer.cc"
+  )
+  target_link_libraries(snappy_compress_fuzzer snappy)
+  set_target_properties(snappy_compress_fuzzer
+    PROPERTIES LINK_FLAGS "-fsanitize=fuzzer"
+  )
+
+  add_executable(snappy_uncompress_fuzzer "")
+  target_sources(snappy_uncompress_fuzzer
+    PRIVATE "${PROJECT_SOURCE_DIR}/snappy_uncompress_fuzzer.cc"
+  )
+  target_link_libraries(snappy_uncompress_fuzzer snappy)
+  set_target_properties(snappy_uncompress_fuzzer
+    PROPERTIES LINK_FLAGS "-fsanitize=fuzzer"
+  )
+endif(SNAPPY_FUZZING_BUILD)
 
 include(GNUInstallDirs)
 install(TARGETS snappy

@@ -53,6 +53,12 @@ install:
 - if [ "$TRAVIS_OS_NAME" == "osx" ]; then
     export PATH="$(brew --prefix llvm)/bin:$PATH";
   fi
+# Fuzzing is only supported on Clang. Perform fuzzing on Debug builds.
+- if [ "$CXX" = "clang++" ] && [ "$BUILD_TYPE" = "Debug" ]; then
+    export FUZZING=1;
+  else
+    export FUZZING=0;
+  fi
 # /usr/bin/gcc points to an older compiler on both Linux and macOS.
 - if [ "$CXX" = "g++" ]; then export CXX="g++-9" CC="gcc-9"; fi
 # /usr/bin/clang points to an older compiler on both Linux and macOS.
@@ -71,9 +77,15 @@ install:
 before_script:
 - mkdir -p build && cd build
 - cmake .. -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-    -DSNAPPY_REQUIRE_${CPU_LEVEL}=ON
+    -DSNAPPY_REQUIRE_${CPU_LEVEL}=ON -DSNAPPY_FUZZING_BUILD=${FUZZING}
 - cmake --build .
 - cd ..
 
 script:
 - build/snappy_unittest
+- if [ -f build/snappy_compress_fuzzer ]; then
+    build/snappy_compress_fuzzer -runs=1000 -close_fd_mask=3;
+  fi
+- if [ -f build/snappy_uncompress_fuzzer ]; then
+    build/snappy_uncompress_fuzzer -runs=1000 -close_fd_mask=3;
+  fi
