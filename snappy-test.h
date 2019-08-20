@@ -265,6 +265,8 @@ extern Benchmark* Benchmark_BM_UFlat;
 extern Benchmark* Benchmark_BM_UIOVec;
 extern Benchmark* Benchmark_BM_UValidate;
 extern Benchmark* Benchmark_BM_ZFlat;
+extern Benchmark* Benchmark_BM_ZFlatAll;
+extern Benchmark* Benchmark_BM_ZFlatIncreasingTableSize;
 
 void ResetBenchmarkTiming();
 void StartBenchmarkTiming();
@@ -416,6 +418,8 @@ static inline void RunSpecifiedBenchmarks() {
   snappy::Benchmark_BM_UIOVec->Run();
   snappy::Benchmark_BM_UValidate->Run();
   snappy::Benchmark_BM_ZFlat->Run();
+  snappy::Benchmark_BM_ZFlatAll->Run();
+  snappy::Benchmark_BM_ZFlatIncreasingTableSize->Run();
 
   fprintf(stderr, "\n");
 }

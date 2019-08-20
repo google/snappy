@@ -1410,19 +1410,23 @@ static void BM_ZFlat(int iters, int arg) {
 }
 BENCHMARK(BM_ZFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
 
-static void BM_ZFlatAll(int iters) {
+static void BM_ZFlatAll(int iters, int arg) {
   StopBenchmarkTiming();
 
+  CHECK_EQ(arg, 0);
   const int num_files = ARRAYSIZE(files);
 
   std::vector<std::string> contents(num_files);
   std::vector<char*> dst(num_files);
 
+  int64 total_contents_size = 0;
   for (int i = 0; i < num_files; ++i) {
     contents[i] = ReadTestDataFile(files[i].filename, files[i].size_limit);
     dst[i] = new char[snappy::MaxCompressedLength(contents[i].size())];
+    total_contents_size += contents[i].size();
   }
 
+  SetBenchmarkBytesProcessed(static_cast<int64>(iters) * total_contents_size);
   StartBenchmarkTiming();
 
   size_t zsize = 0;
@@ -1437,27 +1441,32 @@ static void BM_ZFlatAll(int iters) {
   for (int i = 0; i < num_files; ++i) {
     delete[] dst[i];
   }
+  SetBenchmarkLabel(StringPrintf("%d files", num_files));
 }
-BENCHMARK(BM_ZFlatAll);
+BENCHMARK(BM_ZFlatAll)->DenseRange(0, 0);
 
-static void BM_ZFlatIncreasingTableSize(int iters) {
+static void BM_ZFlatIncreasingTableSize(int iters, int arg) {
   StopBenchmarkTiming();
 
-  QCHECK_GT(ARRAYSIZE(files), 0);
+  CHECK_EQ(arg, 0);
+  CHECK_GT(ARRAYSIZE(files), 0);
   const std::string base_content =
       ReadTestDataFile(files[0].filename, files[0].size_limit);
 
   std::vector<std::string> contents;
   std::vector<char*> dst;
+  int64 total_contents_size = 0;
   for (int table_bits = kMinHashTableBits; table_bits <= kMaxHashTableBits;
        ++table_bits) {
     std::string content = base_content;
     content.resize(1 << table_bits);
     dst.push_back(new char[snappy::MaxCompressedLength(content.size())]);
+    total_contents_size += content.size();
     contents.push_back(std::move(content));
   }
 
   size_t zsize = 0;
+  SetBenchmarkBytesProcessed(static_cast<int64>(iters) * total_contents_size);
   StartBenchmarkTiming();
   while (iters-- > 0) {
     for (int i = 0; i < contents.size(); ++i) {
