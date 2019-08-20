@@ -43,6 +43,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   size_t compressed_size =
       snappy::Compress(input.data(), input.size(), &compressed);
 
+  (void)compressed_size;  // Variable only used in debug builds.
   assert(compressed_size == compressed.size());
   assert(compressed.size() <= snappy::MaxCompressedLength(input.size()));
   assert(snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
@@ -51,6 +52,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   bool uncompress_succeeded = snappy::Uncompress(
       compressed.data(), compressed.size(), &uncompressed_after_compress);
 
+  (void)uncompress_succeeded;  // Variable only used in debug builds.
   assert(uncompress_succeeded);
   assert(input == uncompressed_after_compress);
   return 0;
