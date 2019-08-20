@@ -45,6 +45,11 @@ option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
 
 option(SNAPPY_FUZZING_BUILD "Build Snappy for fuzzing." OFF)
 
+option(SNAPPY_OSSFUZZ_BUILD "Build Snappy for oss-fuzz." OFF)
+
+set(SNAPPY_FUZZING_FLAGS "-fsanitize=address" CACHE STRING
+    "Compiler flags for fuzzing (e.g., -fsanitize=address).")
+
 option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
 
 option(SNAPPY_REQUIRE_AVX2 "Target processors with AVX2 support." OFF)
@@ -148,19 +153,28 @@ if(NOT HAVE_SYS_UIO_H_01)
   set(HAVE_SYS_UIO_H_01 0)
 endif(NOT HAVE_SYS_UIO_H_01)
 
-if (SNAPPY_FUZZING_BUILD)
-  if (NOT "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+if(SNAPPY_FUZZING_BUILD OR SNAPPY_OSSFUZZ_BUILD)
+  if(NOT "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     message(WARNING "Fuzzing builds are only supported with Clang")
-  endif (NOT "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+  endif(NOT "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
 
-  if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=address")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
-  endif(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=address")
 
   if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=fuzzer-no-link")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=fuzzer-no-link")
   endif(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=fuzzer-no-link")
-endif (SNAPPY_FUZZING_BUILD)
+endif(SNAPPY_FUZZING_BUILD OR SNAPPY_OSSFUZZ_BUILD)
+
+if(SNAPPY_OSSFUZZ_BUILD)
+  if(NOT DEFINED ENV{LIB_FUZZING_ENGINE})
+    message(SEND_ERROR "OSS-Fuzz builds require LIB_FUZZING_ENGINE to be set")
+  endif(NOT DEFINED ENV{LIB_FUZZING_ENGINE})
+endif(SNAPPY_OSSFUZZ_BUILD)
+
+if(SNAPPY_FUZZING_BUILD)
+  if(NOT CMAKE_CXX_FLAGS MATCHES "${SNAPPY_FUZZING_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SNAPPY_FUZZING_FLAGS}")
+  endif(NOT CMAKE_CXX_FLAGS MATCHES "${SNAPPY_FUZZING_FLAGS}")
+endif(SNAPPY_FUZZING_BUILD)
 
 configure_file(
   "snappy-stubs-public.h.in"
@@ -234,24 +248,36 @@ if(SNAPPY_BUILD_TESTS)
     COMMAND "${PROJECT_BINARY_DIR}/snappy_unittest")
 endif(SNAPPY_BUILD_TESTS)
 
-if(SNAPPY_FUZZING_BUILD)
+if(SNAPPY_FUZZING_BUILD OR SNAPPY_OSSFUZZ_BUILD)
   add_executable(snappy_compress_fuzzer "")
   target_sources(snappy_compress_fuzzer
     PRIVATE "snappy_compress_fuzzer.cc"
   )
   target_link_libraries(snappy_compress_fuzzer snappy)
-  set_target_properties(snappy_compress_fuzzer
-    PROPERTIES LINK_FLAGS "-fsanitize=fuzzer"
-  )
+  if(DEFINED ENV{LIB_FUZZING_ENGINE})
+    set_target_properties(snappy_compress_fuzzer
+      PROPERTIES LINK_FLAGS $ENV{LIB_FUZZING_ENGINE}
+    )
+  else()
+    set_target_properties(snappy_compress_fuzzer
+      PROPERTIES LINK_FLAGS "-fsanitize=fuzzer"
+    )
+  endif(DEFINED ENV{LIB_FUZZING_ENGINE})
 
   add_executable(snappy_uncompress_fuzzer "")
   target_sources(snappy_uncompress_fuzzer
     PRIVATE "snappy_uncompress_fuzzer.cc"
   )
   target_link_libraries(snappy_uncompress_fuzzer snappy)
-  set_target_properties(snappy_uncompress_fuzzer
-    PROPERTIES LINK_FLAGS "-fsanitize=fuzzer"
-  )
+  if(DEFINED ENV{LIB_FUZZING_ENGINE})
+    set_target_properties(snappy_uncompress_fuzzer
+            PROPERTIES LINK_FLAGS $ENV{LIB_FUZZING_ENGINE}
+    )
+  else()
+    set_target_properties(snappy_uncompress_fuzzer
+            PROPERTIES LINK_FLAGS "-fsanitize=fuzzer"
+    )
+  endif(DEFINED ENV{LIB_FUZZING_ENGINE})
 endif(SNAPPY_FUZZING_BUILD)
 
 # Must be included before CMAKE_INSTALL_INCLUDEDIR is used.
