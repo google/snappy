@@ -752,7 +752,7 @@ TEST(Snappy, FourByteOffset) {
   }
   AppendCopy(&compressed, src.size(), fragment1.size());
   src += fragment1;
-  CHECK_EQ(length, src.size());
+  CHECK_EQ(unsigned(length), src.size());
 
   string uncompressed;
   CHECK(snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
@@ -771,7 +771,7 @@ TEST(Snappy, IOVecEdgeCases) {
   static const int kLengths[] = { 2, 1, 4, 8, 128 };
 
   struct iovec iov[ARRAYSIZE(kLengths)];
-  for (int i = 0; i < ARRAYSIZE(kLengths); ++i) {
+  for (unsigned int i = 0; i < ARRAYSIZE(kLengths); ++i) {
     iov[i].iov_base = new char[kLengths[i]];
     iov[i].iov_len = kLengths[i];
   }
@@ -823,7 +823,7 @@ TEST(Snappy, IOVecEdgeCases) {
   CHECK_EQ(0, memcmp(iov[3].iov_base, "23123123", 8));
   CHECK_EQ(0, memcmp(iov[4].iov_base, "123bc12", 7));
 
-  for (int i = 0; i < ARRAYSIZE(kLengths); ++i) {
+  for (unsigned int i = 0; i < ARRAYSIZE(kLengths); ++i) {
     delete[] reinterpret_cast<char *>(iov[i].iov_base);
   }
 }
@@ -832,7 +832,7 @@ TEST(Snappy, IOVecLiteralOverflow) {
   static const int kLengths[] = { 3, 4 };
 
   struct iovec iov[ARRAYSIZE(kLengths)];
-  for (int i = 0; i < ARRAYSIZE(kLengths); ++i) {
+  for (unsigned int i = 0; i < ARRAYSIZE(kLengths); ++i) {
     iov[i].iov_base = new char[kLengths[i]];
     iov[i].iov_len = kLengths[i];
   }
@@ -845,7 +845,7 @@ TEST(Snappy, IOVecLiteralOverflow) {
   CHECK(!snappy::RawUncompressToIOVec(
       compressed.data(), compressed.size(), iov, ARRAYSIZE(iov)));
 
-  for (int i = 0; i < ARRAYSIZE(kLengths); ++i) {
+  for (unsigned int i = 0; i < ARRAYSIZE(kLengths); ++i) {
     delete[] reinterpret_cast<char *>(iov[i].iov_base);
   }
 }
@@ -854,7 +854,7 @@ TEST(Snappy, IOVecCopyOverflow) {
   static const int kLengths[] = { 3, 4 };
 
   struct iovec iov[ARRAYSIZE(kLengths)];
-  for (int i = 0; i < ARRAYSIZE(kLengths); ++i) {
+  for (unsigned int i = 0; i < ARRAYSIZE(kLengths); ++i) {
     iov[i].iov_base = new char[kLengths[i]];
     iov[i].iov_len = kLengths[i];
   }
@@ -868,7 +868,7 @@ TEST(Snappy, IOVecCopyOverflow) {
   CHECK(!snappy::RawUncompressToIOVec(
       compressed.data(), compressed.size(), iov, ARRAYSIZE(iov)));
 
-  for (int i = 0; i < ARRAYSIZE(kLengths); ++i) {
+  for (unsigned int i = 0; i < ARRAYSIZE(kLengths); ++i) {
     delete[] reinterpret_cast<char *>(iov[i].iov_base);
   }
 }
@@ -1075,7 +1075,7 @@ TEST(Snappy, FindMatchLengthRandom) {
     DataEndingAtUnreadablePage u(s);
     DataEndingAtUnreadablePage v(t);
     int matched = TestFindMatchLength(u.data(), v.data(), t.size());
-    if (matched == t.size()) {
+    if (unsigned(matched) == t.size()) {
       EXPECT_EQ(s, t);
     } else {
       EXPECT_NE(s[matched], t[matched]);
@@ -1258,7 +1258,7 @@ static void BM_UFlat(int iters, int arg) {
 
   // Pick file to process based on "arg"
   CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
+  CHECK_LT(unsigned(arg), ARRAYSIZE(files));
   string contents = ReadTestDataFile(files[arg].filename,
                                      files[arg].size_limit);
 
@@ -1284,7 +1284,7 @@ static void BM_UValidate(int iters, int arg) {
 
   // Pick file to process based on "arg"
   CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
+  CHECK_LT(unsigned(arg), ARRAYSIZE(files));
   string contents = ReadTestDataFile(files[arg].filename,
                                      files[arg].size_limit);
 
@@ -1307,7 +1307,7 @@ static void BM_UIOVec(int iters, int arg) {
 
   // Pick file to process based on "arg"
   CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
+  CHECK_LT(unsigned(arg), ARRAYSIZE(files));
   string contents = ReadTestDataFile(files[arg].filename,
                                      files[arg].size_limit);
 
@@ -1321,7 +1321,7 @@ static void BM_UIOVec(int iters, int arg) {
   int used_so_far = 0;
   for (int i = 0; i < kNumEntries; ++i) {
     iov[i].iov_base = dst + used_so_far;
-    if (used_so_far == contents.size()) {
+    if (unsigned(used_so_far) == contents.size()) {
       iov[i].iov_len = 0;
       continue;
     }
@@ -1353,7 +1353,7 @@ static void BM_UFlatSink(int iters, int arg) {
 
   // Pick file to process based on "arg"
   CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
+  CHECK_LT(unsigned(arg), ARRAYSIZE(files));
   string contents = ReadTestDataFile(files[arg].filename,
                                      files[arg].size_limit);
 
@@ -1385,7 +1385,7 @@ static void BM_ZFlat(int iters, int arg) {
 
   // Pick file to process based on "arg"
   CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
+  CHECK_LT(unsigned(arg), ARRAYSIZE(files));
   string contents = ReadTestDataFile(files[arg].filename,
                                      files[arg].size_limit);
 
