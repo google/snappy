@@ -167,7 +167,7 @@ namespace file {
 namespace snappy {
 
 #define FLAGS_test_random_seed 301
-typedef string TypeParam;
+using TypeParam = std::string;
 
 void Test_CorruptedTest_VerifyCorrupted();
 void Test_Snappy_SimpleTests();
@@ -181,13 +181,13 @@ void Test_Snappy_ReadPastEndOfBuffer();
 void Test_Snappy_FindMatchLength();
 void Test_Snappy_FindMatchLengthRandom();
 
-string ReadTestDataFile(const string& base, size_t size_limit);
+std::string ReadTestDataFile(const std::string& base, size_t size_limit);
 
-string ReadTestDataFile(const string& base);
+std::string ReadTestDataFile(const std::string& base);
 
 // A sprintf() variant that returns a std::string.
 // Not safe for general use due to truncation issues.
-string StringPrintf(const char* format, ...);
+std::string StringPrintf(const char* format, ...);
 
 // A wall-time clock. This stub is not super-accurate, nor resistant to the
 // system time changing.
@@ -241,8 +241,8 @@ typedef void (*BenchmarkFunction)(int, int);
 
 class Benchmark {
  public:
-  Benchmark(const string& name, BenchmarkFunction function) :
-      name_(name), function_(function) {}
+  Benchmark(const std::string& name, BenchmarkFunction function)
+      : name_(name), function_(function) {}
 
   Benchmark* DenseRange(int start, int stop) {
     start_ = start;
@@ -253,7 +253,7 @@ class Benchmark {
   void Run();
 
  private:
-  const string name_;
+  const std::string name_;
   const BenchmarkFunction function_;
   int start_, stop_;
 };
@@ -271,7 +271,7 @@ extern Benchmark* Benchmark_BM_ZFlatIncreasingTableSize;
 void ResetBenchmarkTiming();
 void StartBenchmarkTiming();
 void StopBenchmarkTiming();
-void SetBenchmarkLabel(const string& str);
+void SetBenchmarkLabel(const std::string& str);
 void SetBenchmarkBytesProcessed(int64 bytes);
 
 #ifdef HAVE_LIBZ

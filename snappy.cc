@@ -1346,7 +1346,7 @@ bool RawUncompress(Source* compressed, char* uncompressed) {
   return InternalUncompress(compressed, &output);
 }
 
-bool Uncompress(const char* compressed, size_t n, string* uncompressed) {
+bool Uncompress(const char* compressed, size_t n, std::string* uncompressed) {
   size_t ulength;
   if (!GetUncompressedLength(compressed, n, &ulength)) {
     return false;
@@ -1414,7 +1414,8 @@ void RawCompress(const char* input,
   *compressed_length = (writer.CurrentDestination() - compressed);
 }
 
-size_t Compress(const char* input, size_t input_length, string* compressed) {
+size_t Compress(const char* input, size_t input_length,
+                std::string* compressed) {
   // Pre-grow the buffer to the max length of the compressed output
   STLStringResizeUninitialized(compressed, MaxCompressedLength(input_length));
 

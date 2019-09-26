@@ -524,7 +524,7 @@ class Varint {
   static char* Encode32(char* ptr, uint32 v);
 
   // EFFECTS    Appends the varint representation of "value" to "*s".
-  static void Append32(string* s, uint32 value);
+  static void Append32(std::string* s, uint32 value);
 };
 
 inline const char* Varint::Parse32WithLimit(const char* p,
@@ -581,7 +581,7 @@ inline char* Varint::Encode32(char* sptr, uint32 v) {
 // replace this function with one that resizes the string without
 // filling the new space with zeros (if applicable) --
 // it will be non-portable but faster.
-inline void STLStringResizeUninitialized(string* s, size_t new_size) {
+inline void STLStringResizeUninitialized(std::string* s, size_t new_size) {
   s->resize(new_size);
 }
 
@@ -597,7 +597,7 @@ inline void STLStringResizeUninitialized(string* s, size_t new_size) {
 // (http://www.open-std.org/JTC1/SC22/WG21/docs/lwg-defects.html#530)
 // proposes this as the method. It will officially be part of the standard
 // for C++0x. This should already work on all current implementations.
-inline char* string_as_array(string* str) {
+inline char* string_as_array(std::string* str) {
   return str->empty() ? NULL : &*str->begin();
 }
 

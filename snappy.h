@@ -69,11 +69,12 @@ namespace snappy {
   // Higher-level string based routines (should be sufficient for most users)
   // ------------------------------------------------------------------------
 
-  // Sets "*output" to the compressed version of "input[0,input_length-1]".
-  // Original contents of *output are lost.
+  // Sets "*compressed" to the compressed version of "input[0,input_length-1]".
+  // Original contents of *compressed are lost.
   //
-  // REQUIRES: "input[]" is not an alias of "*output".
-  size_t Compress(const char* input, size_t input_length, string* output);
+  // REQUIRES: "input[]" is not an alias of "*compressed".
+  size_t Compress(const char* input, size_t input_length,
+                  std::string* compressed);
 
   // Decompresses "compressed[0,compressed_length-1]" to "*uncompressed".
   // Original contents of "*uncompressed" are lost.
@@ -82,7 +83,7 @@ namespace snappy {
   //
   // returns false if the message is corrupted and could not be decompressed
   bool Uncompress(const char* compressed, size_t compressed_length,
-                  string* uncompressed);
+                  std::string* uncompressed);
 
   // Decompresses "compressed" to "*uncompressed".
   //
