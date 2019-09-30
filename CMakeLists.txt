@@ -124,9 +124,9 @@ if (SNAPPY_FUZZING_BUILD)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
   endif(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=address")
 
-  if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize-coverage=trace-pc-guard")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize-coverage=trace-pc-guard")
-  endif(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize-coverage=trace-pc-guard")
+  if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=fuzzer-no-link")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=fuzzer-no-link")
+  endif(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize=fuzzer-no-link")
 endif (SNAPPY_FUZZING_BUILD)
 
 configure_file(
