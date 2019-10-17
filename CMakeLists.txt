@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.1)
 project(Snappy VERSION 1.1.7 LANGUAGES C CXX)
 
-# This project requires C++11.
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# Allow build with different standard 
+if(NOT CMAKE_CXX_STANDARD)
+  # This project requires C++11.
+  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
 
 # BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to make
 # it prominent in the GUI.
