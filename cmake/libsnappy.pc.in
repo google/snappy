@@ -1,0 +1,10 @@
+prefix=@PKG_CONFIG_PREFIX@
+exec_prefix=@PKG_CONFIG_PREFIX@
+libdir=@PKG_CONFIG_LIBDIR@
+includedir=@PKG_CONFIG_INCLUDEDIR@
+
+Name: snappy
+Description: Fast compressor/decompressor library.
+Version: @SNAPPY_VER@
+Libs: -L@PKG_CONFIG_LIBDIR@ -lsnappy
+Cflags: -I@PKG_CONFIG_INCLUDEDIR@

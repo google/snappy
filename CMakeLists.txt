@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.1)
-project(Snappy VERSION 1.1.7 LANGUAGES C CXX)
+
+set(SNAPPY_VER 1.1.7)
+
+project(Snappy VERSION ${SNAPPY_VER} LANGUAGES C CXX)
 
 # This project requires C++11.
 set(CMAKE_CXX_STANDARD 11)
@@ -106,6 +109,21 @@ configure_file(
   "${PROJECT_SOURCE_DIR}/cmake/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"
 )
+
+include(GNUInstallDirs)
+set(PKG_CONFIG_PREFIX ${CMAKE_INSTALL_PREFIX})
+if(IS_ABSOLUTE ${CMAKE_INSTALL_LIBDIR})
+    set(PKG_CONFIG_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+    set(PKG_CONFIG_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+    set(INSTALL_PKGCONFIG_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig" CACHE PATH "Installation directory for pkgconfig (.pc) files")
+else()
+    set(PKG_CONFIG_LIBDIR "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
+    set(PKG_CONFIG_INCLUDEDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+    set(INSTALL_PKGCONFIG_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/pkgconfig" CACHE PATH "Installation directory for pkgconfig (.pc) files")
+endif(IS_ABSOLUTE ${CMAKE_INSTALL_LIBDIR})
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/libsnappy.pc.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/libsnappy.pc")
 
 # We don't want to define HAVE_ macros in public headers. Instead, we use
 # CMake's variable substitution with 0/1 variables, which will be seen by the
@@ -253,3 +271,6 @@ install(
     "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Snappy"
 )
+
+install(FILES ${PROJECT_BINARY_DIR}/libsnappy.pc
+        DESTINATION ${INSTALL_PKGCONFIG_DIR})
