@@ -346,8 +346,8 @@ static void Measure(const char* data,
   float uncomp_rate = (length / utime[med]) * repeats / 1048576.0;
   std::string x = names[comp];
   x += ":";
-  std::string urate =
-      (uncomp_rate >= 0) ? StringPrintf("%.1f", uncomp_rate) : std::string("?");
+  std::string urate = (uncomp_rate >= 0) ? absl::StrFormat("%.1f", uncomp_rate)
+                                         : std::string("?");
   printf("%-7s [b %dM] bytes %6d -> %6d %4.1f%%  "
          "comp %5.1f MB/s  uncomp %5s MB/s\n",
          x.c_str(),
@@ -582,7 +582,7 @@ TEST(CorruptedTest, VerifyCorrupted) {
   // try reading stuff in from a bad file.
   for (int i = 1; i <= 3; ++i) {
     std::string data =
-        ReadTestDataFile(StringPrintf("baddata%d.snappy", i).c_str(), 0);
+        ReadTestDataFile(absl::StrFormat("baddata%d.snappy", i).c_str(), 0);
     std::string uncmp;
     // check that we don't return a crazy length
     size_t ulen;
@@ -1401,8 +1401,8 @@ static void BM_ZFlat(int iters, int arg) {
   StopBenchmarkTiming();
   const double compression_ratio =
       static_cast<double>(zsize) / std::max<size_t>(1, contents.size());
-  SetBenchmarkLabel(StringPrintf("%s (%.2f %%)",
-                                 files[arg].label, 100.0 * compression_ratio));
+  SetBenchmarkLabel(absl::StrFormat("%s (%.2f %%)", files[arg].label,
+                                    100.0 * compression_ratio));
   VLOG(0) << StringPrintf("compression for %s: %zd -> %zd bytes",
                           files[arg].label, contents.size(), zsize);
   delete[] dst;
@@ -1440,7 +1440,7 @@ static void BM_ZFlatAll(int iters, int arg) {
   for (int i = 0; i < num_files; ++i) {
     delete[] dst[i];
   }
-  SetBenchmarkLabel(StringPrintf("%d files", num_files));
+  SetBenchmarkLabel(absl::StrFormat("%d files", num_files));
 }
 BENCHMARK(BM_ZFlatAll)->DenseRange(0, 0);
 
