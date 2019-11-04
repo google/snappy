@@ -187,7 +187,7 @@ std::string ReadTestDataFile(const std::string& base);
 
 // A sprintf() variant that returns a std::string.
 // Not safe for general use due to truncation issues.
-std::string StringPrintf(const char* format, ...);
+std::string StrFormat(const char* format, ...);
 
 // A wall-time clock. This stub is not super-accurate, nor resistant to the
 // system time changing.

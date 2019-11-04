@@ -346,7 +346,7 @@ static void Measure(const char* data,
   float uncomp_rate = (length / utime[med]) * repeats / 1048576.0;
   std::string x = names[comp];
   x += ":";
-  std::string urate = (uncomp_rate >= 0) ? absl::StrFormat("%.1f", uncomp_rate)
+  std::string urate = (uncomp_rate >= 0) ? StrFormat("%.1f", uncomp_rate)
                                          : std::string("?");
   printf("%-7s [b %dM] bytes %6d -> %6d %4.1f%%  "
          "comp %5.1f MB/s  uncomp %5s MB/s\n",
@@ -582,7 +582,7 @@ TEST(CorruptedTest, VerifyCorrupted) {
   // try reading stuff in from a bad file.
   for (int i = 1; i <= 3; ++i) {
     std::string data =
-        ReadTestDataFile(absl::StrFormat("baddata%d.snappy", i).c_str(), 0);
+        ReadTestDataFile(StrFormat("baddata%d.snappy", i).c_str(), 0);
     std::string uncmp;
     // check that we don't return a crazy length
     size_t ulen;
@@ -1401,10 +1401,11 @@ static void BM_ZFlat(int iters, int arg) {
   StopBenchmarkTiming();
   const double compression_ratio =
       static_cast<double>(zsize) / std::max<size_t>(1, contents.size());
-  SetBenchmarkLabel(absl::StrFormat("%s (%.2f %%)", files[arg].label,
-                                    100.0 * compression_ratio));
-  VLOG(0) << StringPrintf("compression for %s: %zd -> %zd bytes",
-                          files[arg].label, contents.size(), zsize);
+  SetBenchmarkLabel(StrFormat("%s (%.2f %%)", files[arg].label,
+                              100.0 * compression_ratio));
+  VLOG(0) << StrFormat("compression for %s: %zd -> %zd bytes",
+                       files[arg].label, static_cast<int>(contents.size()),
+                       static_cast<int>(zsize));
   delete[] dst;
 }
 BENCHMARK(BM_ZFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
@@ -1440,7 +1441,7 @@ static void BM_ZFlatAll(int iters, int arg) {
   for (int i = 0; i < num_files; ++i) {
     delete[] dst[i];
   }
-  SetBenchmarkLabel(absl::StrFormat("%d files", num_files));
+  SetBenchmarkLabel(StrFormat("%d files", num_files));
 }
 BENCHMARK(BM_ZFlatAll)->DenseRange(0, 0);
 

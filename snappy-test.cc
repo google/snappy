@@ -67,7 +67,7 @@ std::string ReadTestDataFile(const std::string& base) {
   return ReadTestDataFile(base, 0);
 }
 
-std::string StringPrintf(const char* format, ...) {
+std::string StrFormat(const char* format, ...) {
   char buf[4096];
   va_list ap;
   va_start(ap, format);
@@ -217,7 +217,7 @@ void Benchmark::Run() {
       benchmark_runs[run].cpu_time_us = benchmark_cpu_time_us;
     }
 
-    std::string heading = StringPrintf("%s/%d", name_.c_str(), test_case_num);
+    std::string heading = StrFormat("%s/%d", name_.c_str(), test_case_num);
     std::string human_readable_speed;
 
     std::nth_element(benchmark_runs,
@@ -232,15 +232,16 @@ void Benchmark::Run() {
       int64 bytes_per_second =
           benchmark_bytes_processed * 1000000 / cpu_time_us;
       if (bytes_per_second < 1024) {
-        human_readable_speed = StringPrintf("%dB/s", bytes_per_second);
+        human_readable_speed =
+            StrFormat("%dB/s", static_cast<int>(bytes_per_second));
       } else if (bytes_per_second < 1024 * 1024) {
-        human_readable_speed = StringPrintf(
+        human_readable_speed = StrFormat(
             "%.1fkB/s", bytes_per_second / 1024.0f);
       } else if (bytes_per_second < 1024 * 1024 * 1024) {
-        human_readable_speed = StringPrintf(
+        human_readable_speed = StrFormat(
             "%.1fMB/s", bytes_per_second / (1024.0f * 1024.0f));
       } else {
-        human_readable_speed = StringPrintf(
+        human_readable_speed = StrFormat(
             "%.1fGB/s", bytes_per_second / (1024.0f * 1024.0f * 1024.0f));
       }
     }
