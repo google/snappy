@@ -1479,7 +1479,7 @@ static void BM_ZFlatIncreasingTableSize(int iters, int arg) {
   for (int i = 0; i < dst.size(); ++i) {
     delete[] dst[i];
   }
-  SetBenchmarkLabel(StringPrintf("%zd tables", contents.size()));
+  SetBenchmarkLabel(StrFormat("%zd tables", contents.size()));
 }
 BENCHMARK(BM_ZFlatIncreasingTableSize)->DenseRange(0, 0);
 
