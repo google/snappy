@@ -103,7 +103,7 @@ if(GFLAGS_FOUND)
 endif(GFLAGS_FOUND)
 
 configure_file(
-  "${PROJECT_SOURCE_DIR}/cmake/config.h.in"
+  "cmake/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"
 )
 
@@ -130,18 +130,18 @@ if (SNAPPY_FUZZING_BUILD)
 endif (SNAPPY_FUZZING_BUILD)
 
 configure_file(
-  "${PROJECT_SOURCE_DIR}/snappy-stubs-public.h.in"
+  "snappy-stubs-public.h.in"
   "${PROJECT_BINARY_DIR}/snappy-stubs-public.h")
 
 add_library(snappy "")
 target_sources(snappy
   PRIVATE
-    "${PROJECT_SOURCE_DIR}/snappy-internal.h"
-    "${PROJECT_SOURCE_DIR}/snappy-stubs-internal.h"
-    "${PROJECT_SOURCE_DIR}/snappy-c.cc"
-    "${PROJECT_SOURCE_DIR}/snappy-sinksource.cc"
-    "${PROJECT_SOURCE_DIR}/snappy-stubs-internal.cc"
-    "${PROJECT_SOURCE_DIR}/snappy.cc"
+    "snappy-internal.h"
+    "snappy-stubs-internal.h"
+    "snappy-c.cc"
+    "snappy-sinksource.cc"
+    "snappy-stubs-internal.cc"
+    "snappy.cc"
     "${PROJECT_BINARY_DIR}/config.h"
 
   # Only CMake 3.3+ supports PUBLIC sources in targets exported by "install".
@@ -175,8 +175,8 @@ if(SNAPPY_BUILD_TESTS)
   add_executable(snappy_unittest "")
   target_sources(snappy_unittest
     PRIVATE
-      "${PROJECT_SOURCE_DIR}/snappy_unittest.cc"
-      "${PROJECT_SOURCE_DIR}/snappy-test.cc"
+      "snappy_unittest.cc"
+      "snappy-test.cc"
   )
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
   target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES})
@@ -204,7 +204,7 @@ endif(SNAPPY_BUILD_TESTS)
 if(SNAPPY_FUZZING_BUILD)
   add_executable(snappy_compress_fuzzer "")
   target_sources(snappy_compress_fuzzer
-    PRIVATE "${PROJECT_SOURCE_DIR}/snappy_compress_fuzzer.cc"
+    PRIVATE "snappy_compress_fuzzer.cc"
   )
   target_link_libraries(snappy_compress_fuzzer snappy)
   set_target_properties(snappy_compress_fuzzer
@@ -213,7 +213,7 @@ if(SNAPPY_FUZZING_BUILD)
 
   add_executable(snappy_uncompress_fuzzer "")
   target_sources(snappy_uncompress_fuzzer
-    PRIVATE "${PROJECT_SOURCE_DIR}/snappy_uncompress_fuzzer.cc"
+    PRIVATE "snappy_uncompress_fuzzer.cc"
   )
   target_link_libraries(snappy_uncompress_fuzzer snappy)
   set_target_properties(snappy_uncompress_fuzzer
@@ -230,9 +230,9 @@ install(TARGETS snappy
 )
 install(
   FILES
-    "${PROJECT_SOURCE_DIR}/snappy-c.h"
-    "${PROJECT_SOURCE_DIR}/snappy-sinksource.h"
-    "${PROJECT_SOURCE_DIR}/snappy.h"
+    "snappy-c.h"
+    "snappy-sinksource.h"
+    "snappy.h"
     "${PROJECT_BINARY_DIR}/snappy-stubs-public.h"
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
@@ -249,7 +249,7 @@ install(
 )
 install(
   FILES
-    "${PROJECT_SOURCE_DIR}/cmake/SnappyConfig.cmake"
+    "cmake/SnappyConfig.cmake"
     "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Snappy"
 )
