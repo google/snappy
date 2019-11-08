@@ -1,3 +1,31 @@
+# Copyright 2019 Google Inc. All Rights Reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+#     * Redistributions of source code must retain the above copyright
+# notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above
+# copyright notice, this list of conditions and the following disclaimer
+# in the documentation and/or other materials provided with the
+# distribution.
+#     * Neither the name of Google Inc. nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 cmake_minimum_required(VERSION 3.1)
 project(Snappy VERSION 1.1.7 LANGUAGES C CXX)
 
@@ -17,6 +45,8 @@ option(SNAPPY_FUZZING_BUILD "Build Snappy for fuzzing." OFF)
 option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
 
 option(SNAPPY_REQUIRE_AVX2 "Target processors with AVX2 support." OFF)
+
+option(SNAPPY_INSTALL "Install Snappy's header and library" ON)
 
 include(TestBigEndian)
 test_big_endian(SNAPPY_IS_BIG_ENDIAN)
@@ -221,35 +251,44 @@ if(SNAPPY_FUZZING_BUILD)
   )
 endif(SNAPPY_FUZZING_BUILD)
 
+# Must be included before CMAKE_INSTALL_INCLUDEDIR is used.
 include(GNUInstallDirs)
-install(TARGETS snappy
-  EXPORT SnappyTargets
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-install(
-  FILES
-    "snappy-c.h"
-    "snappy-sinksource.h"
-    "snappy.h"
-    "${PROJECT_BINARY_DIR}/snappy-stubs-public.h"
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-)
 
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file(
-    "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
+if(SNAPPY_INSTALL)
+  install(TARGETS snappy
+    EXPORT SnappyTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+  install(
+    FILES
+      "snappy-c.h"
+      "snappy-sinksource.h"
+      "snappy.h"
+      "${PROJECT_BINARY_DIR}/snappy-stubs-public.h"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+  )
+
+  include(CMakePackageConfigHelpers)
+  configure_package_config_file(
+    "cmake/${PROJECT_NAME}Config.cmake.in"
+    "${PROJECT_BINARY_DIR}/cmake/${PROJECT_NAME}Config.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+  )
+  write_basic_package_version_file(
+    "${PROJECT_BINARY_DIR}/cmake/${PROJECT_NAME}ConfigVersion.cmake"
     COMPATIBILITY SameMajorVersion
-)
-install(
-  EXPORT SnappyTargets
-  NAMESPACE Snappy::
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Snappy"
-)
-install(
-  FILES
-    "cmake/SnappyConfig.cmake"
-    "${PROJECT_BINARY_DIR}/SnappyConfigVersion.cmake"
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Snappy"
-)
+  )
+  install(
+    EXPORT SnappyTargets
+    NAMESPACE Snappy::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+  )
+  install(
+    FILES
+      "${PROJECT_BINARY_DIR}/cmake/${PROJECT_NAME}Config.cmake"
+      "${PROJECT_BINARY_DIR}/cmake/${PROJECT_NAME}ConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+  )
+endif(SNAPPY_INSTALL)
