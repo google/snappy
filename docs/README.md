@@ -66,6 +66,7 @@ Snappy is used or is available as an alternative in software such as
   [Google Chrome](http://chrome.google.com/))
 * [Lucene](http://lucene.apache.org/)
 * [VoltDB](http://voltdb.com/)
+* [DeltaFS](https://github.com/pdlfs/deltafs)
 
 If you know of more, do not hesitate to let us know. The easiest way to get in
 touch is via the
