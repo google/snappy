@@ -281,29 +281,25 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
   // Typically, the op_limit is the gating factor so try to simplify the loop
   // based on that.
   if (SNAPPY_PREDICT_TRUE(op_limit <= buf_limit - 16)) {
-    // Factor the displacement from op to the source into a variable. This helps
-    // simplify the loop below by only varying the op pointer which we need to
-    // test for the end. Note that this was done after carefully examining the
-    // generated code to allow the addressing modes in the loop below to
-    // maximize micro-op fusion where possible on modern Intel processors. The
-    // generated code should be checked carefully for new processors or with
-    // major changes to the compiler.
-    // TODO: Simplify this code when the compiler reliably produces
-    // the correct x86 instruction sequence.
-    ptrdiff_t op_to_src = src - op;
+    // There is at least one, and at most four 16-byte blocks. Writing four
+    // conditionals instead of a loop allows FDO to layout the code with respect
+    // to the actual probabilities of each length.
+    // TODO: Replace with loop with trip count hint.
+    UnalignedCopy64(src, op);
+    UnalignedCopy64(src + 8, op + 8);
 
-    // The trip count of this loop is not large and so unrolling will only hurt
-    // code size without helping performance.
-    //
-    // TODO: Replace with loop trip count hint.
-#ifdef __clang__
-#pragma clang loop unroll(disable)
-#endif
-    do {
-      UnalignedCopy64(op + op_to_src, op);
-      UnalignedCopy64(op + op_to_src + 8, op + 8);
-      op += 16;
-    } while (op < op_limit);
+    if (op + 16 < op_limit) {
+      UnalignedCopy64(src + 16, op + 16);
+      UnalignedCopy64(src + 24, op + 24);
+    }
+    if (op + 32 < op_limit) {
+      UnalignedCopy64(src + 32, op + 32);
+      UnalignedCopy64(src + 40, op + 40);
+    }
+    if (op + 48 < op_limit) {
+      UnalignedCopy64(src + 48, op + 48);
+      UnalignedCopy64(src + 56, op + 56);
+    }
     return op_limit;
   }
 
