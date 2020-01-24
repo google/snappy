@@ -1,0 +1,94 @@
+# Copyright 2020 Google Inc. All Rights Reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above
+#       copyright notice, this list of conditions and the following disclaimer
+#       in the documentation and/or other materials provided with the
+#       distribution.
+#     * Neither the name of Google Inc. nor the names of its
+#       contributors may be used to endorse or promote products derived from
+#       this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+VERSION = "1.1.8"
+
+genrule(
+    name = "snappy_stubs_public_h",
+    srcs = [
+        "snappy-stubs-public.h.in",
+    ],
+    outs = [
+        "snappy-stubs-public.h",
+    ],
+    cmd = "sed " + " ".join([
+        "-e 's/$${HAVE_SYS_UIO_H_01}/0/g'",
+    ] + [
+        "-e 's/$${PROJECT_VERSION_MAJOR}/" + s + "/g'"
+        for s in VERSION.split(".")
+    ]) + " snappy-stubs-public.h.in > $@",
+)
+
+cc_library(
+    name = "snappy",
+    srcs = [
+        "config.h",
+        "snappy.cc",
+        "snappy-c.cc",
+        "snappy-internal.h",
+        "snappy-sinksource.cc",
+        "snappy-stubs-internal.cc",
+        "snappy-stubs-internal.h",
+    ],
+    hdrs = [
+        "snappy.h",
+        "snappy-c.h",
+        "snappy-sinksource.h",
+        "snappy-stubs-public.h",
+    ],
+    copts = [
+        "-mbmi2",
+        "-mssse3",
+    ],
+    local_defines = [
+        "HAVE_CONFIG_H",
+        "SNAPPY_BAZEL_BUILD",
+    ],
+)
+
+cc_test(
+    name = "snappy_unittest",
+    srcs = [
+        "snappy-stubs-internal.h",
+        "snappy-test.cc",
+        "snappy-test.h",
+        "snappy_unittest.cc",
+    ],
+    data = glob(["testdata/**"]),
+    local_defines = [
+        "HAVE_CONFIG_H",
+        "SNAPPY_BAZEL_BUILD",
+    ],
+    deps = [
+        ":snappy",
+        "@com_github_gflags_gflags//:gflags",
+        "@com_google_googletest//:gtest",
+    ],
+)

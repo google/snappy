@@ -104,6 +104,8 @@
 #define SNAPPY_PREDICT_TRUE(x) x
 #endif
 
+#if !defined(HAVE_GFLAGS)
+
 // This is only used for recomputing the tag byte table used during
 // decompression; for simplicity we just remove it from the open-source
 // version (anyone who wants to regenerate it can just do the call
@@ -112,6 +114,8 @@
   bool FLAGS_ ## flag_name = default_value
 #define DECLARE_bool(flag_name) \
   extern bool FLAGS_ ## flag_name
+
+#endif  // !defined(HAVE_GFLAGS)
 
 namespace snappy {
 
