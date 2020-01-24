@@ -4,5 +4,6 @@
 .DS_Store
 
 # Build directory.
+/bazel-*
 build/
 out/

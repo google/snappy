@@ -39,9 +39,17 @@
 #include <cstdint>
 #include <string>
 
-#if ${HAVE_SYS_UIO_H_01}  // HAVE_SYS_UIO_H
+#if ${HAVE_SYS_UIO_H_01}
+#define SNAPPY_STUBS_PUBLIC_HAVE_SYS_UIO_H() 1
+#elif defined(__has_include)
+#define SNAPPY_STUBS_PUBLIC_HAVE_SYS_UIO_H() __has_include(<sys/uio.h>)
+#else
+#define SNAPPY_STUBS_PUBLIC_HAVE_SYS_UIO_H() ${HAVE_SYS_UIO_H_01}
+#endif
+
+#if SNAPPY_STUBS_PUBLIC_HAVE_SYS_UIO_H()
 #include <sys/uio.h>
-#endif  // HAVE_SYS_UIO_H
+#endif  // SNAPPY_STUBS_PUBLIC_HAVE_SYS_UIO_H()
 
 #define SNAPPY_MAJOR ${PROJECT_VERSION_MAJOR}
 #define SNAPPY_MINOR ${PROJECT_VERSION_MINOR}
@@ -60,15 +68,17 @@ using uint32 = std::uint32_t;
 using int64 = std::int64_t;
 using uint64 = std::uint64_t;
 
-#if !${HAVE_SYS_UIO_H_01}  // !HAVE_SYS_UIO_H
+#if !SNAPPY_STUBS_PUBLIC_HAVE_SYS_UIO_H()
 // Windows does not have an iovec type, yet the concept is universally useful.
 // It is simple to define it ourselves, so we put it inside our own namespace.
 struct iovec {
   void* iov_base;
   size_t iov_len;
 };
-#endif  // !HAVE_SYS_UIO_H
+#endif  // !SNAPPY_STUBS_PUBLIC_HAVE_SYS_UIO_H()
 
 }  // namespace snappy
+
+#undef SNAPPY_STUBS_PUBLIC_HAVE_SYS_UIO_H
 
 #endif  // THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_STUBS_PUBLIC_H_
