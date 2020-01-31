@@ -190,9 +190,12 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
   assert(src < op);
   assert(op <= op_limit);
   assert(op_limit <= buf_limit);
-  // NOTE: The compressor always emits 4 <= len <= 64. It is ok to assume that
-  // to optimize this function but we have to also handle other cases in case
-  // the input does not satisfy these conditions.
+  // NOTE: The copy tags use 3 or 6 bits to store the copy length, so len <= 64.
+  assert(op_limit - op <= 64);
+  // NOTE: In practice the compressor always emits len >= 4, so it is ok to
+  // assume that to optimize this function, but this is not guaranteed by the
+  // compression format, so we have to also handle len < 4 in case the input
+  // does not satisfy these conditions.
 
   size_t pattern_size = op - src;
   // The cases are split into different branches to allow the branch predictor,
