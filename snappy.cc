@@ -76,11 +76,12 @@
 
 namespace snappy {
 
+using internal::char_table;
 using internal::COPY_1_BYTE_OFFSET;
 using internal::COPY_2_BYTE_OFFSET;
-using internal::LITERAL;
-using internal::char_table;
+using internal::COPY_4_BYTE_OFFSET;
 using internal::kMaximumTagLength;
+using internal::LITERAL;
 
 // Any hash function will produce a valid compressed bitstream, but a good
 // hash function reduces the number of collisions and thus yields better
@@ -890,18 +891,40 @@ class SnappyDecompressor {
         ip += literal_length;
         MAYBE_REFILL();
       } else {
-        const size_t entry = char_table[c];
-        const size_t trailer =
-            ExtractLowBytes(LittleEndian::Load32(ip), entry >> 11);
-        const size_t length = entry & 0xff;
-        ip += entry >> 11;
+        // If we ignore branch prediction misses, then the throughput of the
+        // loop over tags is limited by the data dependency chain carried by
+        // ip. The amount ip advances per iteration depends on the value c.
+        // For COPY_1 it's 2 bytes, for COPY_2 it's 3 bytes and for COPY_4 it's
+        // 5 bytes. We could be branch free and use information from the entry
+        // in char_table to advance ip, but that would lead to the following
+        // critical data dependency chain
+        //   ip -> c = *ip++ -> entry = char_table[c] ->
+        //   advance = entry >> 11 -> ip += advance
+        // which is 5 + 5 + 1 + 1 = 12 cycles of latency. Meaning the processor
+        // will never be able to execute the loop faster then 12 cycles per
+        // iteration. It's better to speculate it's not a COPY_4, which is an
+        // uncommon tag, in which case we get the data dependency chain
+        //   ip -> c = *ip++ -> c &= 3 -> ip += c
+        // which is 5 + 1 + 1 = 7 cycles of latency.
+        if (SNAPPY_PREDICT_FALSE((c & 3) == COPY_4_BYTE_OFFSET)) {
+          const size_t copy_offset = LittleEndian::Load32(ip);
+          const size_t length = (c >> 2) + 1;
+          ip += 4;
+          if (!writer->AppendFromSelf(copy_offset, length)) return;
+        } else {
+          const size_t entry = char_table[c];
+          const size_t trailer =
+              ExtractLowBytes(LittleEndian::Load32(ip), c & 3);
+          const size_t length = entry & 0xff;
+          ip += (c & 3);
 
-        // copy_offset/256 is encoded in bits 8..10.  By just fetching
-        // those bits, we get copy_offset (since the bit-field starts at
-        // bit 8).
-        const size_t copy_offset = entry & 0x700;
-        if (!writer->AppendFromSelf(copy_offset + trailer, length)) {
-          return;
+          // copy_offset/256 is encoded in bits 8..10.  By just fetching
+          // those bits, we get copy_offset (since the bit-field starts at
+          // bit 8).
+          const size_t copy_offset = entry & 0x700;
+          if (!writer->AppendFromSelf(copy_offset + trailer, length)) {
+            return;
+          }
         }
         MAYBE_REFILL();
       }
