@@ -76,6 +76,9 @@
 
 namespace snappy {
 
+// The amount of slop bytes writers are using for unconditional copies.
+constexpr int kSlopBytes = 64;
+
 using internal::char_table;
 using internal::COPY_1_BYTE_OFFSET;
 using internal::COPY_2_BYTE_OFFSET;
@@ -688,12 +691,28 @@ static inline void Report(const char *algorithm, size_t compressed_size,
 //   // Called before decompression
 //   void SetExpectedLength(size_t length);
 //
+//   // For performance a writer may choose to donate the cursor variable to the
+//   // decompression function. The decompression will inject it in all its
+//   // function calls to the writer. Keeping the important output cursor as a
+//   // function local stack variable allows the compiler to keep it in
+//   // register, which greatly aids performance by avoiding loads and stores of
+//   // this variable in the fast path loop iterations.
+//   T GetOutputPtr() const;
+//
+//   // At end of decompression the loop donates the ownership of the cursor
+//   // variable back to the writer by calling this function.
+//   void SetOutputPtr(T op);
+//
 //   // Called after decompression
 //   bool CheckLength() const;
 //
 //   // Called repeatedly during decompression
-//   bool Append(const char* ip, size_t length);
-//   bool AppendFromSelf(uint32 offset, size_t length);
+//   // Each function get a pointer to the op (output pointer), that the writer
+//   // can use and update. Note it's important that these functions get fully
+//   // inlined so that no actual address of the local variable needs to be
+//   // taken.
+//   bool Append(const char* ip, size_t length, T* op);
+//   bool AppendFromSelf(uint32 offset, size_t length, T* op);
 //
 //   // The rules for how TryFastAppend differs from Append are somewhat
 //   // convoluted:
@@ -715,7 +734,7 @@ static inline void Report(const char *algorithm, size_t compressed_size,
 //   //    as it is unlikely that one would implement a fast path accepting
 //   //    this much data.
 //   //
-//   bool TryFastAppend(const char* ip, size_t available, size_t length);
+//   bool TryFastAppend(const char* ip, size_t available, size_t length, T* op);
 // };
 
 static inline uint32 ExtractLowBytes(uint32 v, int n) {
@@ -747,6 +766,9 @@ class SnappyDecompressor {
   Source*       reader_;         // Underlying source of bytes to decompress
   const char*   ip_;             // Points to next buffered byte
   const char*   ip_limit_;       // Points just past buffered bytes
+  // If ip < ip_limit_min_maxtaglen_ it's safe to read kMaxTagLength from
+  // buffer.
+  const char* ip_limit_min_maxtaglen_;
   uint32        peeked_;         // Bytes peeked from reader (need to skip)
   bool          eof_;            // Hit end of input without an error?
   char          scratch_[kMaximumTagLength];  // See RefillTag().
@@ -757,6 +779,11 @@ class SnappyDecompressor {
   //
   // Returns true on success, false on error or end of input.
   bool RefillTag();
+
+  void ResetLimit(const char* ip) {
+    ip_limit_min_maxtaglen_ =
+        ip_limit_ - std::min<ptrdiff_t>(ip_limit_ - ip, kMaximumTagLength - 1);
+  }
 
  public:
   explicit SnappyDecompressor(Source* reader)
@@ -810,37 +837,29 @@ class SnappyDecompressor {
   __attribute__((aligned(32)))
 #endif
   void DecompressAllTags(Writer* writer) {
-    // In x86, pad the function body to start 16 bytes later. This function has
-    // a couple of hotspots that are highly sensitive to alignment: we have
-    // observed regressions by more than 20% in some metrics just by moving the
-    // exact same code to a different position in the benchmark binary.
-    //
-    // Putting this code on a 32-byte-aligned boundary + 16 bytes makes us hit
-    // the "lucky" case consistently. Unfortunately, this is a very brittle
-    // workaround, and future differences in code generation may reintroduce
-    // this regression. If you experience a big, difficult to explain, benchmark
-    // performance regression here, first try removing this hack.
-#if defined(__GNUC__) && defined(__x86_64__)
-    // Two 8-byte "NOP DWORD ptr [EAX + EAX*1 + 00000000H]" instructions.
-    asm(".byte 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00");
-    asm(".byte 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00");
-#endif
-
     const char* ip = ip_;
+    ResetLimit(ip);
+    auto op = writer->GetOutputPtr();
     // We could have put this refill fragment only at the beginning of the loop.
     // However, duplicating it at the end of each branch gives the compiler more
     // scope to optimize the <ip_limit_ - ip> expression based on the local
     // context, which overall increases speed.
-    #define MAYBE_REFILL() \
-        if (ip_limit_ - ip < kMaximumTagLength) { \
-          ip_ = ip; \
-          if (!RefillTag()) return; \
-          ip = ip_; \
-        }
+#define MAYBE_REFILL()                                      \
+  if (SNAPPY_PREDICT_FALSE(ip >= ip_limit_min_maxtaglen_)) { \
+    ip_ = ip;                                               \
+    if (SNAPPY_PREDICT_FALSE(!RefillTag())) goto exit;       \
+    ip = ip_;                                               \
+    ResetLimit(ip);                                         \
+  }                                                         \
+  preload = static_cast<uint8>(*ip)
 
+    // At the start of the for loop below the least significant byte of preload
+    // contains the tag.
+    uint32 preload;
     MAYBE_REFILL();
     for ( ;; ) {
-      const unsigned char c = *(reinterpret_cast<const unsigned char*>(ip++));
+      const uint8 c = static_cast<uint8>(preload);
+      ip++;
 
       // Ratio of iterations that have LITERAL vs non-LITERAL for different
       // inputs.
@@ -856,12 +875,13 @@ class SnappyDecompressor {
       // bin             24%        76%
       if (SNAPPY_PREDICT_FALSE((c & 0x3) == LITERAL)) {
         size_t literal_length = (c >> 2) + 1u;
-        if (writer->TryFastAppend(ip, ip_limit_ - ip, literal_length)) {
+        if (writer->TryFastAppend(ip, ip_limit_ - ip, literal_length, &op)) {
           assert(literal_length < 61);
           ip += literal_length;
           // NOTE: There is no MAYBE_REFILL() here, as TryFastAppend()
           // will not return true unless there's already at least five spare
           // bytes in addition to the literal.
+          preload = static_cast<uint8>(*ip);
           continue;
         }
         if (SNAPPY_PREDICT_FALSE(literal_length >= 61)) {
@@ -875,62 +895,51 @@ class SnappyDecompressor {
 
         size_t avail = ip_limit_ - ip;
         while (avail < literal_length) {
-          if (!writer->Append(ip, avail)) return;
+          if (!writer->Append(ip, avail, &op)) goto exit;
           literal_length -= avail;
           reader_->Skip(peeked_);
           size_t n;
           ip = reader_->Peek(&n);
           avail = n;
           peeked_ = avail;
-          if (avail == 0) return;  // Premature end of input
+          if (avail == 0) goto exit;
           ip_limit_ = ip + avail;
+          ResetLimit(ip);
         }
-        if (!writer->Append(ip, literal_length)) {
-          return;
-        }
+        if (!writer->Append(ip, literal_length, &op)) goto exit;
         ip += literal_length;
         MAYBE_REFILL();
       } else {
-        // If we ignore branch prediction misses, then the throughput of the
-        // loop over tags is limited by the data dependency chain carried by
-        // ip. The amount ip advances per iteration depends on the value c.
-        // For COPY_1 it's 2 bytes, for COPY_2 it's 3 bytes and for COPY_4 it's
-        // 5 bytes. We could be branch free and use information from the entry
-        // in char_table to advance ip, but that would lead to the following
-        // critical data dependency chain
-        //   ip -> c = *ip++ -> entry = char_table[c] ->
-        //   advance = entry >> 11 -> ip += advance
-        // which is 5 + 5 + 1 + 1 = 12 cycles of latency. Meaning the processor
-        // will never be able to execute the loop faster then 12 cycles per
-        // iteration. It's better to speculate it's not a COPY_4, which is an
-        // uncommon tag, in which case we get the data dependency chain
-        //   ip -> c = *ip++ -> c &= 3 -> ip += c
-        // which is 5 + 1 + 1 = 7 cycles of latency.
         if (SNAPPY_PREDICT_FALSE((c & 3) == COPY_4_BYTE_OFFSET)) {
           const size_t copy_offset = LittleEndian::Load32(ip);
           const size_t length = (c >> 2) + 1;
           ip += 4;
-          if (!writer->AppendFromSelf(copy_offset, length)) return;
+
+          if (!writer->AppendFromSelf(copy_offset, length, &op)) goto exit;
         } else {
-          const size_t entry = char_table[c];
-          const size_t trailer =
-              ExtractLowBytes(LittleEndian::Load32(ip), c & 3);
-          const size_t length = entry & 0xff;
-          ip += (c & 3);
+          const uint32 entry = char_table[c];
+          preload = LittleEndian::Load32(ip);
+          const uint32 trailer = ExtractLowBytes(preload, c & 3);
+          const uint32 length = entry & 0xff;
 
           // copy_offset/256 is encoded in bits 8..10.  By just fetching
           // those bits, we get copy_offset (since the bit-field starts at
           // bit 8).
-          const size_t copy_offset = entry & 0x700;
-          if (!writer->AppendFromSelf(copy_offset + trailer, length)) {
-            return;
-          }
+          const uint32 copy_offset = (entry & 0x700) + trailer;
+          if (!writer->AppendFromSelf(copy_offset, length, &op)) goto exit;
+
+          ip += (c & 3);
+          // By using the result of the previous load we reduce the critical
+          // dependency chain of ip to 4 cycles.
+          preload >>= (c & 3) * 8;
+          if (ip < ip_limit_min_maxtaglen_) continue;
         }
         MAYBE_REFILL();
       }
     }
-
 #undef MAYBE_REFILL
+  exit:
+    writer->SetOutputPtr(op);
   }
 };
 
@@ -1151,13 +1160,16 @@ class SnappyIOVecWriter {
     return total_written_ == output_limit_;
   }
 
-  inline bool Append(const char* ip, size_t len) {
+  inline bool Append(const char* ip, size_t len, char**) {
     if (total_written_ + len > output_limit_) {
       return false;
     }
 
     return AppendNoCheck(ip, len);
   }
+
+  char* GetOutputPtr() { return nullptr; }
+  void SetOutputPtr(char* op) {}
 
   inline bool AppendNoCheck(const char* ip, size_t len) {
     while (len > 0) {
@@ -1183,7 +1195,8 @@ class SnappyIOVecWriter {
     return true;
   }
 
-  inline bool TryFastAppend(const char* ip, size_t available, size_t len) {
+  inline bool TryFastAppend(const char* ip, size_t available, size_t len,
+                            char**) {
     const size_t space_left = output_limit_ - total_written_;
     if (len <= 16 && available >= 16 + kMaximumTagLength && space_left >= 16 &&
         curr_iov_remaining_ >= 16) {
@@ -1198,7 +1211,7 @@ class SnappyIOVecWriter {
     return false;
   }
 
-  inline bool AppendFromSelf(size_t offset, size_t len) {
+  inline bool AppendFromSelf(size_t offset, size_t len, char**) {
     // See SnappyArrayWriter::AppendFromSelf for an explanation of
     // the "offset - 1u" trick.
     if (offset - 1u >= total_written_) {
@@ -1296,59 +1309,68 @@ class SnappyArrayWriter {
   char* base_;
   char* op_;
   char* op_limit_;
+  // If op < op_limit_min_slop_ then it's safe to unconditionally write
+  // kSlopBytes starting at op.
+  char* op_limit_min_slop_;
 
  public:
   inline explicit SnappyArrayWriter(char* dst)
       : base_(dst),
         op_(dst),
-        op_limit_(dst) {
-  }
+        op_limit_(dst),
+        op_limit_min_slop_(dst) {}  // Safe default see invariant.
 
   inline void SetExpectedLength(size_t len) {
     op_limit_ = op_ + len;
+    // Prevent pointer from being past the buffer.
+    op_limit_min_slop_ = op_limit_ - std::min<size_t>(kSlopBytes - 1, len);
   }
 
   inline bool CheckLength() const {
     return op_ == op_limit_;
   }
 
-  inline bool Append(const char* ip, size_t len) {
-    char* op = op_;
+  char* GetOutputPtr() { return op_; }
+  void SetOutputPtr(char* op) { op_ = op; }
+
+  inline bool Append(const char* ip, size_t len, char** op_p) {
+    char* op = *op_p;
     const size_t space_left = op_limit_ - op;
-    if (space_left < len) {
-      return false;
-    }
+    if (space_left < len) return false;
     memcpy(op, ip, len);
-    op_ = op + len;
+    *op_p = op + len;
     return true;
   }
 
-  inline bool TryFastAppend(const char* ip, size_t available, size_t len) {
-    char* op = op_;
+  inline bool TryFastAppend(const char* ip, size_t available, size_t len,
+                            char** op_p) {
+    char* op = *op_p;
     const size_t space_left = op_limit_ - op;
     if (len <= 16 && available >= 16 + kMaximumTagLength && space_left >= 16) {
       // Fast path, used for the majority (about 95%) of invocations.
       UnalignedCopy128(ip, op);
-      op_ = op + len;
+      *op_p = op + len;
       return true;
     } else {
       return false;
     }
   }
 
-  inline bool AppendFromSelf(size_t offset, size_t len) {
-    char* const op_end = op_ + len;
+  ABSL_ATTRIBUTE_ALWAYS_INLINE
+  inline bool AppendFromSelf(size_t offset, size_t len, char** op_p) {
+    char* const op = *op_p;
+    char* const op_end = op + len;
 
     // Check if we try to append from before the start of the buffer.
-    // Normally this would just be a check for "produced < offset",
-    // but "produced <= offset - 1u" is equivalent for every case
-    // except the one where offset==0, where the right side will wrap around
-    // to a very big number. This is convenient, as offset==0 is another
-    // invalid case that we also want to catch, so that we do not go
-    // into an infinite loop.
-    if (Produced() <= offset - 1u || op_end > op_limit_) return false;
-    op_ = IncrementalCopy(op_ - offset, op_, op_end, op_limit_);
-
+    if (SNAPPY_PREDICT_FALSE(op - base_ < offset)) return false;
+    if (SNAPPY_PREDICT_FALSE((kSlopBytes < 64 && len > kSlopBytes) ||
+                            op >= op_limit_min_slop_ || offset < len)) {
+      if (op_end > op_limit_ || offset == 0) return false;
+      *op_p = IncrementalCopy(op - offset, op, op_end, op_limit_);
+      return true;
+    }
+    std::memmove(op, op - offset, kSlopBytes);
+    *op_p = op_end;
     return true;
   }
   inline size_t Produced() const {
@@ -1393,22 +1415,25 @@ class SnappyDecompressionValidator {
   inline void SetExpectedLength(size_t len) {
     expected_ = len;
   }
+  size_t GetOutputPtr() { return produced_; }
+  void SetOutputPtr(size_t op) { produced_ = op; }
   inline bool CheckLength() const {
     return expected_ == produced_;
   }
-  inline bool Append(const char* ip, size_t len) {
-    produced_ += len;
-    return produced_ <= expected_;
+  inline bool Append(const char* ip, size_t len, size_t* produced) {
+    *produced += len;
+    return *produced <= expected_;
   }
-  inline bool TryFastAppend(const char* ip, size_t available, size_t length) {
+  inline bool TryFastAppend(const char* ip, size_t available, size_t length,
+                            size_t* produced) {
     return false;
   }
-  inline bool AppendFromSelf(size_t offset, size_t len) {
+  inline bool AppendFromSelf(size_t offset, size_t len, size_t* produced) {
     // See SnappyArrayWriter::AppendFromSelf for an explanation of
     // the "offset - 1u" trick.
-    if (produced_ <= offset - 1u) return false;
-    produced_ += len;
-    return produced_ <= expected_;
+    if (*produced <= offset - 1u) return false;
+    *produced += len;
+    return *produced <= expected_;
   }
   inline void Flush() {}
 };
@@ -1472,6 +1497,9 @@ class SnappyScatteredWriter {
   char* op_base_;       // Base of output block
   char* op_ptr_;        // Pointer to next unfilled byte in block
   char* op_limit_;      // Pointer just past block
+  // If op < op_limit_min_slop_ then it's safe to unconditionally write
+  // kSlopBytes starting at op.
+  char* op_limit_min_slop_;
 
   inline size_t Size() const {
     return full_size_ + (op_ptr_ - op_base_);
@@ -1488,6 +1516,8 @@ class SnappyScatteredWriter {
         op_ptr_(NULL),
         op_limit_(NULL) {
   }
+  char* GetOutputPtr() { return op_ptr_; }
+  void SetOutputPtr(char* op) { op_ptr_ = op; }
 
   inline void SetExpectedLength(size_t len) {
     assert(blocks_.empty());
@@ -1503,43 +1533,59 @@ class SnappyScatteredWriter {
     return Size();
   }
 
-  inline bool Append(const char* ip, size_t len) {
-    size_t avail = op_limit_ - op_ptr_;
+  inline bool Append(const char* ip, size_t len, char** op_p) {
+    char* op = *op_p;
+    size_t avail = op_limit_ - op;
     if (len <= avail) {
       // Fast path
-      memcpy(op_ptr_, ip, len);
-      op_ptr_ += len;
+      memcpy(op, ip, len);
+      *op_p = op + len;
       return true;
     } else {
-      return SlowAppend(ip, len);
+      op_ptr_ = op;
+      bool res = SlowAppend(ip, len);
+      *op_p = op_ptr_;
+      return res;
     }
   }
 
-  inline bool TryFastAppend(const char* ip, size_t available, size_t length) {
-    char* op = op_ptr_;
+  inline bool TryFastAppend(const char* ip, size_t available, size_t length,
+                            char** op_p) {
+    char* op = *op_p;
     const int space_left = op_limit_ - op;
     if (length <= 16 && available >= 16 + kMaximumTagLength &&
         space_left >= 16) {
       // Fast path, used for the majority (about 95%) of invocations.
       UnalignedCopy128(ip, op);
-      op_ptr_ = op + length;
+      *op_p = op + length;
       return true;
     } else {
       return false;
     }
   }
 
-  inline bool AppendFromSelf(size_t offset, size_t len) {
-    char* const op_end = op_ptr_ + len;
-    // See SnappyArrayWriter::AppendFromSelf for an explanation of
-    // the "offset - 1u" trick.
-    if (SNAPPY_PREDICT_TRUE(offset - 1u < op_ptr_ - op_base_ &&
-                          op_end <= op_limit_)) {
-      // Fast path: src and dst in current block.
-      op_ptr_ = IncrementalCopy(op_ptr_ - offset, op_ptr_, op_end, op_limit_);
+  inline bool AppendFromSelf(size_t offset, size_t len, char** op_p) {
+    char* op = *op_p;
+    // Check if we try to append from before the start of the buffer.
+    if (SNAPPY_PREDICT_FALSE((kSlopBytes < 64 && len > kSlopBytes) ||
+                            op - op_base_ < offset ||
+                            op >= op_limit_min_slop_ || offset < len)) {
+      if (offset == 0) return false;
+      char* const op_end = op + len;
+      if (SNAPPY_PREDICT_FALSE(op - op_base_ < offset || op_end > op_limit_)) {
+        op_ptr_ = op;
+        bool res = SlowAppendFromSelf(offset, len);
+        *op_p = op_ptr_;
+        return res;
+      }
+      *op_p = IncrementalCopy(op - offset, op, op_end, op_limit_);
       return true;
     }
-    return SlowAppendFromSelf(offset, len);
+    // Fast path
+    char* const op_end = op + len;
+    std::memmove(op, op - offset, kSlopBytes);
+    *op_p = op_end;
+    return true;
   }
 
   // Called at the end of the decompress. We ask the allocator
@@ -1560,15 +1606,15 @@ bool SnappyScatteredWriter<Allocator>::SlowAppend(const char* ip, size_t len) {
     ip += avail;
 
     // Bounds check
-    if (full_size_ + len > expected_) {
-      return false;
-    }
+    if (full_size_ + len > expected_) return false;
 
     // Make new block
     size_t bsize = std::min<size_t>(kBlockSize, expected_ - full_size_);
     op_base_ = allocator_.Allocate(bsize);
     op_ptr_ = op_base_;
     op_limit_ = op_base_ + bsize;
+    op_limit_min_slop_ = op_limit_ - std::min<size_t>(kSlopBytes - 1, bsize);
+
     blocks_.push_back(op_base_);
     avail = bsize;
   }
@@ -1593,12 +1639,20 @@ bool SnappyScatteredWriter<Allocator>::SlowAppendFromSelf(size_t offset,
   // nice if we do not rely on that, since we can get better compression if we
   // allow cross-block copies and thus might want to change the compressor in
   // the future.
+  // TODO Replace this with a properly optimized path. This is not
+  // triggered right now. But this is so super slow, that it would regress
+  // performance unacceptably if triggered.
   size_t src = cur - offset;
+  char* op = op_ptr_;
   while (len-- > 0) {
     char c = blocks_[src >> kBlockLog][src & (kBlockSize-1)];
-    Append(&c, 1);
+    if (!Append(&c, 1, &op)) {
+      op_ptr_ = op;
+      return false;
+    }
     src++;
   }
+  op_ptr_ = op;
   return true;
 }
 
