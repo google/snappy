@@ -80,6 +80,10 @@
 
 #define ARCH_ARM 1
 
+#elif defined(__mips__)
+
+#define ARCH_MIPS 1
+
 #endif
 
 // Needed by OS X, among others.
@@ -211,6 +215,78 @@ inline uint64 UNALIGNED_LOAD64(const void *p) {
 
 inline void UNALIGNED_STORE64(void *p, uint64 v) {
   memcpy(p, &v, sizeof v);
+}
+
+#elif defined(__mips64)
+
+inline uint16 UNALIGNED_LOAD16(const void *p) {
+  uint16 t;
+  __asm__ volatile (
+        ".set noat \n\t"
+        "lb %[t], 0x0(%[p]) \n\t"
+        "lb $1, 0x1(%[p]) \n\t"
+        "ins %[t], $1, 8, 8 \n\t"
+        :[t]"=&r"(t)
+        :[p]"r"(p)
+        :
+  );
+  return t;
+}
+
+inline void UNALIGNED_STORE16(void *p, uint16 v) {
+  __asm__ volatile (
+        ".set noat \n\t"
+        "sb %[v], 0x0(%[p]) \n\t"
+        "srl $1, %[v], 8\n\t"
+        "sb $1, 0x1(%[p]) \n\t"
+        :
+        :[p]"r"(p),[v]"r"(v)
+        :
+  );
+}
+
+inline uint32 UNALIGNED_LOAD32(const void *p) {
+  uint32 t;
+  __asm__ volatile (
+        "lwl %[t], 0x3(%[p]) \n\t"
+        "lwr %[t], 0x0(%[p]) \n\t"
+        :[t]"=&r"(t)
+        :[p]"r"(p)
+        :
+  );
+  return t;
+}
+
+inline uint64 UNALIGNED_LOAD64(const void *p) {
+  uint64 t;
+  __asm__ volatile (
+        "ldl %[temp], 0x7(%[p]) \n\t"
+        "ldr %[temp], 0x0(%[p]) \n\t"
+        :[temp]"=&r"(t)
+        :[p]"r"(p)
+        :
+  );
+  return t;
+}
+
+inline void UNALIGNED_STORE32(void *p, uint32 v) {
+  __asm__ volatile (
+        "swl %[v], 0x3(%[p]) \n\t"
+        "swr %[v], 0x0(%[p]) \n\t"
+        :
+        :[p]"r"(p),[v]"r"(v)
+        :
+  );
+}
+
+inline void UNALIGNED_STORE64(void *p, uint64 v) {
+  __asm__ volatile (
+        "sdl %[v], 0x7(%[p]) \n\t"
+        "sdr %[v], 0x0(%[p]) \n\t"
+        :
+        :[p]"r"(p),[v]"r"(v)
+        :
+  );
 }
 
 #else
@@ -376,7 +452,8 @@ class Bits {
   // that it's 0-indexed.
   static int FindLSBSetNonZero(uint32 n);
 
-#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
+#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM) || \
+    defined(ARCH_MIPS)
   static int FindLSBSetNonZero64(uint64 n);
 #endif  // defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 
@@ -408,7 +485,8 @@ inline int Bits::FindLSBSetNonZero(uint32 n) {
   return __builtin_ctz(n);
 }
 
-#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
+#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)  || \
+    defined(ARCH_MIPS)
 inline int Bits::FindLSBSetNonZero64(uint64 n) {
   assert(n != 0);
   return __builtin_ctzll(n);
@@ -439,7 +517,8 @@ inline int Bits::FindLSBSetNonZero(uint32 n) {
   return 32;
 }
 
-#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
+#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)  || \
+    defined(ARCH_MIPS)
 inline int Bits::FindLSBSetNonZero64(uint64 n) {
   assert(n != 0);
   unsigned long where;
@@ -487,7 +566,8 @@ inline int Bits::FindLSBSetNonZero(uint32 n) {
   return rc;
 }
 
-#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
+#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM) || \
+    defined(ARCH_MIPS)
 // FindLSBSetNonZero64() is defined in terms of FindLSBSetNonZero().
 inline int Bits::FindLSBSetNonZero64(uint64 n) {
   assert(n != 0);
