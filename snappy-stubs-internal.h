@@ -72,7 +72,7 @@
 // Enable 64-bit optimized versions of some routines.
 #define ARCH_K8 1
 
-#elif defined(__ppc64__)
+#elif defined(__ppc64__) || defined(__PPC64__) || defined(__powerpc64__)
 
 #define ARCH_PPC 1
 
