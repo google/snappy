@@ -88,7 +88,7 @@ using internal::kMaximumTagLength;
 // input. Of course, it doesn't hurt if the hash function is reasonably fast
 // either, as it gets called a lot.
 static inline uint32 HashBytes(uint32 bytes, int shift) {
-  uint32 kMul = 0x1e35a7bd;
+  const uint32 kMul = 0x1e35a7bd;
   return (bytes * kMul) >> shift;
 }
 static inline uint32 Hash(const char* p, int shift) {
@@ -263,7 +263,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       while (pattern_size < 8) {
         UnalignedCopy64(src, op);
         op += pattern_size;
-        pattern_size *= 2;
+        pattern_size <<= 1;
       }
       if (SNAPPY_PREDICT_TRUE(op >= op_limit)) return op_limit;
     } else {
@@ -781,8 +781,7 @@ class SnappyDecompressor {
     // Length is encoded in 1..5 bytes
     *result = 0;
     uint32 shift = 0;
-    while (true) {
-      if (shift >= 32) return false;
+    for (;;) {
       size_t n;
       const char* ip = reader_->Peek(&n);
       if (n == 0) return false;
@@ -795,6 +794,7 @@ class SnappyDecompressor {
         break;
       }
       shift += 7;
+      if (shift >= 32) return false;
     }
     return true;
   }
