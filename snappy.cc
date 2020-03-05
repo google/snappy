@@ -62,6 +62,10 @@
 #include <tmmintrin.h>
 #endif
 
+#if ARCH_ARM
+#include <arm_neon.h>
+#endif
+
 #if SNAPPY_HAVE_BMI2
 // Please do not replace with <x86intrin.h>. or with headers that assume more
 // advanced SSE versions without checking with all the OWNERS.
@@ -94,6 +98,15 @@ static inline uint32 HashBytes(uint32 bytes, int shift) {
 static inline uint32 Hash(const char* p, int shift) {
   return HashBytes(UNALIGNED_LOAD32(p), shift);
 }
+
+#if ARCH_ARM
+static inline void Prefetch(const void* data) {
+	__asm__ __volatile__(
+	"prfm PLDL1STRM, [%[data]]       \n\t"
+	:: [data] "r" (data)
+	);
+}
+#endif //ARCH_ARM
 
 size_t MaxCompressedLength(size_t source_len) {
   // Compressed data can be defined as:
@@ -626,6 +639,9 @@ char* CompressFragment(const char* input,
       do {
         // We have a 4-byte match at ip, and no need to emit any
         // "literal bytes" prior to ip.
+#if defined(ARCH_ARM)
+	Prefetch(ip + 256);
+#endif
         const char* base = ip;
         std::pair<size_t, bool> p =
             FindMatchLength(candidate + 4, ip + 4, ip_end);
