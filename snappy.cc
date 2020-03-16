@@ -127,6 +127,20 @@ void UnalignedCopy64(const void* src, void* dst) {
   memcpy(dst, tmp, 8);
 }
 
+#if ARCH_ARM
+void UnalignedCopy64Pair(const void* src, void* dst) {
+    __asm__ __volatile__(
+        "ldr d0, [%[src]]        \n\t"
+        "str d0, [%[dst]]        \n\t"
+        "ldr d1, [%[src], #8]    \n\t"
+        "str d1, [%[dst], #8]    \n\t"
+        : [dst] "+r" (dst)
+        : [src] "r" (src)
+        : "d0", "d1"
+    );
+}
+#endif
+
 void UnalignedCopy128(const void* src, void* dst) {
   // memcpy gets vectorized when the appropriate compiler options are used.
   // For example, x86 compilers targeting SSE2+ will optimize to an SSE2 load
@@ -285,6 +299,18 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     // conditionals instead of a loop allows FDO to layout the code with respect
     // to the actual probabilities of each length.
     // TODO: Replace with loop with trip count hint.
+#if ARCH_ARM
+    UnalignedCopy64Pair(src, op);
+    if (op + 16 < op_limit) {
+      UnalignedCopy64Pair(src + 16, op + 16);
+    }
+    if (op + 32 < op_limit) {
+      UnalignedCopy64Pair(src + 32, op + 32);
+    }
+    if (op + 48 < op_limit) {
+      UnalignedCopy64Pair(src + 48, op + 48);
+    }
+#else
     UnalignedCopy64(src, op);
     UnalignedCopy64(src + 8, op + 8);
 
@@ -300,6 +326,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       UnalignedCopy64(src + 48, op + 48);
       UnalignedCopy64(src + 56, op + 56);
     }
+#endif
     return op_limit;
   }
 
@@ -313,8 +340,12 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
 #pragma clang loop unroll(disable)
 #endif
   for (char *op_end = buf_limit - 16; op < op_end; op += 16, src += 16) {
+#if ARCH_ARM
+    UnalignedCopy64Pair(src, op);
+#else
     UnalignedCopy64(src, op);
     UnalignedCopy64(src + 8, op + 8);
+#endif
   }
   if (op >= op_limit)
     return op_limit;
@@ -347,15 +378,18 @@ static inline char* EmitLiteral(char* op,
   //     MaxCompressedLength).
   assert(len > 0);      // Zero-length literals are disallowed
   int n = len - 1;
-  if (allow_fast_path && len <= 16) {
+  if (allow_fast_path && SNAPPY_PREDICT_TRUE(len <= 16)) {
     // Fits in tag byte
     *op++ = LITERAL | (n << 2);
-
+#if ARCH_ARM
+    vst1q_u64((uint64_t*)op, vld1q_u64((const uint64_t*)literal));
+#else
     UnalignedCopy128(literal, op);
+#endif
     return op + len;
   }
 
-  if (n < 60) {
+  if (SNAPPY_PREDICT_TRUE(n < 60)) {
     // Fits in tag byte
     *op++ = LITERAL | (n << 2);
   } else {
