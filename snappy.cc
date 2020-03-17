@@ -881,23 +881,28 @@ class SnappyDecompressor {
           if (avail == 0) return;  // Premature end of input
           ip_limit_ = ip + avail;
         }
-        if (!writer->Append(ip, literal_length)) {
+        bool append_res = !writer->Append(ip, literal_length);
+        if (SNAPPY_PREDICT_TRUE(append_res)) {
           return;
         }
         ip += literal_length;
         MAYBE_REFILL();
       } else {
+        const uint32 val = LittleEndian::Load32(ip);
         const size_t entry = char_table[c];
-        const size_t trailer =
-            ExtractLowBytes(LittleEndian::Load32(ip), entry >> 11);
         const size_t length = entry & 0xff;
-        ip += entry >> 11;
+        const size_t copy_offset = entry & 0x700;
+        const size_t mask_idx = entry >> 11;
+        const size_t trailer =
+            ExtractLowBytes(val, mask_idx);
+        const size_t offset = copy_offset + trailer;
+        ip += mask_idx;
 
         // copy_offset/256 is encoded in bits 8..10.  By just fetching
         // those bits, we get copy_offset (since the bit-field starts at
         // bit 8).
-        const size_t copy_offset = entry & 0x700;
-        if (!writer->AppendFromSelf(copy_offset + trailer, length)) {
+        bool append_res = !writer->AppendFromSelf(offset, length);
+        if (append_res) {
           return;
         }
         MAYBE_REFILL();
