@@ -597,12 +597,12 @@ char* CompressFragment(const char* input,
         if (SNAPPY_PREDICT_FALSE(next_ip > ip_limit)) {
           goto emit_remainder;
         }
-        next_hash = Hash(next_ip, shift);
         candidate = base_ip + table[hash];
         assert(candidate >= base_ip);
         assert(candidate < ip);
 
         table[hash] = ip - base_ip;
+        next_hash = Hash(next_ip, shift);
       } while (SNAPPY_PREDICT_TRUE(UNALIGNED_LOAD32(ip) !=
                                  UNALIGNED_LOAD32(candidate)));
 
@@ -622,16 +622,23 @@ char* CompressFragment(const char* input,
       // this loop via goto if we get close to exhausting the input.
       EightBytesReference input_bytes;
       uint32 candidate_bytes = 0;
+      uint32 prev_val = 0;
+      uint32 cur_val = 0;
+      uint32 next_val = 0;
 
       do {
         // We have a 4-byte match at ip, and no need to emit any
         // "literal bytes" prior to ip.
+#if defined(ARCH_ARM)
+        Prefetch(ip + 256);
+#endif
+        size_t offset = ip - candidate;
         const char* base = ip;
         std::pair<size_t, bool> p =
             FindMatchLength(candidate + 4, ip + 4, ip_end);
         size_t matched = 4 + p.first;
+        assert(0 == memcmp(ip, candidate, matched));
         ip += matched;
-        size_t offset = base - candidate;
         assert(0 == memcmp(base, candidate, matched));
         if (p.second) {
           op = EmitCopy</*len_less_than_12=*/true>(op, offset, matched);
@@ -646,15 +653,18 @@ char* CompressFragment(const char* input,
         // table[Hash(ip, shift)] for that.  To improve compression,
         // we also update table[Hash(ip - 1, shift)] and table[Hash(ip, shift)].
         input_bytes = GetEightBytesAt(ip - 1);
-        uint32 prev_hash = HashBytes(GetUint32AtOffset(input_bytes, 0), shift);
-        table[prev_hash] = ip - base_ip - 1;
-        uint32 cur_hash = HashBytes(GetUint32AtOffset(input_bytes, 1), shift);
+        prev_val = GetUint32AtOffset(input_bytes, 0);
+        cur_val = GetUint32AtOffset(input_bytes, 1);
+        next_val = GetUint32AtOffset(input_bytes, 2);
+        uint32 prev_hash = HashBytes(prev_val, shift);
+        uint32 cur_hash = HashBytes(cur_val, shift);
         candidate = base_ip + table[cur_hash];
         candidate_bytes = UNALIGNED_LOAD32(candidate);
+        table[prev_hash] = ip - base_ip - 1;
         table[cur_hash] = ip - base_ip;
-      } while (GetUint32AtOffset(input_bytes, 1) == candidate_bytes);
+      } while (cur_val == candidate_bytes);
 
-      next_hash = HashBytes(GetUint32AtOffset(input_bytes, 2), shift);
+      next_hash = HashBytes(next_val, shift);
       ++ip;
     }
   }
