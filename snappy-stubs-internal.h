@@ -330,6 +330,9 @@ class LittleEndian {
   static uint32 FromHost32(uint32 x) { return bswap_32(x); }
   static uint32 ToHost32(uint32 x) { return bswap_32(x); }
 
+  static uint32 FromHost64(uint64 x) { return bswap_64(x); }
+  static uint32 ToHost64(uint64 x) { return bswap_64(x); }
+
   static bool IsLittleEndian() { return false; }
 
 #else  // !defined(SNAPPY_IS_BIG_ENDIAN)
@@ -339,6 +342,9 @@ class LittleEndian {
 
   static uint32 FromHost32(uint32 x) { return x; }
   static uint32 ToHost32(uint32 x) { return x; }
+
+  static uint32 FromHost64(uint64 x) { return x; }
+  static uint32 ToHost64(uint64 x) { return x; }
 
   static bool IsLittleEndian() { return true; }
 
@@ -359,6 +365,14 @@ class LittleEndian {
 
   static void Store32(void *p, uint32 v) {
     UNALIGNED_STORE32(p, FromHost32(v));
+  }
+
+  static uint64 Load64(const void *p) {
+    return ToHost64(UNALIGNED_LOAD64(p));
+  }
+
+  static void Store64(void *p, uint64 v) {
+    UNALIGNED_STORE64(p, FromHost64(v));
   }
 };
 

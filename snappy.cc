@@ -95,9 +95,6 @@ static inline uint32 HashBytes(uint32 bytes, int shift) {
   uint32 kMul = 0x1e35a7bd;
   return (bytes * kMul) >> shift;
 }
-static inline uint32 Hash(const char* p, int shift) {
-  return HashBytes(UNALIGNED_LOAD32(p), shift);
-}
 
 size_t MaxCompressedLength(size_t source_len) {
   // Compressed data can be defined as:
@@ -487,49 +484,6 @@ uint16* WorkingMemory::GetHashTable(size_t fragment_size,
 }
 }  // end namespace internal
 
-// For 0 <= offset <= 4, GetUint32AtOffset(GetEightBytesAt(p), offset) will
-// equal UNALIGNED_LOAD32(p + offset).  Motivation: On x86-64 hardware we have
-// empirically found that overlapping loads such as
-//  UNALIGNED_LOAD32(p) ... UNALIGNED_LOAD32(p+1) ... UNALIGNED_LOAD32(p+2)
-// are slower than UNALIGNED_LOAD64(p) followed by shifts and casts to uint32.
-//
-// We have different versions for 64- and 32-bit; ideally we would avoid the
-// two functions and just inline the UNALIGNED_LOAD64 call into
-// GetUint32AtOffset, but GCC (at least not as of 4.6) is seemingly not clever
-// enough to avoid loading the value multiple times then. For 64-bit, the load
-// is done when GetEightBytesAt() is called, whereas for 32-bit, the load is
-// done at GetUint32AtOffset() time.
-
-#ifdef ARCH_K8
-
-typedef uint64 EightBytesReference;
-
-static inline EightBytesReference GetEightBytesAt(const char* ptr) {
-  return UNALIGNED_LOAD64(ptr);
-}
-
-static inline uint32 GetUint32AtOffset(uint64 v, int offset) {
-  assert(offset >= 0);
-  assert(offset <= 4);
-  return v >> (LittleEndian::IsLittleEndian() ? 8 * offset : 32 - 8 * offset);
-}
-
-#else
-
-typedef const char* EightBytesReference;
-
-static inline EightBytesReference GetEightBytesAt(const char* ptr) {
-  return ptr;
-}
-
-static inline uint32 GetUint32AtOffset(const char* v, int offset) {
-  assert(offset >= 0);
-  assert(offset <= 4);
-  return UNALIGNED_LOAD32(v + offset);
-}
-
-#endif
-
 // Flat array compression that does not emit the "uncompressed length"
 // prefix. Compresses "input" string to the "*op" buffer.
 //
@@ -563,7 +517,7 @@ char* CompressFragment(const char* input,
   if (SNAPPY_PREDICT_TRUE(input_size >= kInputMarginBytes)) {
     const char* ip_limit = input + input_size - kInputMarginBytes;
 
-    for (uint32 next_hash = Hash(++ip, shift); ; ) {
+    for (uint64 data = LittleEndian::Load64(++ip);;) {
       assert(next_emit < ip);
       // The body of this loop calls EmitLiteral once and then EmitCopy one or
       // more times.  (The exception is that when we're close to exhausting
@@ -592,26 +546,54 @@ char* CompressFragment(const char* input,
       // number of bytes to move ahead for each iteration.
       uint32 skip = 32;
 
-      const char* next_ip = ip;
       const char* candidate;
-      do {
-        ip = next_ip;
-        uint32 hash = next_hash;
-        assert(hash == Hash(ip, shift));
+      if (ip_limit - ip >= 16) {
+        auto delta = ip - base_ip;
+        for (int j = 0; j < 4; j++) {
+          for (int k = 0; k < 4; k++) {
+            int i = 4 * j + k;
+            assert(static_cast<uint32>(data) == LittleEndian::Load32(ip + i));
+            uint32 hash = HashBytes(data, shift);
+            candidate = base_ip + table[hash];
+            assert(candidate >= base_ip);
+            assert(candidate < ip + i);
+            table[hash] = delta + i;
+            if (SNAPPY_PREDICT_FALSE(LittleEndian::Load32(candidate) ==
+                                    static_cast<uint32>(data))) {
+              *op = LITERAL | (i << 2);
+              UnalignedCopy128(next_emit, op + 1);
+              ip += i;
+              op = op + i + 2;
+              goto emit_match;
+            }
+            data >>= 8;
+          }
+          data = LittleEndian::Load64(ip + 4 * j + 4);
+        }
+        ip += 16;
+        skip += 16;
+      }
+      while (true) {
+        assert(static_cast<uint32>(data) == LittleEndian::Load32(ip));
+        uint32 hash = HashBytes(data, shift);
         uint32 bytes_between_hash_lookups = skip >> 5;
         skip += bytes_between_hash_lookups;
-        next_ip = ip + bytes_between_hash_lookups;
+        const char* next_ip = ip + bytes_between_hash_lookups;
         if (SNAPPY_PREDICT_FALSE(next_ip > ip_limit)) {
           goto emit_remainder;
         }
-        next_hash = Hash(next_ip, shift);
         candidate = base_ip + table[hash];
         assert(candidate >= base_ip);
         assert(candidate < ip);
 
         table[hash] = ip - base_ip;
-      } while (SNAPPY_PREDICT_TRUE(UNALIGNED_LOAD32(ip) !=
-                                 UNALIGNED_LOAD32(candidate)));
+        if (SNAPPY_PREDICT_FALSE(static_cast<uint32>(data) ==
+                                LittleEndian::Load32(candidate))) {
+          break;
+        }
+        data = LittleEndian::Load32(next_ip);
+        ip = next_ip;
+      }
 
       // Step 2: A 4-byte match has been found.  We'll later see if more
       // than 4 bytes match.  But, prior to the match, input
@@ -627,9 +609,7 @@ char* CompressFragment(const char* input,
       // though we don't yet know how big the literal will be.  We handle that
       // by proceeding to the next iteration of the main loop.  We also can exit
       // this loop via goto if we get close to exhausting the input.
-      EightBytesReference input_bytes;
-      uint32 candidate_bytes = 0;
-
+    emit_match:
       do {
         // We have a 4-byte match at ip, and no need to emit any
         // "literal bytes" prior to ip.
@@ -652,17 +632,15 @@ char* CompressFragment(const char* input,
         // We are now looking for a 4-byte match again.  We read
         // table[Hash(ip, shift)] for that.  To improve compression,
         // we also update table[Hash(ip - 1, shift)] and table[Hash(ip, shift)].
-        input_bytes = GetEightBytesAt(ip - 1);
-        uint32 prev_hash = HashBytes(GetUint32AtOffset(input_bytes, 0), shift);
-        table[prev_hash] = ip - base_ip - 1;
-        uint32 cur_hash = HashBytes(GetUint32AtOffset(input_bytes, 1), shift);
-        candidate = base_ip + table[cur_hash];
-        candidate_bytes = UNALIGNED_LOAD32(candidate);
-        table[cur_hash] = ip - base_ip;
-      } while (GetUint32AtOffset(input_bytes, 1) == candidate_bytes);
-
-      next_hash = HashBytes(GetUint32AtOffset(input_bytes, 2), shift);
+        data = LittleEndian::Load64(ip - 1);
+        table[HashBytes(data, shift)] = ip - base_ip - 1;
+        data >>= 8;
+        uint32 hash = HashBytes(data, shift);
+        candidate = base_ip + table[hash];
+        table[hash] = ip - base_ip;
+      } while (static_cast<uint32>(data) == LittleEndian::Load32(candidate));
       ++ip;
+      data = LittleEndian::Load64(ip);
     }
   }
 
