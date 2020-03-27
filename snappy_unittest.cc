@@ -957,9 +957,8 @@ TEST(Snappy, ZeroOffsetCopyValidation) {
 namespace {
 
 int TestFindMatchLength(const char* s1, const char *s2, unsigned length) {
-  uint64 data;
   std::pair<size_t, bool> p =
-      snappy::internal::FindMatchLength(s1, s2, s2 + length, &data);
+      snappy::internal::FindMatchLength(s1, s2, s2 + length);
   CHECK_EQ(p.first < 8, p.second);
   return p.first;
 }

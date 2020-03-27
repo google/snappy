@@ -385,18 +385,11 @@ static inline char* EmitCopyAtMost64(char* op, size_t offset, size_t len) {
   assert(offset < 65536);
   assert(len_less_than_12 == (len < 12));
 
-  if (len_less_than_12) {
-    uint32 u = (len << 2) + (offset << 8);
-    uint32 copy1 = COPY_1_BYTE_OFFSET - (4 << 2) + ((offset >> 3) & 0xe0);
-    uint32 copy2 = COPY_2_BYTE_OFFSET - (1 << 2);
-    // It turns out that offset < 2048 is a difficult to predict branch.
-    // `perf record` shows this is the highest percentage of branch misses in
-    // benchmarks. This code produces branch free code, the data dependency
-    // chain that bottlenecks the throughput is so long that a few extra
-    // instructions are completely free (IPC << 6 because of data deps).
-    u += offset < 2048 ? copy1 : copy2;
-    LittleEndian::Store32(op, u);
-    op += offset < 2048 ? 2 : 3;
+  if (len_less_than_12 && SNAPPY_PREDICT_TRUE(offset < 2048)) {
+    // offset fits in 11 bits.  The 3 highest go in the top of the first byte,
+    // and the rest go in the second byte.
+    *op++ = COPY_1_BYTE_OFFSET + ((len - 4) << 2) + ((offset >> 3) & 0xe0);
+    *op++ = offset & 0xff;
   } else {
     // Write 4 bytes, though we only care about 3 of them.  The output buffer
     // is required to have some slack, so the extra byte won't overrun it.
@@ -622,7 +615,7 @@ char* CompressFragment(const char* input,
         // "literal bytes" prior to ip.
         const char* base = ip;
         std::pair<size_t, bool> p =
-            FindMatchLength(candidate + 4, ip + 4, ip_end, &data);
+            FindMatchLength(candidate + 4, ip + 4, ip_end);
         size_t matched = 4 + p.first;
         ip += matched;
         size_t offset = base - candidate;
@@ -636,12 +629,12 @@ char* CompressFragment(const char* input,
         if (SNAPPY_PREDICT_FALSE(ip >= ip_limit)) {
           goto emit_remainder;
         }
-        assert(LittleEndian::Load64(ip) == data);
         // We are now looking for a 4-byte match again.  We read
         // table[Hash(ip, shift)] for that.  To improve compression,
         // we also update table[Hash(ip - 1, shift)] and table[Hash(ip, shift)].
-        table[HashBytes(LittleEndian::Load32(ip - 1), shift)] =
-            ip - base_ip - 1;
+        data = LittleEndian::Load64(ip - 1);
+        table[HashBytes(data, shift)] = ip - base_ip - 1;
+        data >>= 8;
         uint32 hash = HashBytes(data, shift);
         candidate = base_ip + table[hash];
         table[hash] = ip - base_ip;
