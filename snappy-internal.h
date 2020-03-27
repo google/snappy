@@ -89,12 +89,18 @@ char* CompressFragment(const char* input,
 // Does not read *(s1 + (s2_limit - s2)) or beyond.
 // Requires that s2_limit >= s2.
 //
+// In addition populate *data with the next 8 bytes from the end of the match.
+// This is only done if 8 bytes are available (s2_limit - s2 >= 8). The point is
+// that on some arch's this can be done faster in this routine than subsequent
+// loading from s2 + n.
+//
 // Separate implementation for 64-bit, little-endian cpus.
 #if !defined(SNAPPY_IS_BIG_ENDIAN) && \
     (defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM))
 static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
                                                       const char* s2,
-                                                      const char* s2_limit) {
+                                                      const char* s2_limit,
+                                                      uint64* data) {
   assert(s2_limit >= s2);
   size_t matched = 0;
 
@@ -103,12 +109,28 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
   // uncommon code paths that determine, without extra effort, whether the match
   // length is less than 8.  In short, we are hoping to avoid a conditional
   // branch, and perhaps get better code layout from the C++ compiler.
-  if (SNAPPY_PREDICT_TRUE(s2 <= s2_limit - 8)) {
+  if (SNAPPY_PREDICT_TRUE(s2 <= s2_limit - 16)) {
     uint64 a1 = UNALIGNED_LOAD64(s1);
     uint64 a2 = UNALIGNED_LOAD64(s2);
-    if (a1 != a2) {
-      return std::pair<size_t, bool>(Bits::FindLSBSetNonZero64(a1 ^ a2) >> 3,
-                                     true);
+    if (SNAPPY_PREDICT_TRUE(a1 != a2)) {
+      uint64 xorval = a1 ^ a2;
+      int shift = Bits::FindLSBSetNonZero64(xorval);
+      size_t matched_bytes = shift >> 3;
+#ifndef __x86_64__
+      *data = UNALIGNED_LOAD64(s2 + matched_bytes);
+#else
+      // Unfortunately the compiler cannot find this using the obvious c++ code
+      // *data = shift == 0 ? a2 : (a2 >> shift) | (a3 << (64 - shift);
+      // the reason is that the above needs the conditional clause to guard
+      // against UB when shift == 0. The compiler doesn't realize the full
+      // expression can be lowered into a single "shrd" instruction and in
+      // effect the conditional can be ignored.
+      uint64 a3 = UNALIGNED_LOAD64(s2 + 8);
+      asm ("shrdq %%cl, %1, %0\n\t" : "+r"(a2) : "r"(a3), "c"(shift & -8));
+      *data = a2;
+#endif
+      assert(*data == UNALIGNED_LOAD64(s2 + matched_bytes));
+      return std::pair<size_t, bool>(matched_bytes, true);
     } else {
       matched = 8;
       s2 += 8;
@@ -119,14 +141,25 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
   // time until we find a 64-bit block that doesn't match; then we find
   // the first non-matching bit and use that to calculate the total
   // length of the match.
-  while (SNAPPY_PREDICT_TRUE(s2 <= s2_limit - 8)) {
-    if (UNALIGNED_LOAD64(s2) == UNALIGNED_LOAD64(s1 + matched)) {
+  while (SNAPPY_PREDICT_TRUE(s2 <= s2_limit - 16)) {
+    uint64 a1 = UNALIGNED_LOAD64(s1 + matched);
+    uint64 a2 = UNALIGNED_LOAD64(s2);
+    if (a1 == a2) {
       s2 += 8;
       matched += 8;
     } else {
-      uint64 x = UNALIGNED_LOAD64(s2) ^ UNALIGNED_LOAD64(s1 + matched);
-      int matching_bits = Bits::FindLSBSetNonZero64(x);
-      matched += matching_bits >> 3;
+      uint64 xorval = a1 ^ a2;
+      int shift = Bits::FindLSBSetNonZero64(xorval);
+      size_t matched_bytes = shift >> 3;
+#ifndef __x86_64__
+      *data = UNALIGNED_LOAD64(s2 + matched_bytes);
+#else
+      uint64 a3 = UNALIGNED_LOAD64(s2 + 8);
+      asm("shrdq %%cl, %1, %0\n\t" : "+r"(a2) : "r"(a3), "c"(shift & -8));
+      *data = a2;
+#endif
+      assert(*data == UNALIGNED_LOAD64(s2 + matched_bytes));
+      matched += matched_bytes;
       assert(matched >= 8);
       return std::pair<size_t, bool>(matched, false);
     }
@@ -136,6 +169,9 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
       ++s2;
       ++matched;
     } else {
+      if (s2 <= s2_limit - 8) {
+        *data = UNALIGNED_LOAD64(s2);
+      }
       return std::pair<size_t, bool>(matched, matched < 8);
     }
   }
@@ -144,7 +180,8 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
 #else
 static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
                                                       const char* s2,
-                                                      const char* s2_limit) {
+                                                      const char* s2_limit,
+                                                      uint64* data) {
   // Implementation based on the x86-64 version, above.
   assert(s2_limit >= s2);
   int matched = 0;
@@ -164,6 +201,7 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
       ++matched;
     }
   }
+  *data = UNALIGNED_LOAD64(s2 + matched);
   return std::pair<size_t, bool>(matched, matched < 8);
 }
 #endif
