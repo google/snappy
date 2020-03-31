@@ -89,7 +89,7 @@ char* CompressFragment(const char* input,
 // Does not read *(s1 + (s2_limit - s2)) or beyond.
 // Requires that s2_limit >= s2.
 //
-// In addition populate *data with the next 8 bytes from the end of the match.
+// In addition populate *data with the next 5 bytes from the end of the match.
 // This is only done if 8 bytes are available (s2_limit - s2 >= 8). The point is
 // that on some arch's this can be done faster in this routine than subsequent
 // loading from s2 + n.
@@ -113,23 +113,65 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
     uint64 a1 = UNALIGNED_LOAD64(s1);
     uint64 a2 = UNALIGNED_LOAD64(s2);
     if (SNAPPY_PREDICT_TRUE(a1 != a2)) {
+      // This code is critical for performance. The reason is that it determines
+      // how much to advance `ip` (s2). This obviously depends on both the loads
+      // from the `candidate` (s1) and `ip`. Furthermore the next `candidate`
+      // depends on the advanced `ip` calculated here through a load, hash and
+      // new candidate hash lookup (a lot of cycles). This makes s1 (ie.
+      // `candidate`) the variable that limits throughput. This is the reason we
+      // go through hoops to have this function update `data` for the next iter.
+      // The straightforward code would use *data, given by
+      //
+      // *data = UNALIGNED_LOAD64(s2 + matched_bytes) (Latency of 5 cycles),
+      //
+      // as input for the hash table lookup to find next candidate. However
+      // this forces the load on the data dependency chain of s1, because
+      // matched_bytes directly depends on s1. However matched_bytes is 0..7, so
+      // we can also calculate *data by
+      //
+      // *data = AlignRight(UNALIGNED_LOAD64(s2), UNALIGNED_LOAD64(s2 + 8),
+      //                    matched_bytes);
+      //
+      // The loads do not depend on s1 anymore and are thus off the bottleneck.
+      // The straightforward implementation on x86_64 would be to use
+      //
+      // shrd rax, rdx, cl  (cl being matched_bytes * 8)
+      //
+      // unfortunately shrd with a variable shift has a 4 cycle latency. So this
+      // only wins 1 cycle. The BMI2 shrx instruction is a 1 cycle variable
+      // shift instruction but can only shift 64 bits. If we focus on just
+      // obtaining the least significant 4 bytes, we can obtain this by
+      //
+      // *data = ConditionalMove(matched_bytes < 4, UNALIGNED_LOAD64(s2),
+      //     UNALIGNED_LOAD64(s2 + 4) >> ((matched_bytes & 3) * 8);
+      //
+      // Writen like above this is not a big win, the conditional move would be
+      // a cmp followed by a cmov (2 cycles) followed by a shift (1 cycle).
+      // However matched_bytes < 4 is equal to static_cast<uint32>(xorval) != 0.
+      // Writen that way the conditional move (2 cycles) can execute parallel
+      // with FindLSBSetNonZero64 (tzcnt), which takes 3 cycles.
       uint64 xorval = a1 ^ a2;
       int shift = Bits::FindLSBSetNonZero64(xorval);
       size_t matched_bytes = shift >> 3;
 #ifndef __x86_64__
       *data = UNALIGNED_LOAD64(s2 + matched_bytes);
 #else
-      // Unfortunately the compiler cannot find this using the obvious c++ code
-      // *data = shift == 0 ? a2 : (a2 >> shift) | (a3 << (64 - shift);
-      // the reason is that the above needs the conditional clause to guard
-      // against UB when shift == 0. The compiler doesn't realize the full
-      // expression can be lowered into a single "shrd" instruction and in
-      // effect the conditional can be ignored.
-      uint64 a3 = UNALIGNED_LOAD64(s2 + 8);
-      asm ("shrdq %%cl, %1, %0\n\t" : "+r"(a2) : "r"(a3), "c"(shift & -8));
-      *data = a2;
+      // Ideally this would just be
+      //
+      // a2 = static_cast<uint32>(xorval) == 0 ? a3 : a2;
+      //
+      // However clang correctly infers that the above statement participates on
+      // a critical data dependency chain and thus, unfortunately, refuses to
+      // use a conditional move (it's tuned to cut data dependencies). In this
+      // case there is a longer parallel chain anyway AND this will be fairly
+      // unpredictable.
+      uint64 a3 = UNALIGNED_LOAD64(s2 + 4);
+      asm("testl %k2, %k2\n\t"
+          "cmovzq %1, %0\n\t"
+          : "+r"(a2)
+          : "r"(a3), "r"(xorval));
+      *data = a2 >> (shift & (3 * 8));
 #endif
-      assert(*data == UNALIGNED_LOAD64(s2 + matched_bytes));
       return std::pair<size_t, bool>(matched_bytes, true);
     } else {
       matched = 8;
@@ -154,11 +196,13 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
 #ifndef __x86_64__
       *data = UNALIGNED_LOAD64(s2 + matched_bytes);
 #else
-      uint64 a3 = UNALIGNED_LOAD64(s2 + 8);
-      asm("shrdq %%cl, %1, %0\n\t" : "+r"(a2) : "r"(a3), "c"(shift & -8));
-      *data = a2;
+      uint64 a3 = UNALIGNED_LOAD64(s2 + 4);
+      asm("testl %k2, %k2\n\t"
+          "cmovzq %1, %0\n\t"
+          : "+r"(a2)
+          : "r"(a3), "r"(xorval));
+      *data = a2 >> (shift & (3 * 8));
 #endif
-      assert(*data == UNALIGNED_LOAD64(s2 + matched_bytes));
       matched += matched_bytes;
       assert(matched >= 8);
       return std::pair<size_t, bool>(matched, false);

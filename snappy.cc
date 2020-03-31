@@ -516,16 +516,16 @@ char* CompressFragment(const char* input,
   assert(static_cast<int>(kuint32max >> shift) == table_size - 1);
   const char* ip_end = input + input_size;
   const char* base_ip = ip;
-  // Bytes in [next_emit, ip) will be emitted as literal bytes.  Or
-  // [next_emit, ip_end) after the main loop.
-  const char* next_emit = ip;
 
   const size_t kInputMarginBytes = 15;
   if (SNAPPY_PREDICT_TRUE(input_size >= kInputMarginBytes)) {
     const char* ip_limit = input + input_size - kInputMarginBytes;
 
-    for (uint64 data = LittleEndian::Load64(++ip);;) {
-      assert(next_emit < ip);
+    for (uint32 preload = LittleEndian::Load32(ip + 1);;) {
+      // Bytes in [next_emit, ip) will be emitted as literal bytes.  Or
+      // [next_emit, ip_end) after the main loop.
+      const char* next_emit = ip++;
+      uint64 data = LittleEndian::Load64(ip);
       // The body of this loop calls EmitLiteral once and then EmitCopy one or
       // more times.  (The exception is that when we're close to exhausting
       // the input we goto emit_remainder.)
@@ -559,14 +559,17 @@ char* CompressFragment(const char* input,
         for (int j = 0; j < 4; j++) {
           for (int k = 0; k < 4; k++) {
             int i = 4 * j + k;
-            assert(static_cast<uint32>(data) == LittleEndian::Load32(ip + i));
-            uint32 hash = HashBytes(data, shift);
+            // These for-loops are meant to be unrolled. So we can freely
+            // special case the first iteration to use the value already
+            // loaded in preload.
+            uint32 dword = i == 0 ? preload : data;
+            assert(dword == LittleEndian::Load32(ip + i));
+            uint32 hash = HashBytes(dword, shift);
             candidate = base_ip + table[hash];
             assert(candidate >= base_ip);
             assert(candidate < ip + i);
             table[hash] = delta + i;
-            if (SNAPPY_PREDICT_FALSE(LittleEndian::Load32(candidate) ==
-                                    static_cast<uint32>(data))) {
+            if (SNAPPY_PREDICT_FALSE(LittleEndian::Load32(candidate) == dword)) {
               *op = LITERAL | (i << 2);
               UnalignedCopy128(next_emit, op + 1);
               ip += i;
@@ -587,6 +590,7 @@ char* CompressFragment(const char* input,
         skip += bytes_between_hash_lookups;
         const char* next_ip = ip + bytes_between_hash_lookups;
         if (SNAPPY_PREDICT_FALSE(next_ip > ip_limit)) {
+          ip = next_emit;
           goto emit_remainder;
         }
         candidate = base_ip + table[hash];
@@ -632,11 +636,12 @@ char* CompressFragment(const char* input,
         } else {
           op = EmitCopy</*len_less_than_12=*/false>(op, offset, matched);
         }
-        next_emit = ip;
         if (SNAPPY_PREDICT_FALSE(ip >= ip_limit)) {
           goto emit_remainder;
         }
-        assert(LittleEndian::Load64(ip) == data);
+        // Expect 5 bytes to match
+        assert((data & 0xFFFFFFFFFF) ==
+               (LittleEndian::Load64(ip) & 0xFFFFFFFFFF));
         // We are now looking for a 4-byte match again.  We read
         // table[Hash(ip, shift)] for that.  To improve compression,
         // we also update table[Hash(ip - 1, shift)] and table[Hash(ip, shift)].
@@ -645,17 +650,27 @@ char* CompressFragment(const char* input,
         uint32 hash = HashBytes(data, shift);
         candidate = base_ip + table[hash];
         table[hash] = ip - base_ip;
+        // Measurements on the benchmarks have shown the following probabilities
+        // for the loop to exit (ie. avg. number of iterations is reciprocal).
+        // BM_Flat/6  txt1    p = 0.3-0.4
+        // BM_Flat/7  txt2    p = 0.35
+        // BM_Flat/8  txt3    p = 0.3-0.4
+        // BM_Flat/9  txt3    p = 0.34-0.4
+        // BM_Flat/10 pb      p = 0.4
+        // BM_Flat/11 gaviota p = 0.1
+        // BM_Flat/12 cp      p = 0.5
+        // BM_Flat/13 c       p = 0.3
       } while (static_cast<uint32>(data) == LittleEndian::Load32(candidate));
-      ++ip;
-      data = LittleEndian::Load64(ip);
+      // Because the least significant 5 bytes matched, we can utilize data
+      // for the next iteration.
+      preload = data >> 8;
     }
   }
 
  emit_remainder:
   // Emit the remaining bytes as a literal
-  if (next_emit < ip_end) {
-    op = EmitLiteral</*allow_fast_path=*/false>(op, next_emit,
-                                                ip_end - next_emit);
+  if (ip < ip_end) {
+    op = EmitLiteral</*allow_fast_path=*/false>(op, ip, ip_end - ip);
   }
 
   return op;
