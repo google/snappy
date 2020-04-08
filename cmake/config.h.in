@@ -55,6 +55,13 @@
 /* Define to 1 if you target processors with BMI2+ and have <bmi2intrin.h>. */
 #cmakedefine01 SNAPPY_HAVE_BMI2
 
+/* Define to 1 if target processor is a Power9 (ISA 3.0). */
+#cmakedefine01 SNAPPY_HAVE_PWR9
+
+/* Define to 1 if target processor has VSX Extensions. */
+#cmakedefine01 SNAPPY_HAVE_VSX
+
+
 /* Define to 1 if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */
 #cmakedefine SNAPPY_IS_BIG_ENDIAN 1

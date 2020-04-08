@@ -69,30 +69,12 @@ check_library_exists(z zlibVersion "" HAVE_LIBZ)
 check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
 
 include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("/arch:AVX" HAVE_VISUAL_STUDIO_ARCH_AVX)
-CHECK_CXX_COMPILER_FLAG("/arch:AVX2" HAVE_VISUAL_STUDIO_ARCH_AVX2)
-CHECK_CXX_COMPILER_FLAG("-mavx" HAVE_CLANG_MAVX)
-CHECK_CXX_COMPILER_FLAG("-mbmi2" HAVE_CLANG_MBMI2)
-if(SNAPPY_REQUIRE_AVX2)
-  if(HAVE_VISUAL_STUDIO_ARCH_AVX2)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
-  endif(HAVE_VISUAL_STUDIO_ARCH_AVX2)
-  if(HAVE_CLANG_MAVX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
-  endif(HAVE_CLANG_MAVX)
-  if(HAVE_CLANG_MBMI2)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mbmi2")
-  endif(HAVE_CLANG_MBMI2)
-elseif (SNAPPY_REQUIRE_AVX)
-  if(HAVE_VISUAL_STUDIO_ARCH_AVX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX")
-  endif(HAVE_VISUAL_STUDIO_ARCH_AVX)
-  if(HAVE_CLANG_MAVX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
-  endif(HAVE_CLANG_MAVX)
-endif(SNAPPY_REQUIRE_AVX2)
-
 include(CheckCXXSourceCompiles)
+
+include(CheckSymbolExists)
+check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
+check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
+
 check_cxx_source_compiles("
 int main() {
   return __builtin_expect(0, 1);
@@ -103,7 +85,33 @@ int main() {
   return __builtin_ctzll(0);
 }" HAVE_BUILTIN_CTZ)
 
-check_cxx_source_compiles("
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "i686.*|i386.*|x86.*|amd64.*|AMD64.*|x86_64.*")
+
+  CHECK_CXX_COMPILER_FLAG("/arch:AVX" HAVE_VISUAL_STUDIO_ARCH_AVX)
+  CHECK_CXX_COMPILER_FLAG("/arch:AVX2" HAVE_VISUAL_STUDIO_ARCH_AVX2)
+  CHECK_CXX_COMPILER_FLAG("-mavx" HAVE_CLANG_MAVX)
+  CHECK_CXX_COMPILER_FLAG("-mbmi2" HAVE_CLANG_MBMI2)
+  if(SNAPPY_REQUIRE_AVX2)
+    if(HAVE_VISUAL_STUDIO_ARCH_AVX2)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
+    endif(HAVE_VISUAL_STUDIO_ARCH_AVX2)
+    if(HAVE_CLANG_MAVX)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
+    endif(HAVE_CLANG_MAVX)
+    if(HAVE_CLANG_MBMI2)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mbmi2")
+    endif(HAVE_CLANG_MBMI2)
+  elseif (SNAPPY_REQUIRE_AVX)
+    if(HAVE_VISUAL_STUDIO_ARCH_AVX)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX")
+    endif(HAVE_VISUAL_STUDIO_ARCH_AVX)
+    if(HAVE_CLANG_MAVX)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
+    endif(HAVE_CLANG_MAVX)
+  endif(SNAPPY_REQUIRE_AVX2)
+
+  check_cxx_source_compiles("
 #include <tmmintrin.h>
 
 int main() {
@@ -115,15 +123,43 @@ int main() {
   return 0;
 }" SNAPPY_HAVE_SSSE3)
 
-check_cxx_source_compiles("
+  check_cxx_source_compiles("
 #include <immintrin.h>
 int main() {
   return _bzhi_u32(0, 1);
 }" SNAPPY_HAVE_BMI2)
 
-include(CheckSymbolExists)
-check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
-check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "PPC64*|ppc64*|powerpc64*")
+
+# Ensure -mcpu=native , many distros still default to power8
+
+  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -mcpu=native")
+  check_cxx_source_compiles("
+#ifndef _ARCH_PWR9
+#error
+#endif
+int main() { return 0; }" SNAPPY_HAVE_PWR9)
+
+  check_cxx_source_compiles("
+#if !defined(__VSX__)
+#error 
+#endif
+int main() { return 0; }" SNAPPY_HAVE_VSX)
+
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=native")
+
+  message("IBM ${CMAKE_SYSTEM_PROCESSOR} , have Power9: \"${SNAPPY_HAVE_PWR9}\" , have VSX: \"${SNAPPY_HAVE_VSX}\"")
+
+endif() # CMAKE_SYSTEM_PROCESSOR
+
+if (SNAPPY_C_ONLY)
+  set(SNAPPY_HAVE_SSSE3 OFF)
+  set(SNAPPY_HAVE_BMI2 OFF)
+  set(SNAPPY_HAVE_PWR9 OFF)
+  set(SNAPPY_HAVE_VSX OFF)
+  message("C Only Version, ${SNAPPY_HAVE_SSSE3} ${SNAPPY_HAVE_BMI2} ${SNAPPY_HAVE_PWR9} ${SNAPPY_HAVE_VSX}")
+endif()
+
 
 find_package(GTest QUIET)
 if(GTEST_FOUND)
