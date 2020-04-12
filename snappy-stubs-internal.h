@@ -35,6 +35,7 @@
 #include "config.h"
 #endif
 
+#include <cstring>
 #include <string>
 
 #include <assert.h>
@@ -205,12 +206,12 @@ struct Unaligned32Struct {
 
 inline uint64 UNALIGNED_LOAD64(const void *p) {
   uint64 t;
-  memcpy(&t, p, sizeof t);
+  std::memcpy(&t, p, sizeof t);
   return t;
 }
 
 inline void UNALIGNED_STORE64(void *p, uint64 v) {
-  memcpy(p, &v, sizeof v);
+  std::memcpy(p, &v, sizeof v);
 }
 
 #else
@@ -220,32 +221,32 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 
 inline uint16 UNALIGNED_LOAD16(const void *p) {
   uint16 t;
-  memcpy(&t, p, sizeof t);
+  std::memcpy(&t, p, sizeof t);
   return t;
 }
 
 inline uint32 UNALIGNED_LOAD32(const void *p) {
   uint32 t;
-  memcpy(&t, p, sizeof t);
+  std::memcpy(&t, p, sizeof t);
   return t;
 }
 
 inline uint64 UNALIGNED_LOAD64(const void *p) {
   uint64 t;
-  memcpy(&t, p, sizeof t);
+  std::memcpy(&t, p, sizeof t);
   return t;
 }
 
 inline void UNALIGNED_STORE16(void *p, uint16 v) {
-  memcpy(p, &v, sizeof v);
+  std::memcpy(p, &v, sizeof v);
 }
 
 inline void UNALIGNED_STORE32(void *p, uint32 v) {
-  memcpy(p, &v, sizeof v);
+  std::memcpy(p, &v, sizeof v);
 }
 
 inline void UNALIGNED_STORE64(void *p, uint64 v) {
-  memcpy(p, &v, sizeof v);
+  std::memcpy(p, &v, sizeof v);
 }
 
 #endif

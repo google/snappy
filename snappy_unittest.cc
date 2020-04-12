@@ -84,7 +84,7 @@ class DataEndingAtUnreadablePage {
     CHECK_NE(MAP_FAILED, mem_);
     protected_page_ = reinterpret_cast<char*>(mem_) + space_for_string;
     char* dst = protected_page_ - size;
-    memcpy(dst, s.data(), size);
+    std::memcpy(dst, s.data(), size);
     data_ = dst;
     size_ = size;
     // Make guard page unreadable.

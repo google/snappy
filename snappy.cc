@@ -71,6 +71,7 @@
 #include <stdio.h>
 
 #include <algorithm>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -124,17 +125,17 @@ namespace {
 
 void UnalignedCopy64(const void* src, void* dst) {
   char tmp[8];
-  memcpy(tmp, src, 8);
-  memcpy(dst, tmp, 8);
+  std::memcpy(tmp, src, 8);
+  std::memcpy(dst, tmp, 8);
 }
 
 void UnalignedCopy128(const void* src, void* dst) {
-  // memcpy gets vectorized when the appropriate compiler options are used.
-  // For example, x86 compilers targeting SSE2+ will optimize to an SSE2 load
-  // and store.
+  // std::memcpy() gets vectorized when the appropriate compiler options are
+  // used. For example, x86 compilers targeting SSE2+ will optimize to an SSE2
+  // load and store.
   char tmp[16];
-  memcpy(tmp, src, 16);
-  memcpy(dst, tmp, 16);
+  std::memcpy(tmp, src, 16);
+  std::memcpy(dst, tmp, 16);
 }
 
 // Copy [src, src+(op_limit-op)) to [op, (op_limit-op)) a byte at a time. Used
@@ -146,7 +147,8 @@ void UnalignedCopy128(const void* src, void* dst) {
 // After IncrementalCopySlow(src, op, op_limit), the result will have eleven
 // copies of "ab"
 //    ababababababababababab
-// Note that this does not match the semantics of either memcpy() or memmove().
+// Note that this does not match the semantics of either std::memcpy() or
+// std::memmove().
 inline char* IncrementalCopySlow(const char* src, char* op,
                                  char* const op_limit) {
   // TODO: Remove pragma when LLVM is aware this
@@ -340,7 +342,7 @@ static inline char* EmitLiteral(char* op,
                                 const char* literal,
                                 int len) {
   // The vast majority of copies are below 16 bytes, for which a
-  // call to memcpy is overkill. This fast path can sometimes
+  // call to std::memcpy() is overkill. This fast path can sometimes
   // copy up to 15 bytes too much, but that is okay in the
   // main loop, since we have a bit to go on for both sides:
   //
@@ -370,11 +372,11 @@ static inline char* EmitLiteral(char* op,
     // Encode in upcoming bytes.
     // Write 4 bytes, though we may care about only 1 of them. The output buffer
     // is guaranteed to have at least 3 more spaces left as 'len >= 61' holds
-    // here and there is a memcpy of size 'len' below.
+    // here and there is a std::memcpy() of size 'len' below.
     LittleEndian::Store32(op, n);
     op += count;
   }
-  memcpy(op, literal, len);
+  std::memcpy(op, literal, len);
   return op + len;
 }
 
@@ -970,7 +972,7 @@ bool SnappyDecompressor::RefillTag() {
     // contents.  We store the needed bytes in "scratch_".  They
     // will be consumed immediately by the caller since we do not
     // read more than we need.
-    memmove(scratch_, ip, nbuf);
+    std::memmove(scratch_, ip, nbuf);
     reader_->Skip(peeked_);  // All peeked bytes are used up
     peeked_ = 0;
     while (nbuf < needed) {
@@ -978,7 +980,7 @@ bool SnappyDecompressor::RefillTag() {
       const char* src = reader_->Peek(&length);
       if (length == 0) return false;
       uint32 to_add = std::min<uint32>(needed - nbuf, length);
-      memcpy(scratch_ + nbuf, src, to_add);
+      std::memcpy(scratch_ + nbuf, src, to_add);
       nbuf += to_add;
       reader_->Skip(to_add);
     }
@@ -988,7 +990,7 @@ bool SnappyDecompressor::RefillTag() {
   } else if (nbuf < kMaximumTagLength) {
     // Have enough bytes, but move into scratch_ so that we do not
     // read past end of input
-    memmove(scratch_, ip, nbuf);
+    std::memmove(scratch_, ip, nbuf);
     reader_->Skip(peeked_);  // All peeked bytes are used up
     peeked_ = 0;
     ip_ = scratch_;
@@ -1057,13 +1059,13 @@ size_t Compress(Source* reader, Sink* writer) {
       fragment_size = num_to_read;
     } else {
       char* scratch = wmem.GetScratchInput();
-      memcpy(scratch, fragment, bytes_read);
+      std::memcpy(scratch, fragment, bytes_read);
       reader->Skip(bytes_read);
 
       while (bytes_read < num_to_read) {
         fragment = reader->Peek(&fragment_size);
         size_t n = std::min<size_t>(fragment_size, num_to_read - bytes_read);
-        memcpy(scratch + bytes_read, fragment, n);
+        std::memcpy(scratch + bytes_read, fragment, n);
         bytes_read += n;
         reader->Skip(n);
       }
@@ -1184,7 +1186,7 @@ class SnappyIOVecWriter {
       }
 
       const size_t to_write = std::min(len, curr_iov_remaining_);
-      memcpy(curr_iov_output_, ip, to_write);
+      std::memcpy(curr_iov_output_, ip, to_write);
       curr_iov_output_ += to_write;
       curr_iov_remaining_ -= to_write;
       total_written_ += to_write;
@@ -1337,7 +1339,7 @@ class SnappyArrayWriter {
     char* op = *op_p;
     const size_t space_left = op_limit_ - op;
     if (space_left < len) return false;
-    memcpy(op, ip, len);
+    std::memcpy(op, ip, len);
     *op_p = op + len;
     return true;
   }
@@ -1538,7 +1540,7 @@ class SnappyScatteredWriter {
     size_t avail = op_limit_ - op;
     if (len <= avail) {
       // Fast path
-      memcpy(op, ip, len);
+      std::memcpy(op, ip, len);
       *op_p = op + len;
       return true;
     } else {
@@ -1598,7 +1600,7 @@ bool SnappyScatteredWriter<Allocator>::SlowAppend(const char* ip, size_t len) {
   size_t avail = op_limit_ - op_ptr_;
   while (len > avail) {
     // Completely fill this block
-    memcpy(op_ptr_, ip, avail);
+    std::memcpy(op_ptr_, ip, avail);
     op_ptr_ += avail;
     assert(op_limit_ - op_ptr_ == 0);
     full_size_ += (op_ptr_ - op_base_);
@@ -1619,7 +1621,7 @@ bool SnappyScatteredWriter<Allocator>::SlowAppend(const char* ip, size_t len) {
     avail = bsize;
   }
 
-  memcpy(op_ptr_, ip, len);
+  std::memcpy(op_ptr_, ip, len);
   op_ptr_ += len;
   return true;
 }

@@ -26,7 +26,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <string.h>
+#include <cstddef>
+#include <cstring>
 
 #include "snappy-sinksource.h"
 
@@ -74,7 +75,7 @@ UncheckedByteArraySink::~UncheckedByteArraySink() { }
 void UncheckedByteArraySink::Append(const char* data, size_t n) {
   // Do no copying if the caller filled in the result of GetAppendBuffer()
   if (data != dest_) {
-    memcpy(dest_, data, n);
+    std::memcpy(dest_, data, n);
   }
   dest_ += n;
 }
@@ -88,7 +89,7 @@ void UncheckedByteArraySink::AppendAndTakeOwnership(
     void (*deleter)(void*, const char*, size_t),
     void *deleter_arg) {
   if (data != dest_) {
-    memcpy(dest_, data, n);
+    std::memcpy(dest_, data, n);
     (*deleter)(deleter_arg, data, n);
   }
   dest_ += n;
