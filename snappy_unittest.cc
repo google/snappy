@@ -182,9 +182,9 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
       unsigned char* mem = new unsigned char[LZO1X_1_15_MEM_COMPRESS];
       lzo_uint destlen;
       int ret = lzo1x_1_15_compress(
-          reinterpret_cast<const uint8*>(input),
+          reinterpret_cast<const uint8_t*>(input),
           input_size,
-          reinterpret_cast<uint8*>(string_as_array(compressed)),
+          reinterpret_cast<uint8_t*>(string_as_array(compressed)),
           &destlen,
           mem);
       CHECK_EQ(LZO_E_OK, ret);
@@ -239,9 +239,9 @@ static bool Uncompress(const std::string& compressed, CompressorType comp,
       output->resize(size);
       lzo_uint destlen;
       int ret = lzo1x_decompress(
-          reinterpret_cast<const uint8*>(compressed.data()),
+          reinterpret_cast<const uint8_t*>(compressed.data()),
           compressed.size(),
-          reinterpret_cast<uint8*>(string_as_array(output)),
+          reinterpret_cast<uint8_t*>(string_as_array(output)),
           &destlen,
           NULL);
       CHECK_EQ(LZO_E_OK, ret);
@@ -352,7 +352,7 @@ static void Measure(const char* data,
          "comp %5.1f MB/s  uncomp %5s MB/s\n",
          x.c_str(),
          block_size/(1<<20),
-         static_cast<int>(length), static_cast<uint32>(compressed_size),
+         static_cast<int>(length), static_cast<uint32_t>(compressed_size),
          (compressed_size * 100.0) / std::max<int>(1, length),
          comp_rate,
          urate.c_str());
@@ -451,7 +451,7 @@ static void VerifyNonBlockedCompression(const std::string& input) {
   // Setup compression table
   snappy::internal::WorkingMemory wmem(input.size());
   int table_size;
-  uint16* table = wmem.GetHashTable(input.size(), &table_size);
+  uint16_t* table = wmem.GetHashTable(input.size(), &table_size);
 
   // Compress entire input in one shot
   std::string compressed;
@@ -588,7 +588,7 @@ TEST(CorruptedTest, VerifyCorrupted) {
     size_t ulen;
     CHECK(!snappy::GetUncompressedLength(data.data(), data.size(), &ulen)
           || (ulen < (1<<20)));
-    uint32 ulen2;
+    uint32_t ulen2;
     snappy::ByteArraySource source(data.data(), data.size());
     CHECK(!snappy::GetUncompressedLength(&source, &ulen2) ||
           (ulen2 < (1<<20)));
@@ -879,7 +879,7 @@ static bool CheckUncompressedLength(const std::string& compressed,
                                                      ulength);
 
   snappy::ByteArraySource source(compressed.data(), compressed.size());
-  uint32 length;
+  uint32_t length;
   const bool result2 = snappy::GetUncompressedLength(&source, &length);
   CHECK_EQ(result1, result2);
   return result1;
@@ -957,7 +957,7 @@ TEST(Snappy, ZeroOffsetCopyValidation) {
 namespace {
 
 int TestFindMatchLength(const char* s1, const char *s2, unsigned length) {
-  uint64 data;
+  uint64_t data;
   std::pair<size_t, bool> p =
       snappy::internal::FindMatchLength(s1, s2, s2 + length, &data);
   CHECK_EQ(p.first < 8, p.second);
@@ -1086,7 +1086,7 @@ TEST(Snappy, FindMatchLengthRandom) {
   }
 }
 
-static uint16 MakeEntry(unsigned int extra,
+static uint16_t MakeEntry(unsigned int extra,
                         unsigned int len,
                         unsigned int copy_offset) {
   // Check that all of the fields fit within the allocated space
@@ -1105,7 +1105,7 @@ TEST(Snappy, VerifyCharTable) {
   using snappy::internal::COPY_4_BYTE_OFFSET;
   using snappy::internal::char_table;
 
-  uint16 dst[256];
+  uint16_t dst[256];
 
   // Place invalid entries in all places to detect missing initialization
   int assigned = 0;
@@ -1164,7 +1164,7 @@ TEST(Snappy, VerifyCharTable) {
   }
 
   if (FLAGS_snappy_dump_decompression_table) {
-    printf("static const uint16 char_table[256] = {\n  ");
+    printf("static const uint16_t char_table[256] = {\n  ");
     for (int i = 0; i < 256; i++) {
       printf("0x%04x%s",
              dst[i],
@@ -1266,8 +1266,8 @@ static void BM_UFlat(int iters, int arg) {
   snappy::Compress(contents.data(), contents.size(), &zcontents);
   char* dst = new char[contents.size()];
 
-  SetBenchmarkBytesProcessed(static_cast<int64>(iters) *
-                             static_cast<int64>(contents.size()));
+  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
+                             static_cast<int64_t>(contents.size()));
   SetBenchmarkLabel(files[arg].label);
   StartBenchmarkTiming();
   while (iters-- > 0) {
@@ -1291,8 +1291,8 @@ static void BM_UValidate(int iters, int arg) {
   std::string zcontents;
   snappy::Compress(contents.data(), contents.size(), &zcontents);
 
-  SetBenchmarkBytesProcessed(static_cast<int64>(iters) *
-                             static_cast<int64>(contents.size()));
+  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
+                             static_cast<int64_t>(contents.size()));
   SetBenchmarkLabel(files[arg].label);
   StartBenchmarkTiming();
   while (iters-- > 0) {
@@ -1334,8 +1334,8 @@ static void BM_UIOVec(int iters, int arg) {
     used_so_far += iov[i].iov_len;
   }
 
-  SetBenchmarkBytesProcessed(static_cast<int64>(iters) *
-                             static_cast<int64>(contents.size()));
+  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
+                             static_cast<int64_t>(contents.size()));
   SetBenchmarkLabel(files[arg].label);
   StartBenchmarkTiming();
   while (iters-- > 0) {
@@ -1361,8 +1361,8 @@ static void BM_UFlatSink(int iters, int arg) {
   snappy::Compress(contents.data(), contents.size(), &zcontents);
   char* dst = new char[contents.size()];
 
-  SetBenchmarkBytesProcessed(static_cast<int64>(iters) *
-                             static_cast<int64>(contents.size()));
+  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
+                             static_cast<int64_t>(contents.size()));
   SetBenchmarkLabel(files[arg].label);
   StartBenchmarkTiming();
   while (iters-- > 0) {
@@ -1391,8 +1391,8 @@ static void BM_ZFlat(int iters, int arg) {
 
   char* dst = new char[snappy::MaxCompressedLength(contents.size())];
 
-  SetBenchmarkBytesProcessed(static_cast<int64>(iters) *
-                             static_cast<int64>(contents.size()));
+  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
+                             static_cast<int64_t>(contents.size()));
   StartBenchmarkTiming();
 
   size_t zsize = 0;
@@ -1420,14 +1420,14 @@ static void BM_ZFlatAll(int iters, int arg) {
   std::vector<std::string> contents(num_files);
   std::vector<char*> dst(num_files);
 
-  int64 total_contents_size = 0;
+  int64_t total_contents_size = 0;
   for (int i = 0; i < num_files; ++i) {
     contents[i] = ReadTestDataFile(files[i].filename, files[i].size_limit);
     dst[i] = new char[snappy::MaxCompressedLength(contents[i].size())];
     total_contents_size += contents[i].size();
   }
 
-  SetBenchmarkBytesProcessed(static_cast<int64>(iters) * total_contents_size);
+  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) * total_contents_size);
   StartBenchmarkTiming();
 
   size_t zsize = 0;
@@ -1456,7 +1456,7 @@ static void BM_ZFlatIncreasingTableSize(int iters, int arg) {
 
   std::vector<std::string> contents;
   std::vector<char*> dst;
-  int64 total_contents_size = 0;
+  int64_t total_contents_size = 0;
   for (int table_bits = kMinHashTableBits; table_bits <= kMaxHashTableBits;
        ++table_bits) {
     std::string content = base_content;
@@ -1467,7 +1467,7 @@ static void BM_ZFlatIncreasingTableSize(int iters, int arg) {
   }
 
   size_t zsize = 0;
-  SetBenchmarkBytesProcessed(static_cast<int64>(iters) * total_contents_size);
+  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) * total_contents_size);
   StartBenchmarkTiming();
   while (iters-- > 0) {
     for (int i = 0; i < contents.size(); ++i) {

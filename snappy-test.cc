@@ -77,10 +77,10 @@ std::string StrFormat(const char* format, ...) {
 }
 
 bool benchmark_running = false;
-int64 benchmark_real_time_us = 0;
-int64 benchmark_cpu_time_us = 0;
+int64_t benchmark_real_time_us = 0;
+int64_t benchmark_cpu_time_us = 0;
 std::string* benchmark_label = nullptr;
-int64 benchmark_bytes_processed = 0;
+int64_t benchmark_bytes_processed = 0;
 
 void ResetBenchmarkTiming() {
   benchmark_real_time_us = 0;
@@ -170,13 +170,13 @@ void SetBenchmarkLabel(const std::string& str) {
   benchmark_label = new std::string(str);
 }
 
-void SetBenchmarkBytesProcessed(int64 bytes) {
+void SetBenchmarkBytesProcessed(int64_t bytes) {
   benchmark_bytes_processed = bytes;
 }
 
 struct BenchmarkRun {
-  int64 real_time_us;
-  int64 cpu_time_us;
+  int64_t real_time_us;
+  int64_t cpu_time_us;
 };
 
 struct BenchmarkCompareCPUTime {
@@ -224,12 +224,12 @@ void Benchmark::Run() {
                      benchmark_runs + kMedianPos,
                      benchmark_runs + kNumRuns,
                      BenchmarkCompareCPUTime());
-    int64 real_time_us = benchmark_runs[kMedianPos].real_time_us;
-    int64 cpu_time_us = benchmark_runs[kMedianPos].cpu_time_us;
+    int64_t real_time_us = benchmark_runs[kMedianPos].real_time_us;
+    int64_t cpu_time_us = benchmark_runs[kMedianPos].cpu_time_us;
     if (cpu_time_us <= 0) {
       human_readable_speed = "?";
     } else {
-      int64 bytes_per_second =
+      int64_t bytes_per_second =
           benchmark_bytes_processed * 1000000 / cpu_time_us;
       if (bytes_per_second < 1024) {
         human_readable_speed =

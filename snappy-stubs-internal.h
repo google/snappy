@@ -35,7 +35,9 @@
 #include "config.h"
 #endif
 
+#include <cstdint>
 #include <cstring>
+#include <numeric_limits>
 #include <string>
 
 #include <assert.h>
@@ -116,8 +118,8 @@
 
 namespace snappy {
 
-static const uint32 kuint32max = static_cast<uint32>(0xFFFFFFFF);
-static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
+static const uint32_t kuint32max = std::numeric_limits<uint32_t>::max();
+static const int64_t kint64max = std::numeric_limits<int64_t>::max();
 
 // Potentially unaligned loads and stores.
 
@@ -126,13 +128,13 @@ static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
 #if defined(__i386__) || defined(__x86_64__) || defined(__powerpc__) || \
     defined(__aarch64__)
 
-#define UNALIGNED_LOAD16(_p) (*reinterpret_cast<const uint16 *>(_p))
-#define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32 *>(_p))
-#define UNALIGNED_LOAD64(_p) (*reinterpret_cast<const uint64 *>(_p))
+#define UNALIGNED_LOAD16(_p) (*reinterpret_cast<const uint16_t *>(_p))
+#define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32_t *>(_p))
+#define UNALIGNED_LOAD64(_p) (*reinterpret_cast<const uint64_t *>(_p))
 
-#define UNALIGNED_STORE16(_p, _val) (*reinterpret_cast<uint16 *>(_p) = (_val))
-#define UNALIGNED_STORE32(_p, _val) (*reinterpret_cast<uint32 *>(_p) = (_val))
-#define UNALIGNED_STORE64(_p, _val) (*reinterpret_cast<uint64 *>(_p) = (_val))
+#define UNALIGNED_STORE16(_p, _val) (*reinterpret_cast<uint16_t *>(_p) = (_val))
+#define UNALIGNED_STORE32(_p, _val) (*reinterpret_cast<uint32_t *>(_p) = (_val))
+#define UNALIGNED_STORE64(_p, _val) (*reinterpret_cast<uint64_t *>(_p) = (_val))
 
 // ARMv7 and newer support native unaligned accesses, but only of 16-bit
 // and 32-bit values (not 64-bit); older versions either raise a fatal signal,
@@ -147,7 +149,7 @@ static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
 // allowed to be unaligned, not LDRD (two reads) or LDM (many reads). Unless we
 // explicitly tell the compiler that these accesses can be unaligned, it can and
 // will combine accesses. On armcc, the way to signal this is done by accessing
-// through the type (uint32 __packed *), but GCC has no such attribute
+// through the type (uint32_t __packed *), but GCC has no such attribute
 // (it ignores __attribute__((packed)) on individual variables). However,
 // we can tell it that a _struct_ is unaligned, which has the same effect,
 // so we do that.
@@ -176,13 +178,13 @@ namespace base {
 namespace internal {
 
 struct Unaligned16Struct {
-  uint16 value;
-  uint8 dummy;  // To make the size non-power-of-two.
+  uint16_t value;
+  uint8_t dummy;  // To make the size non-power-of-two.
 } ATTRIBUTE_PACKED;
 
 struct Unaligned32Struct {
-  uint32 value;
-  uint8 dummy;  // To make the size non-power-of-two.
+  uint32_t value;
+  uint8_t dummy;  // To make the size non-power-of-two.
 } ATTRIBUTE_PACKED;
 
 }  // namespace internal
@@ -204,13 +206,13 @@ struct Unaligned32Struct {
 // See if that would be more efficient on platforms supporting it,
 // at least for copies.
 
-inline uint64 UNALIGNED_LOAD64(const void *p) {
-  uint64 t;
+inline uint64_t UNALIGNED_LOAD64(const void *p) {
+  uint64_t t;
   std::memcpy(&t, p, sizeof t);
   return t;
 }
 
-inline void UNALIGNED_STORE64(void *p, uint64 v) {
+inline void UNALIGNED_STORE64(void *p, uint64_t v) {
   std::memcpy(p, &v, sizeof v);
 }
 
@@ -219,33 +221,33 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 // These functions are provided for architectures that don't support
 // unaligned loads and stores.
 
-inline uint16 UNALIGNED_LOAD16(const void *p) {
-  uint16 t;
+inline uint16_t UNALIGNED_LOAD16(const void *p) {
+  uint16_t t;
   std::memcpy(&t, p, sizeof t);
   return t;
 }
 
-inline uint32 UNALIGNED_LOAD32(const void *p) {
-  uint32 t;
+inline uint32_t UNALIGNED_LOAD32(const void *p) {
+  uint32_t t;
   std::memcpy(&t, p, sizeof t);
   return t;
 }
 
-inline uint64 UNALIGNED_LOAD64(const void *p) {
-  uint64 t;
+inline uint64_t UNALIGNED_LOAD64(const void *p) {
+  uint64_t t;
   std::memcpy(&t, p, sizeof t);
   return t;
 }
 
-inline void UNALIGNED_STORE16(void *p, uint16 v) {
+inline void UNALIGNED_STORE16(void *p, uint16_t v) {
   std::memcpy(p, &v, sizeof v);
 }
 
-inline void UNALIGNED_STORE32(void *p, uint32 v) {
+inline void UNALIGNED_STORE32(void *p, uint32_t v) {
   std::memcpy(p, &v, sizeof v);
 }
 
-inline void UNALIGNED_STORE64(void *p, uint64 v) {
+inline void UNALIGNED_STORE64(void *p, uint64_t v) {
   std::memcpy(p, &v, sizeof v);
 }
 
@@ -292,16 +294,16 @@ inline void UNALIGNED_STORE64(void *p, uint64 v) {
 
 #else
 
-inline uint16 bswap_16(uint16 x) {
+inline uint16_t bswap_16(uint16_t x) {
   return (x << 8) | (x >> 8);
 }
 
-inline uint32 bswap_32(uint32 x) {
+inline uint32_t bswap_32(uint32_t x) {
   x = ((x & 0xff00ff00UL) >> 8) | ((x & 0x00ff00ffUL) << 8);
   return (x >> 16) | (x << 16);
 }
 
-inline uint64 bswap_64(uint64 x) {
+inline uint64_t bswap_64(uint64_t x) {
   x = ((x & 0xff00ff00ff00ff00ULL) >> 8) | ((x & 0x00ff00ff00ff00ffULL) << 8);
   x = ((x & 0xffff0000ffff0000ULL) >> 16) | ((x & 0x0000ffff0000ffffULL) << 16);
   return (x >> 32) | (x << 32);
@@ -325,54 +327,54 @@ class LittleEndian {
   // Conversion functions.
 #if defined(SNAPPY_IS_BIG_ENDIAN)
 
-  static uint16 FromHost16(uint16 x) { return bswap_16(x); }
-  static uint16 ToHost16(uint16 x) { return bswap_16(x); }
+  static uint16_t FromHost16(uint16_t x) { return bswap_16(x); }
+  static uint16_t ToHost16(uint16_t x) { return bswap_16(x); }
 
-  static uint32 FromHost32(uint32 x) { return bswap_32(x); }
-  static uint32 ToHost32(uint32 x) { return bswap_32(x); }
+  static uint32_t FromHost32(uint32_t x) { return bswap_32(x); }
+  static uint32_t ToHost32(uint32_t x) { return bswap_32(x); }
 
-  static uint32 FromHost64(uint64 x) { return bswap_64(x); }
-  static uint32 ToHost64(uint64 x) { return bswap_64(x); }
+  static uint32_t FromHost64(uint64_t x) { return bswap_64(x); }
+  static uint32_t ToHost64(uint64_t x) { return bswap_64(x); }
 
   static bool IsLittleEndian() { return false; }
 
 #else  // !defined(SNAPPY_IS_BIG_ENDIAN)
 
-  static uint16 FromHost16(uint16 x) { return x; }
-  static uint16 ToHost16(uint16 x) { return x; }
+  static uint16_t FromHost16(uint16_t x) { return x; }
+  static uint16_t ToHost16(uint16_t x) { return x; }
 
-  static uint32 FromHost32(uint32 x) { return x; }
-  static uint32 ToHost32(uint32 x) { return x; }
+  static uint32_t FromHost32(uint32_t x) { return x; }
+  static uint32_t ToHost32(uint32_t x) { return x; }
 
-  static uint32 FromHost64(uint64 x) { return x; }
-  static uint32 ToHost64(uint64 x) { return x; }
+  static uint32_t FromHost64(uint64_t x) { return x; }
+  static uint32_t ToHost64(uint64_t x) { return x; }
 
   static bool IsLittleEndian() { return true; }
 
 #endif  // !defined(SNAPPY_IS_BIG_ENDIAN)
 
   // Functions to do unaligned loads and stores in little-endian order.
-  static uint16 Load16(const void *p) {
+  static uint16_t Load16(const void *p) {
     return ToHost16(UNALIGNED_LOAD16(p));
   }
 
-  static void Store16(void *p, uint16 v) {
+  static void Store16(void *p, uint16_t v) {
     UNALIGNED_STORE16(p, FromHost16(v));
   }
 
-  static uint32 Load32(const void *p) {
+  static uint32_t Load32(const void *p) {
     return ToHost32(UNALIGNED_LOAD32(p));
   }
 
-  static void Store32(void *p, uint32 v) {
+  static void Store32(void *p, uint32_t v) {
     UNALIGNED_STORE32(p, FromHost32(v));
   }
 
-  static uint64 Load64(const void *p) {
+  static uint64_t Load64(const void *p) {
     return ToHost64(UNALIGNED_LOAD64(p));
   }
 
-  static void Store64(void *p, uint64 v) {
+  static void Store64(void *p, uint64_t v) {
     UNALIGNED_STORE64(p, FromHost64(v));
   }
 };
@@ -381,18 +383,18 @@ class LittleEndian {
 class Bits {
  public:
   // Return floor(log2(n)) for positive integer n.
-  static int Log2FloorNonZero(uint32 n);
+  static int Log2FloorNonZero(uint32_t n);
 
   // Return floor(log2(n)) for positive integer n.  Returns -1 iff n == 0.
-  static int Log2Floor(uint32 n);
+  static int Log2Floor(uint32_t n);
 
   // Return the first set least / most significant bit, 0-indexed.  Returns an
   // undefined value if n == 0.  FindLSBSetNonZero() is similar to ffs() except
   // that it's 0-indexed.
-  static int FindLSBSetNonZero(uint32 n);
+  static int FindLSBSetNonZero(uint32_t n);
 
 #if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
-  static int FindLSBSetNonZero64(uint64 n);
+  static int FindLSBSetNonZero64(uint64_t n);
 #endif  // defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 
  private:
@@ -403,7 +405,7 @@ class Bits {
 
 #ifdef HAVE_BUILTIN_CTZ
 
-inline int Bits::Log2FloorNonZero(uint32 n) {
+inline int Bits::Log2FloorNonZero(uint32_t n) {
   assert(n != 0);
   // (31 ^ x) is equivalent to (31 - x) for x in [0, 31]. An easy proof
   // represents subtraction in base 2 and observes that there's no carry.
@@ -414,17 +416,17 @@ inline int Bits::Log2FloorNonZero(uint32 n) {
   return 31 ^ __builtin_clz(n);
 }
 
-inline int Bits::Log2Floor(uint32 n) {
+inline int Bits::Log2Floor(uint32_t n) {
   return (n == 0) ? -1 : Bits::Log2FloorNonZero(n);
 }
 
-inline int Bits::FindLSBSetNonZero(uint32 n) {
+inline int Bits::FindLSBSetNonZero(uint32_t n) {
   assert(n != 0);
   return __builtin_ctz(n);
 }
 
 #if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
-inline int Bits::FindLSBSetNonZero64(uint64 n) {
+inline int Bits::FindLSBSetNonZero64(uint64_t n) {
   assert(n != 0);
   return __builtin_ctzll(n);
 }
@@ -432,21 +434,21 @@ inline int Bits::FindLSBSetNonZero64(uint64 n) {
 
 #elif defined(_MSC_VER)
 
-inline int Bits::Log2FloorNonZero(uint32 n) {
+inline int Bits::Log2FloorNonZero(uint32_t n) {
   assert(n != 0);
   unsigned long where;
   _BitScanReverse(&where, n);
   return static_cast<int>(where);
 }
 
-inline int Bits::Log2Floor(uint32 n) {
+inline int Bits::Log2Floor(uint32_t n) {
   unsigned long where;
   if (_BitScanReverse(&where, n))
     return static_cast<int>(where);
   return -1;
 }
 
-inline int Bits::FindLSBSetNonZero(uint32 n) {
+inline int Bits::FindLSBSetNonZero(uint32_t n) {
   assert(n != 0);
   unsigned long where;
   if (_BitScanForward(&where, n))
@@ -455,7 +457,7 @@ inline int Bits::FindLSBSetNonZero(uint32 n) {
 }
 
 #if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
-inline int Bits::FindLSBSetNonZero64(uint64 n) {
+inline int Bits::FindLSBSetNonZero64(uint64_t n) {
   assert(n != 0);
   unsigned long where;
   if (_BitScanForward64(&where, n))
@@ -466,14 +468,14 @@ inline int Bits::FindLSBSetNonZero64(uint64 n) {
 
 #else  // Portable versions.
 
-inline int Bits::Log2FloorNonZero(uint32 n) {
+inline int Bits::Log2FloorNonZero(uint32_t n) {
   assert(n != 0);
 
   int log = 0;
-  uint32 value = n;
+  uint32_t value = n;
   for (int i = 4; i >= 0; --i) {
     int shift = (1 << i);
-    uint32 x = value >> shift;
+    uint32_t x = value >> shift;
     if (x != 0) {
       value = x;
       log += shift;
@@ -483,16 +485,16 @@ inline int Bits::Log2FloorNonZero(uint32 n) {
   return log;
 }
 
-inline int Bits::Log2Floor(uint32 n) {
+inline int Bits::Log2Floor(uint32_t n) {
   return (n == 0) ? -1 : Bits::Log2FloorNonZero(n);
 }
 
-inline int Bits::FindLSBSetNonZero(uint32 n) {
+inline int Bits::FindLSBSetNonZero(uint32_t n) {
   assert(n != 0);
 
   int rc = 31;
   for (int i = 4, shift = 1 << 4; i >= 0; --i) {
-    const uint32 x = n << shift;
+    const uint32_t x = n << shift;
     if (x != 0) {
       n = x;
       rc -= shift;
@@ -504,13 +506,13 @@ inline int Bits::FindLSBSetNonZero(uint32 n) {
 
 #if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 // FindLSBSetNonZero64() is defined in terms of FindLSBSetNonZero().
-inline int Bits::FindLSBSetNonZero64(uint64 n) {
+inline int Bits::FindLSBSetNonZero64(uint64_t n) {
   assert(n != 0);
 
-  const uint32 bottombits = static_cast<uint32>(n);
+  const uint32_t bottombits = static_cast<uint32_t>(n);
   if (bottombits == 0) {
     // Bottom bits are zero, so scan in top bits
-    return 32 + FindLSBSetNonZero(static_cast<uint32>(n >> 32));
+    return 32 + FindLSBSetNonZero(static_cast<uint32_t>(n >> 32));
   } else {
     return FindLSBSetNonZero(bottombits);
   }
@@ -522,7 +524,7 @@ inline int Bits::FindLSBSetNonZero64(uint64 n) {
 // Variable-length integer encoding.
 class Varint {
  public:
-  // Maximum lengths of varint encoding of uint32.
+  // Maximum lengths of varint encoding of uint32_t.
   static const int kMax32 = 5;
 
   // Attempts to parse a varint32 from a prefix of the bytes in [ptr,limit-1].
@@ -531,23 +533,23 @@ class Varint {
   // past the last byte of the varint32. Else returns NULL.  On success,
   // "result <= limit".
   static const char* Parse32WithLimit(const char* ptr, const char* limit,
-                                      uint32* OUTPUT);
+                                      uint32_t* OUTPUT);
 
   // REQUIRES   "ptr" points to a buffer of length sufficient to hold "v".
   // EFFECTS    Encodes "v" into "ptr" and returns a pointer to the
   //            byte just past the last encoded byte.
-  static char* Encode32(char* ptr, uint32 v);
+  static char* Encode32(char* ptr, uint32_t v);
 
   // EFFECTS    Appends the varint representation of "value" to "*s".
-  static void Append32(std::string* s, uint32 value);
+  static void Append32(std::string* s, uint32_t value);
 };
 
 inline const char* Varint::Parse32WithLimit(const char* p,
                                             const char* l,
-                                            uint32* OUTPUT) {
+                                            uint32_t* OUTPUT) {
   const unsigned char* ptr = reinterpret_cast<const unsigned char*>(p);
   const unsigned char* limit = reinterpret_cast<const unsigned char*>(l);
-  uint32 b, result;
+  uint32_t b, result;
   if (ptr >= limit) return NULL;
   b = *(ptr++); result = b & 127;          if (b < 128) goto done;
   if (ptr >= limit) return NULL;
@@ -564,7 +566,7 @@ inline const char* Varint::Parse32WithLimit(const char* p,
   return reinterpret_cast<const char*>(ptr);
 }
 
-inline char* Varint::Encode32(char* sptr, uint32 v) {
+inline char* Varint::Encode32(char* sptr, uint32_t v) {
   // Operate on characters as unsigneds
   unsigned char* ptr = reinterpret_cast<unsigned char*>(sptr);
   static const int B = 128;

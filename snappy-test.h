@@ -227,7 +227,7 @@ class CycleTimer {
   }
 
  private:
-  int64 real_time_us_;
+  int64_t real_time_us_;
 #ifdef WIN32
   LARGE_INTEGER start_;
 #else
@@ -272,7 +272,7 @@ void ResetBenchmarkTiming();
 void StartBenchmarkTiming();
 void StopBenchmarkTiming();
 void SetBenchmarkLabel(const std::string& str);
-void SetBenchmarkBytesProcessed(int64 bytes);
+void SetBenchmarkBytesProcessed(int64_t bytes);
 
 #ifdef HAVE_LIBZ
 

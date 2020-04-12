@@ -46,16 +46,16 @@ class WorkingMemory {
   // Allocates and clears a hash table using memory in "*this",
   // stores the number of buckets in "*table_size" and returns a pointer to
   // the base of the hash table.
-  uint16* GetHashTable(size_t fragment_size, int* table_size) const;
+  uint16_t* GetHashTable(size_t fragment_size, int* table_size) const;
   char* GetScratchInput() const { return input_; }
   char* GetScratchOutput() const { return output_; }
 
  private:
-  char* mem_;      // the allocated memory, never nullptr
-  size_t size_;    // the size of the allocated memory, never 0
-  uint16* table_;  // the pointer to the hashtable
-  char* input_;    // the pointer to the input scratch buffer
-  char* output_;   // the pointer to the output scratch buffer
+  char* mem_;        // the allocated memory, never nullptr
+  size_t size_;      // the size of the allocated memory, never 0
+  uint16_t* table_;  // the pointer to the hashtable
+  char* input_;      // the pointer to the input scratch buffer
+  char* output_;     // the pointer to the output scratch buffer
 
   // No copying
   WorkingMemory(const WorkingMemory&);
@@ -76,7 +76,7 @@ class WorkingMemory {
 char* CompressFragment(const char* input,
                        size_t input_length,
                        char* op,
-                       uint16* table,
+                       uint16_t* table,
                        const int table_size);
 
 // Find the largest n such that
@@ -100,7 +100,7 @@ char* CompressFragment(const char* input,
 static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
                                                       const char* s2,
                                                       const char* s2_limit,
-                                                      uint64* data) {
+                                                      uint64_t* data) {
   assert(s2_limit >= s2);
   size_t matched = 0;
 
@@ -110,8 +110,8 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
   // length is less than 8.  In short, we are hoping to avoid a conditional
   // branch, and perhaps get better code layout from the C++ compiler.
   if (SNAPPY_PREDICT_TRUE(s2 <= s2_limit - 16)) {
-    uint64 a1 = UNALIGNED_LOAD64(s1);
-    uint64 a2 = UNALIGNED_LOAD64(s2);
+    uint64_t a1 = UNALIGNED_LOAD64(s1);
+    uint64_t a2 = UNALIGNED_LOAD64(s2);
     if (SNAPPY_PREDICT_TRUE(a1 != a2)) {
       // This code is critical for performance. The reason is that it determines
       // how much to advance `ip` (s2). This obviously depends on both the loads
@@ -147,10 +147,11 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
       //
       // Writen like above this is not a big win, the conditional move would be
       // a cmp followed by a cmov (2 cycles) followed by a shift (1 cycle).
-      // However matched_bytes < 4 is equal to static_cast<uint32>(xorval) != 0.
-      // Writen that way the conditional move (2 cycles) can execute parallel
-      // with FindLSBSetNonZero64 (tzcnt), which takes 3 cycles.
-      uint64 xorval = a1 ^ a2;
+      // However matched_bytes < 4 is equal to
+      // static_cast<uint32_t>(xorval) != 0. Writen that way, the conditional
+      // move (2 cycles) can execute in parallel with FindLSBSetNonZero64
+      // (tzcnt), which takes 3 cycles.
+      uint64_t xorval = a1 ^ a2;
       int shift = Bits::FindLSBSetNonZero64(xorval);
       size_t matched_bytes = shift >> 3;
 #ifndef __x86_64__
@@ -158,14 +159,14 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
 #else
       // Ideally this would just be
       //
-      // a2 = static_cast<uint32>(xorval) == 0 ? a3 : a2;
+      // a2 = static_cast<uint32_t>(xorval) == 0 ? a3 : a2;
       //
       // However clang correctly infers that the above statement participates on
       // a critical data dependency chain and thus, unfortunately, refuses to
       // use a conditional move (it's tuned to cut data dependencies). In this
       // case there is a longer parallel chain anyway AND this will be fairly
       // unpredictable.
-      uint64 a3 = UNALIGNED_LOAD64(s2 + 4);
+      uint64_t a3 = UNALIGNED_LOAD64(s2 + 4);
       asm("testl %k2, %k2\n\t"
           "cmovzq %1, %0\n\t"
           : "+r"(a2)
@@ -184,19 +185,19 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
   // the first non-matching bit and use that to calculate the total
   // length of the match.
   while (SNAPPY_PREDICT_TRUE(s2 <= s2_limit - 16)) {
-    uint64 a1 = UNALIGNED_LOAD64(s1 + matched);
-    uint64 a2 = UNALIGNED_LOAD64(s2);
+    uint64_t a1 = UNALIGNED_LOAD64(s1 + matched);
+    uint64_t a2 = UNALIGNED_LOAD64(s2);
     if (a1 == a2) {
       s2 += 8;
       matched += 8;
     } else {
-      uint64 xorval = a1 ^ a2;
+      uint64_t xorval = a1 ^ a2;
       int shift = Bits::FindLSBSetNonZero64(xorval);
       size_t matched_bytes = shift >> 3;
 #ifndef __x86_64__
       *data = UNALIGNED_LOAD64(s2 + matched_bytes);
 #else
-      uint64 a3 = UNALIGNED_LOAD64(s2 + 4);
+      uint64_t a3 = UNALIGNED_LOAD64(s2 + 4);
       asm("testl %k2, %k2\n\t"
           "cmovzq %1, %0\n\t"
           : "+r"(a2)
@@ -225,7 +226,7 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
 static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
                                                       const char* s2,
                                                       const char* s2_limit,
-                                                      uint64* data) {
+                                                      uint64_t* data) {
   // Implementation based on the x86-64 version, above.
   assert(s2_limit >= s2);
   int matched = 0;
@@ -236,7 +237,7 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
     matched += 4;
   }
   if (LittleEndian::IsLittleEndian() && s2 <= s2_limit - 4) {
-    uint32 x = UNALIGNED_LOAD32(s2) ^ UNALIGNED_LOAD32(s1 + matched);
+    uint32_t x = UNALIGNED_LOAD32(s2) ^ UNALIGNED_LOAD32(s1 + matched);
     int matching_bits = Bits::FindLSBSetNonZero(x);
     matched += matching_bits >> 3;
     s2 += matching_bits >> 3;
@@ -273,7 +274,7 @@ static const int kMaximumTagLength = 5;  // COPY_4_BYTE_OFFSET plus the actual o
 // because of efficiency reasons:
 //      (1) Extracting a byte is faster than a bit-field
 //      (2) It properly aligns copy offset so we do not need a <<8
-static const uint16 char_table[256] = {
+static const uint16_t char_table[256] = {
   0x0001, 0x0804, 0x1001, 0x2001, 0x0002, 0x0805, 0x1002, 0x2002,
   0x0003, 0x0806, 0x1003, 0x2003, 0x0004, 0x0807, 0x1004, 0x2004,
   0x0005, 0x0808, 0x1005, 0x2005, 0x0006, 0x0809, 0x1006, 0x2006,
