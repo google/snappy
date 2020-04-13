@@ -1,6 +1,9 @@
 #ifndef THIRD_PARTY_SNAPPY_OPENSOURCE_CMAKE_CONFIG_H_
 #define THIRD_PARTY_SNAPPY_OPENSOURCE_CMAKE_CONFIG_H_
 
+/* Define to 1 if the compiler supports __attribute__((always_inline)). */
+#cmakedefine HAVE_ATTRIBUTE_ALWAYS_INLINE 1
+
 /* Define to 1 if the compiler supports __builtin_ctz and friends. */
 #cmakedefine HAVE_BUILTIN_CTZ 1
 

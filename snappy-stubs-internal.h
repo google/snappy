@@ -37,7 +37,7 @@
 
 #include <cstdint>
 #include <cstring>
-#include <numeric_limits>
+#include <limits>
 #include <string>
 
 #include <assert.h>
@@ -105,6 +105,13 @@
 #else
 #define SNAPPY_PREDICT_FALSE(x) x
 #define SNAPPY_PREDICT_TRUE(x) x
+#endif
+
+// Inlining hints.
+#ifdef HAVE_ATTRIBUTE_ALWAYS_INLINE
+#define SNAPPY_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
+#else
+#define SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 #endif
 
 // This is only used for recomputing the tag byte table used during

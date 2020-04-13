@@ -1358,7 +1358,7 @@ class SnappyArrayWriter {
     }
   }
 
-  ABSL_ATTRIBUTE_ALWAYS_INLINE
+  SNAPPY_ATTRIBUTE_ALWAYS_INLINE
   inline bool AppendFromSelf(size_t offset, size_t len, char** op_p) {
     char* const op = *op_p;
     char* const op_end = op + len;
