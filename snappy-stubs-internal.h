@@ -260,66 +260,6 @@ inline void UNALIGNED_STORE64(void *p, uint64_t v) {
 
 #endif
 
-// The following guarantees declaration of the byte swap functions.
-#if defined(SNAPPY_IS_BIG_ENDIAN)
-
-#ifdef HAVE_SYS_BYTEORDER_H
-#include <sys/byteorder.h>
-#endif
-
-#ifdef HAVE_SYS_ENDIAN_H
-#include <sys/endian.h>
-#endif
-
-#ifdef _MSC_VER
-#include <stdlib.h>
-#define bswap_16(x) _byteswap_ushort(x)
-#define bswap_32(x) _byteswap_ulong(x)
-#define bswap_64(x) _byteswap_uint64(x)
-
-#elif defined(__APPLE__)
-// Mac OS X / Darwin features
-#include <libkern/OSByteOrder.h>
-#define bswap_16(x) OSSwapInt16(x)
-#define bswap_32(x) OSSwapInt32(x)
-#define bswap_64(x) OSSwapInt64(x)
-
-#elif defined(HAVE_BYTESWAP_H)
-#include <byteswap.h>
-
-#elif defined(bswap32)
-// FreeBSD defines bswap{16,32,64} in <sys/endian.h> (already #included).
-#define bswap_16(x) bswap16(x)
-#define bswap_32(x) bswap32(x)
-#define bswap_64(x) bswap64(x)
-
-#elif defined(BSWAP_64)
-// Solaris 10 defines BSWAP_{16,32,64} in <sys/byteorder.h> (already #included).
-#define bswap_16(x) BSWAP_16(x)
-#define bswap_32(x) BSWAP_32(x)
-#define bswap_64(x) BSWAP_64(x)
-
-#else
-
-inline uint16_t bswap_16(uint16_t x) {
-  return (x << 8) | (x >> 8);
-}
-
-inline uint32_t bswap_32(uint32_t x) {
-  x = ((x & 0xff00ff00UL) >> 8) | ((x & 0x00ff00ffUL) << 8);
-  return (x >> 16) | (x << 16);
-}
-
-inline uint64_t bswap_64(uint64_t x) {
-  x = ((x & 0xff00ff00ff00ff00ULL) >> 8) | ((x & 0x00ff00ff00ff00ffULL) << 8);
-  x = ((x & 0xffff0000ffff0000ULL) >> 16) | ((x & 0x0000ffff0000ffffULL) << 16);
-  return (x >> 32) | (x << 32);
-}
-
-#endif
-
-#endif  // defined(SNAPPY_IS_BIG_ENDIAN)
-
 // Convert to little-endian storage, opposite of network format.
 // Convert x from host to little endian: x = LittleEndian.FromHost(x);
 // convert x from little endian to host: x = LittleEndian.ToHost(x);
@@ -331,58 +271,77 @@ inline uint64_t bswap_64(uint64_t x) {
 //    x = LittleEndian.Load16(p);
 class LittleEndian {
  public:
-  // Conversion functions.
-#if defined(SNAPPY_IS_BIG_ENDIAN)
-
-  static uint16_t FromHost16(uint16_t x) { return bswap_16(x); }
-  static uint16_t ToHost16(uint16_t x) { return bswap_16(x); }
-
-  static uint32_t FromHost32(uint32_t x) { return bswap_32(x); }
-  static uint32_t ToHost32(uint32_t x) { return bswap_32(x); }
-
-  static uint32_t FromHost64(uint64_t x) { return bswap_64(x); }
-  static uint32_t ToHost64(uint64_t x) { return bswap_64(x); }
-
-  static bool IsLittleEndian() { return false; }
-
-#else  // !defined(SNAPPY_IS_BIG_ENDIAN)
-
-  static uint16_t FromHost16(uint16_t x) { return x; }
-  static uint16_t ToHost16(uint16_t x) { return x; }
-
-  static uint32_t FromHost32(uint32_t x) { return x; }
-  static uint32_t ToHost32(uint32_t x) { return x; }
-
-  static uint32_t FromHost64(uint64_t x) { return x; }
-  static uint32_t ToHost64(uint64_t x) { return x; }
-
-  static bool IsLittleEndian() { return true; }
-
-#endif  // !defined(SNAPPY_IS_BIG_ENDIAN)
-
   // Functions to do unaligned loads and stores in little-endian order.
-  static uint16_t Load16(const void *p) {
-    return ToHost16(UNALIGNED_LOAD16(p));
+  static inline uint16_t Load16(const void *ptr) {
+    const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
+
+    // Compiles to a single mov/str on recent clang and gcc.
+    return (static_cast<uint16_t>(buffer[0])) |
+            (static_cast<uint16_t>(buffer[1]) << 8);
   }
 
-  static void Store16(void *p, uint16_t v) {
-    UNALIGNED_STORE16(p, FromHost16(v));
+  static inline uint32_t Load32(const void *ptr) {
+    const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
+
+    // Compiles to a single mov/str on recent clang and gcc.
+    return (static_cast<uint32_t>(buffer[0])) |
+            (static_cast<uint32_t>(buffer[1]) << 8) |
+            (static_cast<uint32_t>(buffer[2]) << 16) |
+            (static_cast<uint32_t>(buffer[3]) << 24);
   }
 
-  static uint32_t Load32(const void *p) {
-    return ToHost32(UNALIGNED_LOAD32(p));
+  static inline uint64_t Load64(const void *ptr) {
+    const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
+
+    // Compiles to a single mov/str on recent clang and gcc.
+    return (static_cast<uint64_t>(buffer[0])) |
+            (static_cast<uint64_t>(buffer[1]) << 8) |
+            (static_cast<uint64_t>(buffer[2]) << 16) |
+            (static_cast<uint64_t>(buffer[3]) << 24) |
+            (static_cast<uint64_t>(buffer[4]) << 32) |
+            (static_cast<uint64_t>(buffer[5]) << 40) |
+            (static_cast<uint64_t>(buffer[6]) << 48) |
+            (static_cast<uint64_t>(buffer[7]) << 56);
   }
 
-  static void Store32(void *p, uint32_t v) {
-    UNALIGNED_STORE32(p, FromHost32(v));
+  static inline void Store16(void *dst, uint16_t value) {
+    uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
+
+    // Compiles to a single mov/str on recent clang and gcc.
+    buffer[0] = static_cast<uint8_t>(value);
+    buffer[1] = static_cast<uint8_t>(value >> 8);
   }
 
-  static uint64_t Load64(const void *p) {
-    return ToHost64(UNALIGNED_LOAD64(p));
+  static void Store32(void *dst, uint32_t value) {
+    uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
+
+    // Compiles to a single mov/str on recent clang and gcc.
+    buffer[0] = static_cast<uint8_t>(value);
+    buffer[1] = static_cast<uint8_t>(value >> 8);
+    buffer[2] = static_cast<uint8_t>(value >> 16);
+    buffer[3] = static_cast<uint8_t>(value >> 24);
   }
 
-  static void Store64(void *p, uint64_t v) {
-    UNALIGNED_STORE64(p, FromHost64(v));
+  static void Store64(void* dst, uint64_t value) {
+    uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
+
+    // Compiles to a single mov/str on recent clang and gcc.
+    buffer[0] = static_cast<uint8_t>(value);
+    buffer[1] = static_cast<uint8_t>(value >> 8);
+    buffer[2] = static_cast<uint8_t>(value >> 16);
+    buffer[3] = static_cast<uint8_t>(value >> 24);
+    buffer[4] = static_cast<uint8_t>(value >> 32);
+    buffer[5] = static_cast<uint8_t>(value >> 40);
+    buffer[6] = static_cast<uint8_t>(value >> 48);
+    buffer[7] = static_cast<uint8_t>(value >> 56);
+  }
+
+  static inline constexpr bool IsLittleEndian() {
+#if defined(SNAPPY_IS_BIG_ENDIAN)
+    return false;
+#else
+    return true;
+#endif  // defined(SNAPPY_IS_BIG_ENDIAN)
   }
 };
 
