@@ -130,132 +130,40 @@ static const int64_t kint64max = std::numeric_limits<int64_t>::max();
 
 // Potentially unaligned loads and stores.
 
-// x86, PowerPC, and ARM64 can simply do these loads and stores native.
-
-#if defined(__i386__) || defined(__x86_64__) || defined(__powerpc__) || \
-    defined(__aarch64__)
-
-#define UNALIGNED_LOAD16(_p) (*reinterpret_cast<const uint16_t *>(_p))
-#define UNALIGNED_LOAD32(_p) (*reinterpret_cast<const uint32_t *>(_p))
-#define UNALIGNED_LOAD64(_p) (*reinterpret_cast<const uint64_t *>(_p))
-
-#define UNALIGNED_STORE16(_p, _val) (*reinterpret_cast<uint16_t *>(_p) = (_val))
-#define UNALIGNED_STORE32(_p, _val) (*reinterpret_cast<uint32_t *>(_p) = (_val))
-#define UNALIGNED_STORE64(_p, _val) (*reinterpret_cast<uint64_t *>(_p) = (_val))
-
-// ARMv7 and newer support native unaligned accesses, but only of 16-bit
-// and 32-bit values (not 64-bit); older versions either raise a fatal signal,
-// do an unaligned read and rotate the words around a bit, or do the reads very
-// slowly (trip through kernel mode). There's no simple #define that says just
-// “ARMv7 or higher”, so we have to filter away all ARMv5 and ARMv6
-// sub-architectures.
-//
-// This is a mess, but there's not much we can do about it.
-//
-// To further complicate matters, only LDR instructions (single reads) are
-// allowed to be unaligned, not LDRD (two reads) or LDM (many reads). Unless we
-// explicitly tell the compiler that these accesses can be unaligned, it can and
-// will combine accesses. On armcc, the way to signal this is done by accessing
-// through the type (uint32_t __packed *), but GCC has no such attribute
-// (it ignores __attribute__((packed)) on individual variables). However,
-// we can tell it that a _struct_ is unaligned, which has the same effect,
-// so we do that.
-
-#elif defined(__arm__) && \
-      !defined(__ARM_ARCH_4__) && \
-      !defined(__ARM_ARCH_4T__) && \
-      !defined(__ARM_ARCH_5__) && \
-      !defined(__ARM_ARCH_5T__) && \
-      !defined(__ARM_ARCH_5TE__) && \
-      !defined(__ARM_ARCH_5TEJ__) && \
-      !defined(__ARM_ARCH_6__) && \
-      !defined(__ARM_ARCH_6J__) && \
-      !defined(__ARM_ARCH_6K__) && \
-      !defined(__ARM_ARCH_6Z__) && \
-      !defined(__ARM_ARCH_6ZK__) && \
-      !defined(__ARM_ARCH_6T2__)
-
-#if __GNUC__
-#define ATTRIBUTE_PACKED __attribute__((__packed__))
-#else
-#define ATTRIBUTE_PACKED
-#endif
-
-namespace base {
-namespace internal {
-
-struct Unaligned16Struct {
-  uint16_t value;
-  uint8_t dummy;  // To make the size non-power-of-two.
-} ATTRIBUTE_PACKED;
-
-struct Unaligned32Struct {
-  uint32_t value;
-  uint8_t dummy;  // To make the size non-power-of-two.
-} ATTRIBUTE_PACKED;
-
-}  // namespace internal
-}  // namespace base
-
-#define UNALIGNED_LOAD16(_p) \
-    ((reinterpret_cast<const ::snappy::base::internal::Unaligned16Struct *>(_p))->value)
-#define UNALIGNED_LOAD32(_p) \
-    ((reinterpret_cast<const ::snappy::base::internal::Unaligned32Struct *>(_p))->value)
-
-#define UNALIGNED_STORE16(_p, _val) \
-    ((reinterpret_cast< ::snappy::base::internal::Unaligned16Struct *>(_p))->value = \
-         (_val))
-#define UNALIGNED_STORE32(_p, _val) \
-    ((reinterpret_cast< ::snappy::base::internal::Unaligned32Struct *>(_p))->value = \
-         (_val))
-
-// TODO: NEON supports unaligned 64-bit loads and stores.
-// See if that would be more efficient on platforms supporting it,
-// at least for copies.
-
-inline uint64_t UNALIGNED_LOAD64(const void *p) {
-  uint64_t t;
-  std::memcpy(&t, p, sizeof t);
-  return t;
-}
-
-inline void UNALIGNED_STORE64(void *p, uint64_t v) {
-  std::memcpy(p, &v, sizeof v);
-}
-
-#else
-
-// These functions are provided for architectures that don't support
-// unaligned loads and stores.
-
 inline uint16_t UNALIGNED_LOAD16(const void *p) {
-  uint16_t t;
-  std::memcpy(&t, p, sizeof t);
-  return t;
+  // Compiles to a single movzx/ldrh on clang/gcc/msvc.
+  uint16_t v;
+  std::memcpy(&v, p, sizeof(v));
+  return v;
 }
 
 inline uint32_t UNALIGNED_LOAD32(const void *p) {
-  uint32_t t;
-  std::memcpy(&t, p, sizeof t);
-  return t;
+  // Compiles to a single mov/ldr on clang/gcc/msvc.
+  uint32_t v;
+  std::memcpy(&v, p, sizeof(v));
+  return v;
 }
 
 inline uint64_t UNALIGNED_LOAD64(const void *p) {
-  uint64_t t;
-  std::memcpy(&t, p, sizeof t);
-  return t;
+  // Compiles to a single mov/ldr on clang/gcc/msvc.
+  uint64_t v;
+  std::memcpy(&v, p, sizeof(v));
+  return v;
 }
 
 inline void UNALIGNED_STORE16(void *p, uint16_t v) {
-  std::memcpy(p, &v, sizeof v);
+  // Compiles to a single mov/strh on clang/gcc/msvc.
+  std::memcpy(p, &v, sizeof(v));
 }
 
 inline void UNALIGNED_STORE32(void *p, uint32_t v) {
-  std::memcpy(p, &v, sizeof v);
+  // Compiles to a single mov/str on clang/gcc/msvc.
+  std::memcpy(p, &v, sizeof(v));
 }
 
 inline void UNALIGNED_STORE64(void *p, uint64_t v) {
-  std::memcpy(p, &v, sizeof v);
+  // Compiles to a single mov/str on clang/gcc/msvc.
+  std::memcpy(p, &v, sizeof(v));
 }
 
 #endif
