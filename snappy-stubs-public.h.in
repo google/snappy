@@ -36,7 +36,6 @@
 #define THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_STUBS_PUBLIC_H_
 
 #include <cstddef>
-#include <string>
 
 #if ${HAVE_SYS_UIO_H_01}  // HAVE_SYS_UIO_H
 #include <sys/uio.h>
