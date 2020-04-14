@@ -166,8 +166,6 @@ inline void UNALIGNED_STORE64(void *p, uint64_t v) {
   std::memcpy(p, &v, sizeof(v));
 }
 
-#endif
-
 // Convert to little-endian storage, opposite of network format.
 // Convert x from host to little endian: x = LittleEndian.FromHost(x);
 // convert x from little endian to host: x = LittleEndian.ToHost(x);
