@@ -119,10 +119,10 @@ namespace file {
 
   DummyStatus GetContents(
       const std::string& filename, std::string* data, int unused) {
-    FILE* fp = fopen(filename.c_str(), "rb");
+    FILE* fp = std::fopen(filename.c_str(), "rb");
     if (fp == NULL) {
-      perror(filename.c_str());
-      exit(1);
+      std::perror(filename.c_str());
+      std::exit(1);
     }
 
     data->clear();
@@ -130,32 +130,32 @@ namespace file {
       char buf[4096];
       size_t ret = fread(buf, 1, 4096, fp);
       if (ret == 0 && ferror(fp)) {
-        perror("fread");
-        exit(1);
+        std::perror("fread");
+        std::exit(1);
       }
       data->append(std::string(buf, ret));
     }
 
-    fclose(fp);
+    std::fclose(fp);
 
     return DummyStatus();
   }
 
   inline DummyStatus SetContents(
       const std::string& filename, const std::string& str, int unused) {
-    FILE* fp = fopen(filename.c_str(), "wb");
+    FILE* fp = std::fopen(filename.c_str(), "wb");
     if (fp == NULL) {
-      perror(filename.c_str());
-      exit(1);
+      std::perror(filename.c_str());
+      std::exit(1);
     }
 
-    int ret = fwrite(str.data(), str.size(), 1, fp);
+    int ret = std::fwrite(str.data(), str.size(), 1, fp);
     if (ret != 1) {
-      perror("fwrite");
-      exit(1);
+      std::std::perror("fwrite");
+      std::exit(1);
     }
 
-    fclose(fp);
+    std::fclose(fp);
 
     return DummyStatus();
   }
@@ -184,7 +184,7 @@ std::string ReadTestDataFile(const std::string& base, size_t size_limit);
 
 std::string ReadTestDataFile(const std::string& base);
 
-// A sprintf() variant that returns a std::string.
+// A std::sprintf() variant that returns a std::string.
 // Not safe for general use due to truncation issues.
 std::string StrFormat(const char* format, ...);
 
@@ -403,15 +403,17 @@ static inline void RunSpecifiedBenchmarks() {
     return;
   }
 
-  fprintf(stderr, "Running microbenchmarks.\n");
+  std::fprintf(stderr, "Running microbenchmarks.\n");
 #ifndef NDEBUG
-  fprintf(stderr, "WARNING: Compiled with assertions enabled, will be slow.\n");
+  std::fprintf(stderr,
+               "WARNING: Compiled with assertions enabled, will be slow.\n");
 #endif
 #ifndef __OPTIMIZE__
-  fprintf(stderr, "WARNING: Compiled without optimization, will be slow.\n");
+  std::fprintf(stderr,
+               "WARNING: Compiled without optimization, will be slow.\n");
 #endif
-  fprintf(stderr, "Benchmark            Time(ns)    CPU(ns) Iterations\n");
-  fprintf(stderr, "---------------------------------------------------\n");
+  std::fprintf(stderr, "Benchmark            Time(ns)    CPU(ns) Iterations\n");
+  std::fprintf(stderr, "---------------------------------------------------\n");
 
   snappy::Benchmark_BM_UFlat->Run();
   snappy::Benchmark_BM_UIOVec->Run();
@@ -420,13 +422,13 @@ static inline void RunSpecifiedBenchmarks() {
   snappy::Benchmark_BM_ZFlatAll->Run();
   snappy::Benchmark_BM_ZFlatIncreasingTableSize->Run();
 
-  fprintf(stderr, "\n");
+  std::fprintf(stderr, "\n");
 }
 
 #ifndef HAVE_GTEST
 
 static inline int RUN_ALL_TESTS() {
-  fprintf(stderr, "Running correctness tests.\n");
+  std::fprintf(stderr, "Running correctness tests.\n");
   snappy::Test_CorruptedTest_VerifyCorrupted();
   snappy::Test_Snappy_SimpleTests();
   snappy::Test_Snappy_MaxBlowup();
@@ -438,7 +440,7 @@ static inline int RUN_ALL_TESTS() {
   snappy::Test_Snappy_ReadPastEndOfBuffer();
   snappy::Test_Snappy_FindMatchLength();
   snappy::Test_Snappy_FindMatchLengthRandom();
-  fprintf(stderr, "All tests passed.\n");
+  std::fprintf(stderr, "All tests passed.\n");
 
   return 0;
 }
@@ -479,8 +481,8 @@ class LogMessage {
     snappy::LogMessageVoidify() & snappy::LogMessageCrash()
 
 #ifdef _MSC_VER
-// ~LogMessageCrash calls abort() and therefore never exits. This is by design
-// so temporarily disable warning C4722.
+// ~LogMessageCrash calls std::abort() and therefore never exits. This is by
+// design, so temporarily disable warning C4722.
 #pragma warning(push)
 #pragma warning(disable:4722)
 #endif
@@ -490,7 +492,7 @@ class LogMessageCrash : public LogMessage {
   LogMessageCrash() { }
   ~LogMessageCrash() {
     std::cerr << std::endl;
-    abort();
+    std::abort();
   }
 };
 

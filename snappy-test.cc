@@ -69,9 +69,9 @@ std::string ReadTestDataFile(const std::string& base) {
 
 std::string StrFormat(const char* format, ...) {
   char buf[4096];
-  va_list ap;
+  std::va_list ap;
   va_start(ap, format);
-  vsnprintf(buf, sizeof(buf), format, ap);
+  std::vsnprintf(buf, sizeof(buf), format, ap);
   va_end(ap);
   return buf;
 }
@@ -104,8 +104,8 @@ void StartBenchmarkTiming() {
 #else
   gettimeofday(&benchmark_start_real, NULL);
   if (getrusage(RUSAGE_SELF, &benchmark_start_cpu) == -1) {
-    perror("getrusage(RUSAGE_SELF)");
-    exit(1);
+    std::perror("getrusage(RUSAGE_SELF)");
+    std::exit(1);
   }
 #endif
   benchmark_running = true;
@@ -151,8 +151,8 @@ void StopBenchmarkTiming() {
 
   struct rusage benchmark_stop_cpu;
   if (getrusage(RUSAGE_SELF, &benchmark_stop_cpu) == -1) {
-    perror("getrusage(RUSAGE_SELF)");
-    exit(1);
+    std::perror("getrusage(RUSAGE_SELF)");
+    std::exit(1);
   }
   benchmark_cpu_time_us += 1000000 * (benchmark_stop_cpu.ru_utime.tv_sec -
                                       benchmark_start_cpu.ru_utime.tv_sec);
@@ -246,7 +246,7 @@ void Benchmark::Run() {
       }
     }
 
-    fprintf(stderr,
+    std::fprintf(stderr,
 #ifdef WIN32
             "%-18s %10I64d %10I64d %10d %s  %s\n",
 #else

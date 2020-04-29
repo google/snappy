@@ -348,14 +348,14 @@ static void Measure(const char* data,
   x += ":";
   std::string urate = (uncomp_rate >= 0) ? StrFormat("%.1f", uncomp_rate)
                                          : std::string("?");
-  printf("%-7s [b %dM] bytes %6d -> %6d %4.1f%%  "
-         "comp %5.1f MB/s  uncomp %5s MB/s\n",
-         x.c_str(),
-         block_size/(1<<20),
-         static_cast<int>(length), static_cast<uint32_t>(compressed_size),
-         (compressed_size * 100.0) / std::max<int>(1, length),
-         comp_rate,
-         urate.c_str());
+  std::printf("%-7s [b %dM] bytes %6d -> %6d %4.1f%%  "
+              "comp %5.1f MB/s  uncomp %5s MB/s\n",
+              x.c_str(),
+              block_size/(1<<20),
+              static_cast<int>(length), static_cast<uint32_t>(compressed_size),
+              (compressed_size * 100.0) / std::max<int>(1, length),
+              comp_rate,
+              urate.c_str());
 }
 
 static int VerifyString(const std::string& input) {
@@ -1164,13 +1164,13 @@ TEST(Snappy, VerifyCharTable) {
   }
 
   if (FLAGS_snappy_dump_decompression_table) {
-    printf("static const uint16_t char_table[256] = {\n  ");
+    std::printf("static const uint16_t char_table[256] = {\n  ");
     for (int i = 0; i < 256; i++) {
-      printf("0x%04x%s",
-             dst[i],
-             ((i == 255) ? "\n" : (((i%8) == 7) ? ",\n  " : ", ")));
+      std::printf("0x%04x%s",
+                  dst[i],
+                  ((i == 255) ? "\n" : (((i%8) == 7) ? ",\n  " : ", ")));
     }
-    printf("};\n");
+    std::printf("};\n");
   }
 
   // Check that computed table matched recorded table.
@@ -1208,7 +1208,7 @@ static void UncompressFile(const char* fname) {
 static void MeasureFile(const char* fname) {
   std::string fullinput;
   CHECK_OK(file::GetContents(fname, &fullinput, file::Defaults()));
-  printf("%-40s :\n", fname);
+  std::printf("%-40s :\n", fname);
 
   int start_len = (FLAGS_start_len < 0) ? fullinput.size() : FLAGS_start_len;
   int end_len = fullinput.size();
