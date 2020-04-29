@@ -35,14 +35,13 @@
 #include "config.h"
 #endif
 
-#include <cstdint>
+#include <stdint.h>
+
+#include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <string>
-
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
 
 #ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>

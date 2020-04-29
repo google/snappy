@@ -31,13 +31,12 @@
 #ifndef THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
 #define THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
 
+#include <cstdarg>
+#include <cstdio>
 #include <iostream>
 #include <string>
 
 #include "snappy-stubs-internal.h"
-
-#include <stdio.h>
-#include <stdarg.h>
 
 #ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h>

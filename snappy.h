@@ -39,8 +39,9 @@
 #ifndef THIRD_PARTY_SNAPPY_SNAPPY_H__
 #define THIRD_PARTY_SNAPPY_SNAPPY_H__
 
-#include <cstddef>
-#include <cstdint>
+#include <stddef.h>
+#include <stdint.h>
+
 #include <string>
 
 #include "snappy-stubs-public.h"

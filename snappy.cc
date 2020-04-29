@@ -68,9 +68,8 @@
 #include <immintrin.h>
 #endif
 
-#include <stdio.h>
-
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
