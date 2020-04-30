@@ -151,7 +151,7 @@ namespace file {
 
     int ret = std::fwrite(str.data(), str.size(), 1, fp);
     if (ret != 1) {
-      std::std::perror("fwrite");
+      std::perror("fwrite");
       std::exit(1);
     }
 
