@@ -33,17 +33,24 @@
 
 namespace snappy {
 
-Source::~Source() { }
+Source::~Source() = default;
 
-Sink::~Sink() { }
+Sink::~Sink() = default;
 
 char* Sink::GetAppendBuffer(size_t length, char* scratch) {
+  // TODO(costan): Switch to [[maybe_unused]] when we can assume C++17.
+  (void)length;
+
   return scratch;
 }
 
 char* Sink::GetAppendBufferVariable(
       size_t min_size, size_t desired_size_hint, char* scratch,
       size_t scratch_size, size_t* allocated_size) {
+  // TODO(costan): Switch to [[maybe_unused]] when we can assume C++17.
+  (void)min_size;
+  (void)desired_size_hint;
+
   *allocated_size = scratch_size;
   return scratch;
 }
@@ -56,7 +63,7 @@ void Sink::AppendAndTakeOwnership(
   (*deleter)(deleter_arg, bytes, n);
 }
 
-ByteArraySource::~ByteArraySource() { }
+ByteArraySource::~ByteArraySource() = default;
 
 size_t ByteArraySource::Available() const { return left_; }
 
@@ -81,6 +88,10 @@ void UncheckedByteArraySink::Append(const char* data, size_t n) {
 }
 
 char* UncheckedByteArraySink::GetAppendBuffer(size_t len, char* scratch) {
+  // TODO(costan): Switch to [[maybe_unused]] when we can assume C++17.
+  (void)len;
+  (void)scratch;
+
   return dest_;
 }
 
@@ -98,6 +109,11 @@ void UncheckedByteArraySink::AppendAndTakeOwnership(
 char* UncheckedByteArraySink::GetAppendBufferVariable(
       size_t min_size, size_t desired_size_hint, char* scratch,
       size_t scratch_size, size_t* allocated_size) {
+  // TODO(costan): Switch to [[maybe_unused]] when we can assume C++17.
+  (void)min_size;
+  (void)scratch;
+  (void)scratch_size;
+
   *allocated_size = desired_size_hint;
   return dest_;
 }

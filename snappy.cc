@@ -563,7 +563,7 @@ char* CompressFragment(const char* input,
             // These for-loops are meant to be unrolled. So we can freely
             // special case the first iteration to use the value already
             // loaded in preload.
-            uint32_t dword = i == 0 ? preload : data;
+            uint32_t dword = i == 0 ? preload : static_cast<uint32_t>(data);
             assert(dword == LittleEndian::Load32(ip + i));
             uint32_t hash = HashBytes(dword, shift);
             candidate = base_ip + table[hash];
@@ -680,7 +680,12 @@ char* CompressFragment(const char* input,
 
 // Called back at avery compression call to trace parameters and sizes.
 static inline void Report(const char *algorithm, size_t compressed_size,
-                          size_t uncompressed_size) {}
+                          size_t uncompressed_size) {
+  // TODO(costan): Switch to [[maybe_unused]] when we can assume C++17.
+  (void)algorithm;
+  (void)compressed_size;
+  (void)uncompressed_size;
+}
 
 // Signature of output types needed by decompression code.
 // The decompression code is templatized on a type that obeys this
@@ -1170,7 +1175,10 @@ class SnappyIOVecWriter {
   }
 
   char* GetOutputPtr() { return nullptr; }
-  void SetOutputPtr(char* op) {}
+  void SetOutputPtr(char* op) {
+    // TODO(costan): Switch to [[maybe_unused]] when we can assume C++17.
+    (void)op;
+  }
 
   inline bool AppendNoCheck(const char* ip, size_t len) {
     while (len > 0) {
@@ -1360,10 +1368,13 @@ class SnappyArrayWriter {
   SNAPPY_ATTRIBUTE_ALWAYS_INLINE
   inline bool AppendFromSelf(size_t offset, size_t len, char** op_p) {
     char* const op = *op_p;
+    assert(op >= base_);
     char* const op_end = op + len;
 
     // Check if we try to append from before the start of the buffer.
-    if (SNAPPY_PREDICT_FALSE(op - base_ < offset)) return false;
+    if (SNAPPY_PREDICT_FALSE(static_cast<size_t>(op - base_) < offset))
+      return false;
+
     if (SNAPPY_PREDICT_FALSE((kSlopBytes < 64 && len > kSlopBytes) ||
                             op >= op_limit_min_slop_ || offset < len)) {
       if (op_end > op_limit_ || offset == 0) return false;
@@ -1422,11 +1433,20 @@ class SnappyDecompressionValidator {
     return expected_ == produced_;
   }
   inline bool Append(const char* ip, size_t len, size_t* produced) {
+    // TODO(costan): Switch to [[maybe_unused]] when we can assume C++17.
+    (void)ip;
+
     *produced += len;
     return *produced <= expected_;
   }
   inline bool TryFastAppend(const char* ip, size_t available, size_t length,
                             size_t* produced) {
+    // TODO(costan): Switch to [[maybe_unused]] when we can assume C++17.
+    (void)ip;
+    (void)available;
+    (void)length;
+    (void)produced;
+
     return false;
   }
   inline bool AppendFromSelf(size_t offset, size_t len, size_t* produced) {
@@ -1567,13 +1587,15 @@ class SnappyScatteredWriter {
 
   inline bool AppendFromSelf(size_t offset, size_t len, char** op_p) {
     char* op = *op_p;
+    assert(op >= op_base_);
     // Check if we try to append from before the start of the buffer.
     if (SNAPPY_PREDICT_FALSE((kSlopBytes < 64 && len > kSlopBytes) ||
-                            op - op_base_ < offset ||
-                            op >= op_limit_min_slop_ || offset < len)) {
+                             static_cast<size_t>(op - op_base_) < offset ||
+                             op >= op_limit_min_slop_ || offset < len)) {
       if (offset == 0) return false;
       char* const op_end = op + len;
-      if (SNAPPY_PREDICT_FALSE(op - op_base_ < offset || op_end > op_limit_)) {
+      if (SNAPPY_PREDICT_FALSE(static_cast<size_t>(op - op_base_) < offset ||
+                               op_end > op_limit_)) {
         op_ptr_ = op;
         bool res = SlowAppendFromSelf(offset, len);
         *op_p = op_ptr_;
@@ -1692,6 +1714,10 @@ class SnappySinkAllocator {
   };
 
   static void Deleter(void* arg, const char* bytes, size_t size) {
+    // TODO(costan): Switch to [[maybe_unused]] when we can assume C++17.
+    (void)arg;
+    (void)size;
+
     delete[] bytes;
   }
 

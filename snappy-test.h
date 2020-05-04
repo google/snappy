@@ -118,7 +118,7 @@ namespace file {
   };
 
   DummyStatus GetContents(
-      const std::string& filename, std::string* data, int unused) {
+      const std::string& filename, std::string* data, int /*unused*/) {
     FILE* fp = std::fopen(filename.c_str(), "rb");
     if (fp == NULL) {
       std::perror(filename.c_str());
@@ -142,7 +142,7 @@ namespace file {
   }
 
   inline DummyStatus SetContents(
-      const std::string& filename, const std::string& str, int unused) {
+      const std::string& filename, const std::string& str, int /*unused*/) {
     FILE* fp = std::fopen(filename.c_str(), "wb");
     if (fp == NULL) {
       std::perror(filename.c_str());
