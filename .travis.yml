@@ -12,15 +12,49 @@ compiler:
 os:
 - linux
 - osx
+arch:
+- amd64
+- arm64
 
 env:
-- BUILD_TYPE=Debug CPU_LEVEL=AVX
-- BUILD_TYPE=Debug CPU_LEVEL=AVX2
-- BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX
-- BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
+  jobs:
+  - BUILD_TYPE: Debug
+    CPU_LEVEL: BASELINE
+  - BUILD_TYPE: Debug
+    CPU_LEVEL: AVX
+  - BUILD_TYPE: Debug
+    CPU_LEVEL: AVX2
+  - BUILD_TYPE: Debug
+    CPU_LEVEL: NEON
+  - BUILD_TYPE: RelWithDebInfo
+    CPU_LEVEL: BASELINE
+  - BUILD_TYPE: RelWithDebInfo
+    CPU_LEVEL: AVX
+  - BUILD_TYPE: RelWithDebInfo
+    CPU_LEVEL: AVX2
+  - BUILD_TYPE: RelWithDebInfo
+    CPU_LEVEL: NEON
 
 jobs:
   exclude:
+  # NEON is mandatory on ARM64. AVX and AVX2 don't make sense on ARM64.
+  - env: BUILD_TYPE=Debug CPU_LEVEL=BASELINE
+    arch: arm64
+  - env: BUILD_TYPE=Debug CPU_LEVEL=AVX
+    arch: arm64
+  - env: BUILD_TYPE=Debug CPU_LEVEL=AVX2
+    arch: arm64
+  - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=BASELINE
+    arch: arm64
+  - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX
+    arch: arm64
+  - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
+    arch: arm64
+  # NEON doesn't make sense on AMD64.
+  - env: BUILD_TYPE=Debug CPU_LEVEL=NEON
+    arch: amd64
+  - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=NEON
+    arch: amd64
   # Travis OSX servers seem to run on pre-Haswell CPUs. Attempting to use AVX2
   # results in crashes.
   - env: BUILD_TYPE=Debug CPU_LEVEL=AVX2
