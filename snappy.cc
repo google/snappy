@@ -557,8 +557,8 @@ char* CompressFragment(const char* input,
       const char* candidate;
       if (ip_limit - ip >= 16) {
         auto delta = ip - base_ip;
-        for (int j = 0; j < 4; j++) {
-          for (int k = 0; k < 4; k++) {
+        for (int j = 0; j < 4; ++j) {
+          for (int k = 0; k < 4; ++k) {
             int i = 4 * j + k;
             // These for-loops are meant to be unrolled. So we can freely
             // special case the first iteration to use the value already
@@ -1675,10 +1675,9 @@ class SnappySinkAllocator {
   // to the blocks.
   void Flush(size_t size) {
     size_t size_written = 0;
-    size_t block_size;
-    for (int i = 0; i < blocks_.size(); ++i) {
-      block_size = std::min<size_t>(blocks_[i].size, size - size_written);
-      dest_->AppendAndTakeOwnership(blocks_[i].data, block_size,
+    for (Datablock& block : blocks_) {
+      size_t block_size = std::min<size_t>(block.size, size - size_written);
+      dest_->AppendAndTakeOwnership(block.data, block_size,
                                     &SnappySinkAllocator::Deleter, NULL);
       size_written += block_size;
     }

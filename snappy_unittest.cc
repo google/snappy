@@ -281,14 +281,16 @@ static void Measure(const char* data,
     std::vector<size_t> input_length(num_blocks);
     std::vector<std::string> compressed(num_blocks);
     std::vector<std::string> output(num_blocks);
-    for (int b = 0; b < num_blocks; b++) {
+    for (int b = 0; b < num_blocks; ++b) {
       int input_start = b * block_size;
       int input_limit = std::min<int>((b+1)*block_size, length);
       input[b] = data+input_start;
       input_length[b] = input_limit-input_start;
+    }
 
-      // Pre-grow the output buffer so we don't measure string append time.
-      compressed[b].resize(MinimumRequiredOutputSpace(block_size, comp));
+    // Pre-grow the output buffers so we don't measure string append time.
+    for (std::string& compressed_block : compressed) {
+      compressed_block.resize(MinimumRequiredOutputSpace(block_size, comp));
     }
 
     // First, try one trial compression to make sure the code is compiled in
@@ -298,34 +300,36 @@ static void Measure(const char* data,
       return;
     }
 
-    for (int run = 0; run < kRuns; run++) {
+    for (int run = 0; run < kRuns; ++run) {
       CycleTimer ctimer, utimer;
 
-      for (int b = 0; b < num_blocks; b++) {
-        // Pre-grow the output buffer so we don't measure string append time.
-        compressed[b].resize(MinimumRequiredOutputSpace(block_size, comp));
+      // Pre-grow the output buffers so we don't measure string append time.
+      for (std::string& compressed_block : compressed) {
+        compressed_block.resize(MinimumRequiredOutputSpace(block_size, comp));
       }
 
       ctimer.Start();
-      for (int b = 0; b < num_blocks; b++)
-        for (int i = 0; i < repeats; i++)
+      for (int b = 0; b < num_blocks; ++b) {
+        for (int i = 0; i < repeats; ++i)
           Compress(input[b], input_length[b], comp, &compressed[b], true);
+      }
       ctimer.Stop();
 
       // Compress once more, with resizing, so we don't leave junk
       // at the end that will confuse the decompressor.
-      for (int b = 0; b < num_blocks; b++) {
+      for (int b = 0; b < num_blocks; ++b) {
         Compress(input[b], input_length[b], comp, &compressed[b], false);
       }
 
-      for (int b = 0; b < num_blocks; b++) {
+      for (int b = 0; b < num_blocks; ++b) {
         output[b].resize(input_length[b]);
       }
 
       utimer.Start();
-      for (int i = 0; i < repeats; i++)
-        for (int b = 0; b < num_blocks; b++)
+      for (int i = 0; i < repeats; ++i) {
+        for (int b = 0; b < num_blocks; ++b)
           Uncompress(compressed[b], comp, input_length[b], &output[b]);
+      }
       utimer.Stop();
 
       ctime[run] = ctimer.Get();
@@ -333,8 +337,8 @@ static void Measure(const char* data,
     }
 
     compressed_size = 0;
-    for (size_t i = 0; i < compressed.size(); i++) {
-      compressed_size += compressed[i].size();
+    for (const std::string& compressed_item : compressed) {
+      compressed_size += compressed_item.size();
     }
   }
 
@@ -481,7 +485,7 @@ static void VerifyNonBlockedCompression(const std::string& input) {
     struct iovec vec[kNumBlocks];
     const int block_size = 1 + input.size() / kNumBlocks;
     std::string iovec_data(block_size * kNumBlocks, 'x');
-    for (int i = 0; i < kNumBlocks; i++) {
+    for (int i = 0; i < kNumBlocks; ++i) {
       vec[i].iov_base = string_as_array(&iovec_data) + i * block_size;
       vec[i].iov_len = block_size;
     }
@@ -549,8 +553,8 @@ TEST(CorruptedTest, VerifyCorrupted) {
   // This is testing for a security bug - a buffer that decompresses to 100k
   // but we lie in the snappy header and only reserve 0 bytes of memory :)
   source.resize(100000);
-  for (size_t i = 0; i < source.length(); ++i) {
-    source[i] = 'A';
+  for (char& source_char : source) {
+    source_char = 'A';
   }
   snappy::Compress(source.data(), source.size(), &dest);
   dest[0] = dest[1] = dest[2] = dest[3] = 0;
@@ -690,7 +694,7 @@ TEST(Snappy, RandomData) {
   std::bernoulli_distribution one_in_ten(1.0 / 10);
 
   constexpr int num_ops = 20000;
-  for (int i = 0; i < num_ops; i++) {
+  for (int i = 0; i < num_ops; ++i) {
     if ((i % 1000) == 0) {
       VLOG(0) << "Random op " << i << " of " << num_ops;
     }
@@ -745,7 +749,7 @@ TEST(Snappy, FourByteOffset) {
 
   AppendLiteral(&compressed, fragment1);
   std::string src = fragment1;
-  for (int i = 0; i < n2; i++) {
+  for (int i = 0; i < n2; ++i) {
     AppendLiteral(&compressed, fragment2);
     src += fragment2;
   }
@@ -1064,7 +1068,7 @@ TEST(Snappy, FindMatchLengthRandom) {
   std::bernoulli_distribution one_in_two(1.0 / 2);
   std::bernoulli_distribution one_in_typical_length(1.0 / kTypicalLength);
 
-  for (int i = 0; i < kNumTrials; i++) {
+  for (int i = 0; i < kNumTrials; ++i) {
     std::string s, t;
     char a = static_cast<char>(uniform_byte(rng));
     char b = static_cast<char>(uniform_byte(rng));
@@ -1079,7 +1083,7 @@ TEST(Snappy, FindMatchLengthRandom) {
       EXPECT_EQ(s, t);
     } else {
       EXPECT_NE(s[matched], t[matched]);
-      for (int j = 0; j < matched; j++) {
+      for (int j = 0; j < matched; ++j) {
         EXPECT_EQ(s[j], t[j]);
       }
     }
@@ -1109,22 +1113,22 @@ TEST(Snappy, VerifyCharTable) {
 
   // Place invalid entries in all places to detect missing initialization
   int assigned = 0;
-  for (int i = 0; i < 256; i++) {
+  for (int i = 0; i < 256; ++i) {
     dst[i] = 0xffff;
   }
 
   // Small LITERAL entries.  We store (len-1) in the top 6 bits.
-  for (unsigned int len = 1; len <= 60; len++) {
-    dst[LITERAL | ((len-1) << 2)] = MakeEntry(0, len, 0);
+  for (uint8_t len = 1; len <= 60; ++len) {
+    dst[LITERAL | ((len - 1) << 2)] = MakeEntry(0, len, 0);
     assigned++;
   }
 
   // Large LITERAL entries.  We use 60..63 in the high 6 bits to
   // encode the number of bytes of length info that follow the opcode.
-  for (unsigned int extra_bytes = 1; extra_bytes <= 4; extra_bytes++) {
+  for (uint8_t extra_bytes = 1; extra_bytes <= 4; ++extra_bytes) {
     // We set the length field in the lookup table to 1 because extra
     // bytes encode len-1.
-    dst[LITERAL | ((extra_bytes+59) << 2)] = MakeEntry(extra_bytes, 1, 0);
+    dst[LITERAL | ((extra_bytes + 59) << 2)] = MakeEntry(extra_bytes, 1, 0);
     assigned++;
   }
 
@@ -1135,46 +1139,47 @@ TEST(Snappy, VerifyCharTable) {
   //
   // This format is used for length in range [4..11] and offset in
   // range [0..2047]
-  for (unsigned int len = 4; len < 12; len++) {
-    for (unsigned int offset = 0; offset < 2048; offset += 256) {
-      dst[COPY_1_BYTE_OFFSET | ((len-4)<<2) | ((offset>>8)<<5)] =
-        MakeEntry(1, len, offset>>8);
+  for (uint8_t len = 4; len < 12; ++len) {
+    for (uint16_t offset = 0; offset < 2048; offset += 256) {
+      uint8_t offset_high = static_cast<uint8_t>(offset >> 8);
+      dst[COPY_1_BYTE_OFFSET | ((len - 4) << 2) | (offset_high << 5)] =
+          MakeEntry(1, len, offset_high);
       assigned++;
     }
   }
 
   // COPY_2_BYTE_OFFSET.
   // Tag contains len-1 in top 6 bits, and offset in next two bytes.
-  for (unsigned int len = 1; len <= 64; len++) {
-    dst[COPY_2_BYTE_OFFSET | ((len-1)<<2)] = MakeEntry(2, len, 0);
+  for (uint8_t len = 1; len <= 64; ++len) {
+    dst[COPY_2_BYTE_OFFSET | ((len - 1) << 2)] = MakeEntry(2, len, 0);
     assigned++;
   }
 
   // COPY_4_BYTE_OFFSET.
   // Tag contents len-1 in top 6 bits, and offset in next four bytes.
-  for (unsigned int len = 1; len <= 64; len++) {
-    dst[COPY_4_BYTE_OFFSET | ((len-1)<<2)] = MakeEntry(4, len, 0);
+  for (uint8_t len = 1; len <= 64; ++len) {
+    dst[COPY_4_BYTE_OFFSET | ((len - 1) << 2)] = MakeEntry(4, len, 0);
     assigned++;
   }
 
   // Check that each entry was initialized exactly once.
   EXPECT_EQ(256, assigned) << "Assigned only " << assigned << " of 256";
-  for (int i = 0; i < 256; i++) {
+  for (int i = 0; i < 256; ++i) {
     EXPECT_NE(0xffff, dst[i]) << "Did not assign byte " << i;
   }
 
   if (FLAGS_snappy_dump_decompression_table) {
     std::printf("static const uint16_t char_table[256] = {\n  ");
-    for (int i = 0; i < 256; i++) {
+    for (int i = 0; i < 256; ++i) {
       std::printf("0x%04x%s",
                   dst[i],
-                  ((i == 255) ? "\n" : (((i%8) == 7) ? ",\n  " : ", ")));
+                  ((i == 255) ? "\n" : (((i % 8) == 7) ? ",\n  " : ", ")));
     }
     std::printf("};\n");
   }
 
   // Check that computed table matched recorded table.
-  for (int i = 0; i < 256; i++) {
+  for (int i = 0; i < 256; ++i) {
     EXPECT_EQ(dst[i], char_table[i]) << "Mismatch in byte " << i;
   }
 }
@@ -1215,7 +1220,7 @@ static void MeasureFile(const char* fname) {
   if (FLAGS_end_len >= 0) {
     end_len = std::min<int>(fullinput.size(), FLAGS_end_len);
   }
-  for (int len = start_len; len <= end_len; len++) {
+  for (int len = start_len; len <= end_len; ++len) {
     const char* const input = fullinput.data();
     int repeats = (FLAGS_bytes + len) / (len + 1);
     if (FLAGS_zlib)     Measure(input, len, ZLIB, repeats, 1024<<10);
@@ -1439,8 +1444,8 @@ static void BM_ZFlatAll(int iters, int arg) {
   }
   StopBenchmarkTiming();
 
-  for (int i = 0; i < num_files; ++i) {
-    delete[] dst[i];
+  for (char* dst_item : dst) {
+    delete[] dst_item;
   }
   SetBenchmarkLabel(StrFormat("%d files", num_files));
 }
@@ -1477,8 +1482,8 @@ static void BM_ZFlatIncreasingTableSize(int iters, int arg) {
   }
   StopBenchmarkTiming();
 
-  for (int i = 0; i < dst.size(); ++i) {
-    delete[] dst[i];
+  for (char* dst_item : dst) {
+    delete[] dst_item;
   }
   SetBenchmarkLabel(StrFormat("%zd tables", contents.size()));
 }
@@ -1491,7 +1496,7 @@ int main(int argc, char** argv) {
   RunSpecifiedBenchmarks();
 
   if (argc >= 2) {
-    for (int arg = 1; arg < argc; arg++) {
+    for (int arg = 1; arg < argc; ++arg) {
       if (FLAGS_write_compressed) {
         snappy::CompressFile(argv[arg]);
       } else if (FLAGS_write_uncompressed) {
