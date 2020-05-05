@@ -264,9 +264,7 @@ class Bits {
   // that it's 0-indexed.
   static int FindLSBSetNonZero(uint32_t n);
 
-#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
   static int FindLSBSetNonZero64(uint64_t n);
-#endif  // defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 
  private:
   // No copying
@@ -274,7 +272,7 @@ class Bits {
   void operator=(const Bits&);
 };
 
-#ifdef HAVE_BUILTIN_CTZ
+#if defined(HAVE_BUILTIN_CTZ)
 
 inline int Bits::Log2FloorNonZero(uint32_t n) {
   assert(n != 0);
@@ -296,23 +294,18 @@ inline int Bits::FindLSBSetNonZero(uint32_t n) {
   return __builtin_ctz(n);
 }
 
-#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
-inline int Bits::FindLSBSetNonZero64(uint64_t n) {
-  assert(n != 0);
-  return __builtin_ctzll(n);
-}
-#endif  // defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
-
 #elif defined(_MSC_VER)
 
 inline int Bits::Log2FloorNonZero(uint32_t n) {
   assert(n != 0);
+  // NOLINTNEXTLINE(runtime/int): The MSVC intrinsic demands unsigned long.
   unsigned long where;
   _BitScanReverse(&where, n);
   return static_cast<int>(where);
 }
 
 inline int Bits::Log2Floor(uint32_t n) {
+  // NOLINTNEXTLINE(runtime/int): The MSVC intrinsic demands unsigned long.
   unsigned long where;
   if (_BitScanReverse(&where, n))
     return static_cast<int>(where);
@@ -321,21 +314,12 @@ inline int Bits::Log2Floor(uint32_t n) {
 
 inline int Bits::FindLSBSetNonZero(uint32_t n) {
   assert(n != 0);
+  // NOLINTNEXTLINE(runtime/int): The MSVC intrinsic demands unsigned long.
   unsigned long where;
   if (_BitScanForward(&where, n))
     return static_cast<int>(where);
   return 32;
 }
-
-#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
-inline int Bits::FindLSBSetNonZero64(uint64_t n) {
-  assert(n != 0);
-  unsigned long where;
-  if (_BitScanForward64(&where, n))
-    return static_cast<int>(where);
-  return 64;
-}
-#endif  // defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 
 #else  // Portable versions.
 
@@ -375,22 +359,43 @@ inline int Bits::FindLSBSetNonZero(uint32_t n) {
   return rc;
 }
 
-#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
+#endif  // End portable versions.
+
+#if defined(HAVE_BUILTIN_CTZ)
+
+inline int Bits::FindLSBSetNonZero64(uint64_t n) {
+  assert(n != 0);
+  return __builtin_ctzll(n);
+}
+
+#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_ARM64))
+// _BitScanForward64() is only available on x64 and ARM64.
+
+inline int Bits::FindLSBSetNonZero64(uint64_t n) {
+  assert(n != 0);
+  // NOLINTNEXTLINE(runtime/int): The MSVC intrinsic demands unsigned long.
+  unsigned long where;
+  if (_BitScanForward64(&where, n))
+    return static_cast<int>(where);
+  return 64;
+}
+
+#else  // Portable version.
+
 // FindLSBSetNonZero64() is defined in terms of FindLSBSetNonZero().
 inline int Bits::FindLSBSetNonZero64(uint64_t n) {
   assert(n != 0);
 
   const uint32_t bottombits = static_cast<uint32_t>(n);
   if (bottombits == 0) {
-    // Bottom bits are zero, so scan in top bits
+    // Bottom bits are zero, so scan the top bits.
     return 32 + FindLSBSetNonZero(static_cast<uint32_t>(n >> 32));
   } else {
     return FindLSBSetNonZero(bottombits);
   }
 }
-#endif  // defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 
-#endif  // End portable versions.
+#endif  // End portable version.
 
 // Variable-length integer encoding.
 class Varint {
