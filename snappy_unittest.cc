@@ -415,7 +415,7 @@ static void VerifyIOVec(const std::string& input) {
     num = input.size();
   }
   struct iovec* iov = new iovec[num];
-  int used_so_far = 0;
+  size_t used_so_far = 0;
   std::bernoulli_distribution one_in_five(1.0 / 5);
   for (size_t i = 0; i < num; ++i) {
     assert(used_so_far < input.size());
@@ -742,7 +742,7 @@ TEST(Snappy, FourByteOffset) {
   // How many times each fragment is emitted.
   const int n1 = 2;
   const int n2 = 100000 / fragment2.size();
-  const int length = n1 * fragment1.size() + n2 * fragment2.size();
+  const size_t length = n1 * fragment1.size() + n2 * fragment2.size();
 
   std::string compressed;
   Varint::Append32(&compressed, length);
@@ -1078,12 +1078,12 @@ TEST(Snappy, FindMatchLengthRandom) {
     }
     DataEndingAtUnreadablePage u(s);
     DataEndingAtUnreadablePage v(t);
-    int matched = TestFindMatchLength(u.data(), v.data(), t.size());
+    size_t matched = TestFindMatchLength(u.data(), v.data(), t.size());
     if (matched == t.size()) {
       EXPECT_EQ(s, t);
     } else {
       EXPECT_NE(s[matched], t[matched]);
-      for (int j = 0; j < matched; ++j) {
+      for (size_t j = 0; j < matched; ++j) {
         EXPECT_EQ(s[j], t[j]);
       }
     }
@@ -1323,7 +1323,7 @@ static void BM_UIOVec(int iters, int arg) {
   const int kNumEntries = 10;
   struct iovec iov[kNumEntries];
   char *dst = new char[contents.size()];
-  int used_so_far = 0;
+  size_t used_so_far = 0;
   for (int i = 0; i < kNumEntries; ++i) {
     iov[i].iov_base = dst + used_so_far;
     if (used_so_far == contents.size()) {
@@ -1475,7 +1475,7 @@ static void BM_ZFlatIncreasingTableSize(int iters, int arg) {
   SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) * total_contents_size);
   StartBenchmarkTiming();
   while (iters-- > 0) {
-    for (int i = 0; i < contents.size(); ++i) {
+    for (size_t i = 0; i < contents.size(); ++i) {
       snappy::RawCompress(contents[i].data(), contents[i].size(), dst[i],
                           &zsize);
     }

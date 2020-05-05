@@ -95,7 +95,7 @@
 #ifdef ARRAYSIZE
 #undef ARRAYSIZE
 #endif
-#define ARRAYSIZE(a) (sizeof(a) / sizeof(*(a)))
+#define ARRAYSIZE(a) int{sizeof(a) / sizeof(*(a))}
 
 // Static prediction hints.
 #ifdef HAVE_BUILTIN_EXPECT
@@ -439,28 +439,28 @@ inline const char* Varint::Parse32WithLimit(const char* p,
 
 inline char* Varint::Encode32(char* sptr, uint32_t v) {
   // Operate on characters as unsigneds
-  unsigned char* ptr = reinterpret_cast<unsigned char*>(sptr);
-  static const int B = 128;
-  if (v < (1<<7)) {
-    *(ptr++) = v;
-  } else if (v < (1<<14)) {
-    *(ptr++) = v | B;
-    *(ptr++) = v>>7;
-  } else if (v < (1<<21)) {
-    *(ptr++) = v | B;
-    *(ptr++) = (v>>7) | B;
-    *(ptr++) = v>>14;
-  } else if (v < (1<<28)) {
-    *(ptr++) = v | B;
-    *(ptr++) = (v>>7) | B;
-    *(ptr++) = (v>>14) | B;
-    *(ptr++) = v>>21;
+  uint8_t* ptr = reinterpret_cast<uint8_t*>(sptr);
+  static const uint8_t B = 128;
+  if (v < (1 << 7)) {
+    *(ptr++) = static_cast<uint8_t>(v);
+  } else if (v < (1 << 14)) {
+    *(ptr++) = static_cast<uint8_t>(v | B);
+    *(ptr++) = static_cast<uint8_t>(v >> 7);
+  } else if (v < (1 << 21)) {
+    *(ptr++) = static_cast<uint8_t>(v | B);
+    *(ptr++) = static_cast<uint8_t>((v >> 7) | B);
+    *(ptr++) = static_cast<uint8_t>(v >> 14);
+  } else if (v < (1 << 28)) {
+    *(ptr++) = static_cast<uint8_t>(v | B);
+    *(ptr++) = static_cast<uint8_t>((v >> 7) | B);
+    *(ptr++) = static_cast<uint8_t>((v >> 14) | B);
+    *(ptr++) = static_cast<uint8_t>(v >> 21);
   } else {
-    *(ptr++) = v | B;
-    *(ptr++) = (v>>7) | B;
-    *(ptr++) = (v>>14) | B;
-    *(ptr++) = (v>>21) | B;
-    *(ptr++) = v>>28;
+    *(ptr++) = static_cast<uint8_t>(v | B);
+    *(ptr++) = static_cast<uint8_t>((v>>7) | B);
+    *(ptr++) = static_cast<uint8_t>((v>>14) | B);
+    *(ptr++) = static_cast<uint8_t>((v>>21) | B);
+    *(ptr++) = static_cast<uint8_t>(v >> 28);
   }
   return reinterpret_cast<char*>(ptr);
 }
