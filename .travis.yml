@@ -29,9 +29,19 @@ jobs:
   - env: BUILD_TYPE=Debug CMAKE_BUILD=-DSNAPPY_REQUIRE_AVX2=ON
     os: linux
     arch: amd64
+    compiler: gcc
   - env: BUILD_TYPE=RelWithDebInfo CMAKE_BUILD=-DSNAPPY_REQUIRE_AVX2=ON
     os: linux
     arch: amd64
+    compiler: gcc
+  - env: BUILD_TYPE=Debug CMAKE_BUILD=-DSNAPPY_REQUIRE_AVX2=ON
+    os: linux
+    arch: amd64
+    compiler: clang
+  - env: BUILD_TYPE=RelWithDebInfo CMAKE_BUILD=-DSNAPPY_REQUIRE_AVX2=ON
+    os: linux
+    arch: amd64
+    compiler: clang
   allow_failures:
   # Homebrew's GCC is currently broken on XCode 11.
   - compiler: gcc
