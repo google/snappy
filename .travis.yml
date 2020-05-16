@@ -16,34 +16,37 @@ arch:
 - amd64
 - arm64
 - ppc64le
+- s390x
 
 env:
-- BUILD_TYPE=Debug CPU_LEVEL=AVX
-- BUILD_TYPE=Debug CPU_LEVEL=AVX2
-- BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX
-- BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
+- BUILD_TYPE=Debug
+- BUILD_TYPE=RelWithDebInfo
 
 jobs:
-  exclude:
+  include:
   # Travis OSX servers seem to run on pre-Haswell CPUs. Attempting to use AVX2
-  # results in crashes.
-  - env: BUILD_TYPE=Debug CPU_LEVEL=AVX2
-    os: osx
-  - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
-    os: osx
+  # results in crashes. So add extra Linux only tests for AVX2
+  - env: BUILD_TYPE=Debug CMAKE_BUILD=-DSNAPPY_REQUIRE_AVX2=ON
+    os: linux
+    arch: amd64
+  - env: BUILD_TYPE=RelWithDebInfo CMAKE_BUILD=-DSNAPPY_REQUIRE_AVX2=ON
+    os: linux
+    arch: amd64
   allow_failures:
   # Homebrew's GCC is currently broken on XCode 11.
   - compiler: gcc
     os: osx
+  # still some random flakness
+  # https://travis-ci.community/t/s90x-adding-apt-sources-no-usable-temporary-directory-found/8635
+  - arch: s390x
 
 addons:
   apt:
     sources:
+    - ubuntu-toolchain-r-test
     - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
       key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
-    - sourceline: 'ppa:ubuntu-toolchain-r/test'
     packages:
-    - clang-10
     - cmake
     - gcc-9
     - g++-9
@@ -56,17 +59,24 @@ addons:
     - ninja
     update: true
 
+before_install:
+- if [ "$TRAVIS_OS_NAME" = "linux" ] && [ "$CXX" = "clang++" ]; then
+    if [ "$TRAVIS_CPU_ARCH" = "amd64" ]; then
+      sudo apt-get -y install clang-10;
+    else
+      sudo apt-get -y install clang-9;
+    fi;
+  fi
+
 install:
 # The following Homebrew packages aren't linked by default, and need to be
 # prepended to the path explicitly.
 - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
     export PATH="$(brew --prefix llvm)/bin:$PATH";
   fi
-# Fuzzing is only supported on Clang. Perform fuzzing on Debug builds.
-- if [ "$CXX" = "clang++" ] && [ "$BUILD_TYPE" = "Debug" ]; then
-    export FUZZING=1;
-  else
-    export FUZZING=0;
+# default x86 accelerations if not set.
+- if [ "$TRAVIS_CPU_ARCH" = "amd64" ] && [ -z "${CMAKE_BUILD}" ]; then
+    export CMAKE_BUILD=-DSNAPPY_REQUIRE_AVX=ON;
   fi
 # /usr/bin/gcc points to an older compiler on both Linux and macOS.
 - if [ "$CXX" = "g++" ]; then export CXX="g++-9" CC="gcc-9"; fi
@@ -75,8 +85,18 @@ install:
 # Homebrew's llvm package doesn't ship a versioned clang++ binary, so the values
 # below don't work on macOS. Fortunately, the path change above makes the
 # default values (clang and clang++) resolve to the correct compiler on macOS.
-- if [ "$TRAVIS_OS_NAME" = "linux" ]; then
-    if [ "$CXX" = "clang++" ]; then export CXX="clang++-10" CC="clang-10"; fi;
+# Fuzzing is only supported on x86_64 Clang. Ubuntu eon+ needed for non-x86_64 fuzzing
+- if [ "$CXX" = "clang++" ]; then
+    if [ "$BUILD_TYPE" = "Debug" ] && [ "$TRAVIS_CPU_ARCH" = "amd64" ]; then
+      export CMAKE_BUILD="${CMAKE_BUILD} -DSNAPPY_FUZZING_BUILD=1";
+    fi;
+    if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+      if [ "$TRAVIS_CPU_ARCH" = "amd64" ]; then
+        export CXX="clang++-10" CC="clang-10";
+      else
+        export CXX="clang++-9" CC="clang-9";
+      fi;
+    fi;
   fi
 - echo ${CC}
 - echo ${CXX}
@@ -86,7 +106,7 @@ install:
 before_script:
 - mkdir -p build && cd build
 - cmake .. -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-    -DSNAPPY_REQUIRE_${CPU_LEVEL}=ON -DSNAPPY_FUZZING_BUILD=${FUZZING}
+    ${CMAKE_BUILD}
     -DCMAKE_INSTALL_PREFIX=$HOME/.local
 - cmake --build .
 - cd ..
