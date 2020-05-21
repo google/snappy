@@ -1538,7 +1538,8 @@ class SnappyScatteredWriter {
         full_size_(0),
         op_base_(NULL),
         op_ptr_(NULL),
-        op_limit_(NULL) {
+        op_limit_(NULL),
+        op_limit_min_slop_(NULL) {
   }
   char* GetOutputPtr() { return op_ptr_; }
   void SetOutputPtr(char* op) { op_ptr_ = op; }
