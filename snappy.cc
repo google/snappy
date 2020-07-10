@@ -177,6 +177,9 @@ alignas(16) const char pshufb_fill_patterns[7][16] = {
   {0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1},
 };
 
+// j * (16 / j) for all j from 0 to 7. 0 is not actually used.
+const uint8_t pattern_size_table[8] = {0, 16, 16, 15, 16, 15, 12, 14};
+
 #endif  // SNAPPY_HAVE_SSSE3
 
 // Copy [src, src+(op_limit-op)) to [op, (op_limit-op)) but faster than
@@ -248,7 +251,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       // Uninitialized bytes are masked out by the shuffle mask.
       // TODO: remove annotation and macro defs once MSan is fixed.
       SNAPPY_ANNOTATE_MEMORY_IS_INITIALIZED(&pattern, sizeof(pattern));
-      pattern_size *= 16 / pattern_size;
+      pattern_size = pattern_size_table[pattern_size];
       char* op_end = std::min(op_limit, buf_limit - 15);
       while (op < op_end) {
         _mm_storeu_si128(reinterpret_cast<__m128i*>(op), pattern);
