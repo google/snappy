@@ -97,12 +97,27 @@ char* CompressFragment(const char* input,
 // Separate implementation for 64-bit, little-endian cpus.
 #if !defined(SNAPPY_IS_BIG_ENDIAN) && \
     (defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM))
+
+#if ARCH_ARM
+static inline void Prefetch(const void* data) {
+        __asm__ __volatile__(
+        "prfm PLDL1STRM, [%[data]]       \n\t"
+        :: [data] "r" (data)
+        );
+}
+#endif //ARCH_ARM
+
 static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
                                                       const char* s2,
                                                       const char* s2_limit,
                                                       uint64_t* data) {
   assert(s2_limit >= s2);
   size_t matched = 0;
+
+  #if ARCH_ARM
+    Prefetch(s1 + 256);
+    Prefetch(s2 + 256);
+  #endif //ARCH_ARM
 
   // This block isn't necessary for correctness; we could just start looping
   // immediately.  As an optimization though, it is useful.  It creates some not
