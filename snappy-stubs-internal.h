@@ -70,9 +70,7 @@
 #include "snappy-stubs-public.h"
 
 // Used to enable 64-bit optimized versions of some routines.
-#if defined(__x86_64__) || defined(_M_X64)
-#define ARCH_K8 1
-#elif defined(__PPC64__) || defined(__powerpc64__)
+#if defined(__PPC64__) || defined(__powerpc64__)
 #define ARCH_PPC 1
 #elif defined(__aarch64__) || defined(_M_ARM64)
 #define ARCH_ARM 1
