@@ -26,9 +26,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "snappy.h"
 #include "snappy-internal.h"
 #include "snappy-sinksource.h"
+#include "snappy.h"
 
 #if !defined(SNAPPY_HAVE_SSSE3)
 // __SSSE3__ is defined by GCC and Clang. Visual Studio doesn't target SIMD
@@ -168,13 +168,13 @@ inline char* IncrementalCopySlow(const char* src, char* op,
 // operand for PSHUFB to permute the contents of the destination XMM register
 // into a repeating byte pattern.
 alignas(16) const char pshufb_fill_patterns[7][16] = {
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-  {0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1},
-  {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0},
-  {0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3},
-  {0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0},
-  {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3},
-  {0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1},
+    {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0},
+    {0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3},
+    {0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0},
+    {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3},
+    {0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1},
 };
 
 // j * (16 / j) for all j from 0 to 7. 0 is not actually used.
@@ -244,8 +244,8 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     // in-place, we avoid the penalty.
     if (SNAPPY_PREDICT_TRUE(op <= buf_limit - 16)) {
       const __m128i shuffle_mask = _mm_load_si128(
-          reinterpret_cast<const __m128i*>(pshufb_fill_patterns)
-          + pattern_size - 1);
+          reinterpret_cast<const __m128i*>(pshufb_fill_patterns) +
+          pattern_size - 1);
       const __m128i pattern = _mm_shuffle_epi8(
           _mm_loadl_epi64(reinterpret_cast<const __m128i*>(src)), shuffle_mask);
       // Uninitialized bytes are masked out by the shuffle mask.
@@ -320,12 +320,11 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
 #ifdef __clang__
 #pragma clang loop unroll(disable)
 #endif
-  for (char *op_end = buf_limit - 16; op < op_end; op += 16, src += 16) {
+  for (char* op_end = buf_limit - 16; op < op_end; op += 16, src += 16) {
     UnalignedCopy64(src, op);
     UnalignedCopy64(src + 8, op + 8);
   }
-  if (op >= op_limit)
-    return op_limit;
+  if (op >= op_limit) return op_limit;
 
   // We only take this branch if we didn't have enough slop and we can do a
   // single 8 byte copy.
@@ -340,9 +339,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
 }  // namespace
 
 template <bool allow_fast_path>
-static inline char* EmitLiteral(char* op,
-                                const char* literal,
-                                int len) {
+static inline char* EmitLiteral(char* op, const char* literal, int len) {
   // The vast majority of copies are below 16 bytes, for which a
   // call to std::memcpy() is overkill. This fast path can sometimes
   // copy up to 15 bytes too much, but that is okay in the
@@ -353,7 +350,7 @@ static inline char* EmitLiteral(char* op,
   //     if not, allow_fast_path = false.
   //   - The output will always have 32 spare bytes (see
   //     MaxCompressedLength).
-  assert(len > 0);      // Zero-length literals are disallowed
+  assert(len > 0);  // Zero-length literals are disallowed
   int n = len - 1;
   if (allow_fast_path && len <= 16) {
     // Fits in tag byte
@@ -487,7 +484,7 @@ WorkingMemory::~WorkingMemory() {
 }
 
 uint16_t* WorkingMemory::GetHashTable(size_t fragment_size,
-                                    int* table_size) const {
+                                      int* table_size) const {
   const size_t htsize = CalculateTableSize(fragment_size);
   memset(table_, 0, htsize * sizeof(*table_));
   *table_size = htsize;
@@ -507,11 +504,8 @@ uint16_t* WorkingMemory::GetHashTable(size_t fragment_size,
 // Returns an "end" pointer into "op" buffer.
 // "end - op" is the compressed size of "input".
 namespace internal {
-char* CompressFragment(const char* input,
-                       size_t input_size,
-                       char* op,
-                       uint16_t* table,
-                       const int table_size) {
+char* CompressFragment(const char* input, size_t input_size, char* op,
+                       uint16_t* table, const int table_size) {
   // "ip" is the input pointer, and "op" is the output pointer.
   const char* ip = input;
   assert(input_size <= kBlockSize);
@@ -671,7 +665,7 @@ char* CompressFragment(const char* input,
     }
   }
 
- emit_remainder:
+emit_remainder:
   // Emit the remaining bytes as a literal
   if (ip < ip_end) {
     op = EmitLiteral</*allow_fast_path=*/false>(op, ip, ip_end - ip);
@@ -772,15 +766,15 @@ static inline bool LeftShiftOverflows(uint8_t value, uint32_t shift) {
 // Helper class for decompression
 class SnappyDecompressor {
  private:
-  Source*       reader_;         // Underlying source of bytes to decompress
-  const char*   ip_;             // Points to next buffered byte
-  const char*   ip_limit_;       // Points just past buffered bytes
+  Source* reader_;        // Underlying source of bytes to decompress
+  const char* ip_;        // Points to next buffered byte
+  const char* ip_limit_;  // Points just past buffered bytes
   // If ip < ip_limit_min_maxtaglen_ it's safe to read kMaxTagLength from
   // buffer.
   const char* ip_limit_min_maxtaglen_;
-  uint32_t      peeked_;         // Bytes peeked from reader (need to skip)
-  bool          eof_;            // Hit end of input without an error?
-  char          scratch_[kMaximumTagLength];  // See RefillTag().
+  uint32_t peeked_;                  // Bytes peeked from reader (need to skip)
+  bool eof_;                         // Hit end of input without an error?
+  char scratch_[kMaximumTagLength];  // See RefillTag().
 
   // Ensure that all of the tag metadata for the next tag is available
   // in [ip_..ip_limit_-1].  Also ensures that [ip,ip+4] is readable even
@@ -796,12 +790,7 @@ class SnappyDecompressor {
 
  public:
   explicit SnappyDecompressor(Source* reader)
-      : reader_(reader),
-        ip_(NULL),
-        ip_limit_(NULL),
-        peeked_(0),
-        eof_(false) {
-  }
+      : reader_(reader), ip_(NULL), ip_limit_(NULL), peeked_(0), eof_(false) {}
 
   ~SnappyDecompressor() {
     // Advance past any bytes we peeked at from the reader
@@ -809,15 +798,13 @@ class SnappyDecompressor {
   }
 
   // Returns true iff we have hit the end of the input without an error.
-  bool eof() const {
-    return eof_;
-  }
+  bool eof() const { return eof_; }
 
   // Read the uncompressed length stored at the start of the compressed data.
   // On success, stores the length in *result and returns true.
   // On failure, returns false.
   bool ReadUncompressedLength(uint32_t* result) {
-    assert(ip_ == NULL);       // Must not have read anything yet
+    assert(ip_ == NULL);  // Must not have read anything yet
     // Length is encoded in 1..5 bytes
     *result = 0;
     uint32_t shift = 0;
@@ -845,7 +832,8 @@ class SnappyDecompressor {
 #if defined(__GNUC__) && defined(__x86_64__)
   __attribute__((aligned(32)))
 #endif
-  void DecompressAllTags(Writer* writer) {
+  void
+  DecompressAllTags(Writer* writer) {
     const char* ip = ip_;
     ResetLimit(ip);
     auto op = writer->GetOutputPtr();
@@ -866,7 +854,7 @@ class SnappyDecompressor {
     // contains the tag.
     uint32_t preload;
     MAYBE_REFILL();
-    for ( ;; ) {
+    for (;;) {
       const uint8_t c = static_cast<uint8_t>(preload);
       ip++;
 
@@ -956,7 +944,7 @@ bool SnappyDecompressor::RefillTag() {
   const char* ip = ip_;
   if (ip == ip_limit_) {
     // Fetch a new fragment from the reader
-    reader_->Skip(peeked_);   // All peeked bytes are used up
+    reader_->Skip(peeked_);  // All peeked bytes are used up
     size_t n;
     ip = reader_->Peek(&n);
     peeked_ = n;
@@ -1022,8 +1010,7 @@ static bool InternalUncompress(Source* r, Writer* writer) {
 
 template <typename Writer>
 static bool InternalUncompressAllTags(SnappyDecompressor* decompressor,
-                                      Writer* writer,
-                                      uint32_t compressed_len,
+                                      Writer* writer, uint32_t compressed_len,
                                       uint32_t uncompressed_len) {
   Report("snappy_uncompress", compressed_len, uncompressed_len);
 
@@ -1046,7 +1033,7 @@ size_t Compress(Source* reader, Sink* writer) {
   const size_t uncompressed_size = N;
   char ulength[Varint::kMax32];
   char* p = Varint::Encode32(ulength, N);
-  writer->Append(ulength, p-ulength);
+  writer->Append(ulength, p - ulength);
   written += (p - ulength);
 
   internal::WorkingMemory wmem(N);
@@ -1159,15 +1146,12 @@ class SnappyIOVecWriter {
                                    : nullptr),
         curr_iov_remaining_(iov_count ? iov->iov_len : 0),
         total_written_(0),
-        output_limit_(-1) {}
-
-  inline void SetExpectedLength(size_t len) {
-    output_limit_ = len;
+        output_limit_(-1) {
   }
 
-  inline bool CheckLength() const {
-    return total_written_ == output_limit_;
-  }
+  inline void SetExpectedLength(size_t len) { output_limit_ = len; }
+
+  inline bool CheckLength() const { return total_written_ == output_limit_; }
 
   inline bool Append(const char* ip, size_t len, char**) {
     if (total_written_ + len > output_limit_) {
@@ -1338,9 +1322,7 @@ class SnappyArrayWriter {
     op_limit_min_slop_ = op_limit_ - std::min<size_t>(kSlopBytes - 1, len);
   }
 
-  inline bool CheckLength() const {
-    return op_ == op_limit_;
-  }
+  inline bool CheckLength() const { return op_ == op_limit_; }
 
   char* GetOutputPtr() { return op_; }
   void SetOutputPtr(char* op) { op_ = op; }
@@ -1429,15 +1411,11 @@ class SnappyDecompressionValidator {
   size_t produced_;
 
  public:
-  inline SnappyDecompressionValidator() : expected_(0), produced_(0) { }
-  inline void SetExpectedLength(size_t len) {
-    expected_ = len;
-  }
+  inline SnappyDecompressionValidator() : expected_(0), produced_(0) {}
+  inline void SetExpectedLength(size_t len) { expected_ = len; }
   size_t GetOutputPtr() { return produced_; }
   void SetOutputPtr(size_t op) { produced_ = op; }
-  inline bool CheckLength() const {
-    return expected_ == produced_;
-  }
+  inline bool CheckLength() const { return expected_ == produced_; }
   inline bool Append(const char* ip, size_t len, size_t* produced) {
     // TODO: Switch to [[maybe_unused]] when we can assume C++17.
     (void)ip;
@@ -1476,9 +1454,7 @@ bool IsValidCompressed(Source* compressed) {
   return InternalUncompress(compressed, &writer);
 }
 
-void RawCompress(const char* input,
-                 size_t input_length,
-                 char* compressed,
+void RawCompress(const char* input, size_t input_length, char* compressed,
                  size_t* compressed_length) {
   ByteArraySource reader(input, input_length);
   UncheckedByteArraySink writer(compressed);
@@ -1521,16 +1497,14 @@ class SnappyScatteredWriter {
   size_t full_size_;
 
   // Pointer into current output block
-  char* op_base_;       // Base of output block
-  char* op_ptr_;        // Pointer to next unfilled byte in block
-  char* op_limit_;      // Pointer just past block
+  char* op_base_;   // Base of output block
+  char* op_ptr_;    // Pointer to next unfilled byte in block
+  char* op_limit_;  // Pointer just past block
   // If op < op_limit_min_slop_ then it's safe to unconditionally write
   // kSlopBytes starting at op.
   char* op_limit_min_slop_;
 
-  inline size_t Size() const {
-    return full_size_ + (op_ptr_ - op_base_);
-  }
+  inline size_t Size() const { return full_size_ + (op_ptr_ - op_base_); }
 
   bool SlowAppend(const char* ip, size_t len);
   bool SlowAppendFromSelf(size_t offset, size_t len);
@@ -1542,8 +1516,7 @@ class SnappyScatteredWriter {
         op_base_(NULL),
         op_ptr_(NULL),
         op_limit_(NULL),
-        op_limit_min_slop_(NULL) {
-  }
+        op_limit_min_slop_(NULL) {}
   char* GetOutputPtr() { return op_ptr_; }
   void SetOutputPtr(char* op) { op_ptr_ = op; }
 
@@ -1552,14 +1525,10 @@ class SnappyScatteredWriter {
     expected_ = len;
   }
 
-  inline bool CheckLength() const {
-    return Size() == expected_;
-  }
+  inline bool CheckLength() const { return Size() == expected_; }
 
   // Return the number of bytes actually uncompressed so far
-  inline size_t Produced() const {
-    return Size();
-  }
+  inline size_t Produced() const { return Size(); }
 
   inline bool Append(const char* ip, size_t len, char** op_p) {
     char* op = *op_p;
@@ -1597,12 +1566,12 @@ class SnappyScatteredWriter {
     assert(op >= op_base_);
     // Check if we try to append from before the start of the buffer.
     if (SNAPPY_PREDICT_FALSE((kSlopBytes < 64 && len > kSlopBytes) ||
-                             static_cast<size_t>(op - op_base_) < offset ||
-                             op >= op_limit_min_slop_ || offset < len)) {
+                            static_cast<size_t>(op - op_base_) < offset ||
+                            op >= op_limit_min_slop_ || offset < len)) {
       if (offset == 0) return false;
       char* const op_end = op + len;
       if (SNAPPY_PREDICT_FALSE(static_cast<size_t>(op - op_base_) < offset ||
-                               op_end > op_limit_)) {
+                              op_end > op_limit_)) {
         op_ptr_ = op;
         bool res = SlowAppendFromSelf(offset, len);
         *op_p = op_ptr_;
@@ -1623,7 +1592,7 @@ class SnappyScatteredWriter {
   inline void Flush() { allocator_.Flush(Produced()); }
 };
 
-template<typename Allocator>
+template <typename Allocator>
 bool SnappyScatteredWriter<Allocator>::SlowAppend(const char* ip, size_t len) {
   size_t avail = op_limit_ - op_ptr_;
   while (len > avail) {
@@ -1654,7 +1623,7 @@ bool SnappyScatteredWriter<Allocator>::SlowAppend(const char* ip, size_t len) {
   return true;
 }
 
-template<typename Allocator>
+template <typename Allocator>
 bool SnappyScatteredWriter<Allocator>::SlowAppendFromSelf(size_t offset,
                                                          size_t len) {
   // Overflow check
@@ -1675,7 +1644,7 @@ bool SnappyScatteredWriter<Allocator>::SlowAppendFromSelf(size_t offset,
   size_t src = cur - offset;
   char* op = op_ptr_;
   while (len-- > 0) {
-    char c = blocks_[src >> kBlockLog][src & (kBlockSize-1)];
+    char c = blocks_[src >> kBlockLog][src & (kBlockSize - 1)];
     if (!Append(&c, 1, &op)) {
       op_ptr_ = op;
       return false;
@@ -1688,7 +1657,7 @@ bool SnappyScatteredWriter<Allocator>::SlowAppendFromSelf(size_t offset,
 
 class SnappySinkAllocator {
  public:
-  explicit SnappySinkAllocator(Sink* dest): dest_(dest) {}
+  explicit SnappySinkAllocator(Sink* dest) : dest_(dest) {}
   ~SnappySinkAllocator() {}
 
   char* Allocate(int size) {
@@ -1751,8 +1720,8 @@ bool Uncompress(Source* compressed, Sink* uncompressed) {
 
   char c;
   size_t allocated_size;
-  char* buf = uncompressed->GetAppendBufferVariable(
-      1, uncompressed_len, &c, 1, &allocated_size);
+  char* buf = uncompressed->GetAppendBufferVariable(1, uncompressed_len, &c, 1,
+                                                    &allocated_size);
 
   const size_t compressed_len = compressed->Available();
   // If we can get a flat buffer, then use it, otherwise do block by block
