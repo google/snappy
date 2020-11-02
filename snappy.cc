@@ -1569,15 +1569,14 @@ class SnappyScatteredWriter {
                             static_cast<size_t>(op - op_base_) < offset ||
                             op >= op_limit_min_slop_ || offset < len)) {
       if (offset == 0) return false;
-      char* const op_end = op + len;
       if (SNAPPY_PREDICT_FALSE(static_cast<size_t>(op - op_base_) < offset ||
-                              op_end > op_limit_)) {
+                              op + len > op_limit_)) {
         op_ptr_ = op;
         bool res = SlowAppendFromSelf(offset, len);
         *op_p = op_ptr_;
         return res;
       }
-      *op_p = IncrementalCopy(op - offset, op, op_end, op_limit_);
+      *op_p = IncrementalCopy(op - offset, op, op + len, op_limit_);
       return true;
     }
     // Fast path
