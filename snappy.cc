@@ -91,10 +91,7 @@ using internal::LITERAL;
 // compression for compressible input, and more speed for incompressible
 // input. Of course, it doesn't hurt if the hash function is reasonably fast
 // either, as it gets called a lot.
-static inline uint32_t HashBytes(uint32_t bytes, int shift) {
-  uint32_t kMul = 0x1e35a7bd;
-  return (bytes * kMul) >> shift;
-}
+#define HashBytes(bytes, shift) ((uint32)((bytes) * (0x1e35a7bd)) >> (shift))
 
 size_t MaxCompressedLength(size_t source_bytes) {
   // Compressed data can be defined as:
