@@ -91,9 +91,9 @@ using internal::LITERAL;
 // compression for compressible input, and more speed for incompressible
 // input. Of course, it doesn't hurt if the hash function is reasonably fast
 // either, as it gets called a lot.
-static inline uint32_t HashBytes(uint32_t bytes, int shift) {
-  uint32_t kMul = 0x1e35a7bd;
-  return (bytes * kMul) >> shift;
+static inline uint32_t HashBytes(uint32_t bytes, uint32_t mask) {
+  constexpr uint32_t kMagic = 0x1e35a7bd;
+  return ((kMagic * bytes) >> (32 - kMaxHashTableBits)) & mask;
 }
 
 size_t MaxCompressedLength(size_t source_bytes) {
@@ -260,7 +260,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       if (SNAPPY_PREDICT_TRUE(op >= op_limit)) return op_limit;
     }
     return IncrementalCopySlow(src, op, op_limit);
-#else  // !SNAPPY_HAVE_SSSE3
+#else   // !SNAPPY_HAVE_SSSE3
     // If plenty of buffer space remains, expand the pattern to at least 8
     // bytes. The way the following loop is written, we need 8 bytes of buffer
     // space if pattern_size >= 4, 11 bytes if pattern_size is 1 or 3, and 10
@@ -510,8 +510,7 @@ char* CompressFragment(const char* input, size_t input_size, char* op,
   const char* ip = input;
   assert(input_size <= kBlockSize);
   assert((table_size & (table_size - 1)) == 0);  // table must be power of two
-  const int shift = 32 - Bits::Log2Floor(table_size);
-  assert(static_cast<int>(kuint32max >> shift) == table_size - 1);
+  const uint32_t mask = table_size - 1;
   const char* ip_end = input + input_size;
   const char* base_ip = ip;
 
@@ -562,7 +561,7 @@ char* CompressFragment(const char* input, size_t input_size, char* op,
             // loaded in preload.
             uint32_t dword = i == 0 ? preload : static_cast<uint32_t>(data);
             assert(dword == LittleEndian::Load32(ip + i));
-            uint32_t hash = HashBytes(dword, shift);
+            uint32_t hash = HashBytes(dword, mask);
             candidate = base_ip + table[hash];
             assert(candidate >= base_ip);
             assert(candidate < ip + i);
@@ -583,7 +582,7 @@ char* CompressFragment(const char* input, size_t input_size, char* op,
       }
       while (true) {
         assert(static_cast<uint32_t>(data) == LittleEndian::Load32(ip));
-        uint32_t hash = HashBytes(data, shift);
+        uint32_t hash = HashBytes(data, mask);
         uint32_t bytes_between_hash_lookups = skip >> 5;
         skip += bytes_between_hash_lookups;
         const char* next_ip = ip + bytes_between_hash_lookups;
@@ -642,10 +641,9 @@ char* CompressFragment(const char* input, size_t input_size, char* op,
                (LittleEndian::Load64(ip) & 0xFFFFFFFFFF));
         // We are now looking for a 4-byte match again.  We read
         // table[Hash(ip, shift)] for that.  To improve compression,
-        // we also update table[Hash(ip - 1, shift)] and table[Hash(ip, shift)].
-        table[HashBytes(LittleEndian::Load32(ip - 1), shift)] =
-            ip - base_ip - 1;
-        uint32_t hash = HashBytes(data, shift);
+        // we also update table[Hash(ip - 1, mask)] and table[Hash(ip, mask)].
+        table[HashBytes(LittleEndian::Load32(ip - 1), mask)] = ip - base_ip - 1;
+        uint32_t hash = HashBytes(data, mask);
         candidate = base_ip + table[hash];
         table[hash] = ip - base_ip;
         // Measurements on the benchmarks have shown the following probabilities
