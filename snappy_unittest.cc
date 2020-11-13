@@ -1284,6 +1284,33 @@ static void BM_UFlat(int iters, int arg) {
 }
 BENCHMARK(BM_UFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
 
+static void BM_UFlatMedley(testing::benchmark::State& state) {
+  constexpr int kFiles = ARRAYSIZE(files);
+  std::string zcontents[kFiles];
+  size_t sizes[kFiles];
+  size_t max_size = 0;
+  for (int i = 0; i < kFiles; i++) {
+    std::string contents =
+        ReadTestDataFile(files[i].filename, files[i].size_limit);
+    max_size = std::max(max_size, contents.size());
+    sizes[i] = contents.size();
+    snappy::Compress(contents.data(), contents.size(), &zcontents[i]);
+  }
+
+  std::vector<char> dst(max_size);
+
+  size_t processed = 0;
+  for (auto s : state) {
+    for (int i = 0; i < kFiles; i++) {
+      CHECK(snappy::RawUncompress(zcontents[i].data(), zcontents[i].size(),
+                                  dst.data()));
+      processed += sizes[i];
+    }
+  }
+  SetBenchmarkBytesProcessed(processed);
+}
+BENCHMARK(BM_UFlatMedley);
+
 static void BM_UValidate(int iters, int arg) {
   StopBenchmarkTiming();
 
