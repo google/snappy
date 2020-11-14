@@ -892,6 +892,8 @@ std::pair<const uint8_t*, char*> DecompressBranchless(
       // always succeed for literals.
       if (SNAPPY_PREDICT_FALSE(offset < len)) {
         assert(tag_type != 0);
+        // offset 0 is an error.
+        if (SNAPPY_PREDICT_FALSE(offset == 0)) break;
         op = IncrementalCopy(op_base + delta, op_base + op, op_base + op + len,
                              op_base + op_limit) -
              op_base;
