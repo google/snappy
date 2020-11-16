@@ -1284,27 +1284,33 @@ static void BM_UFlat(int iters, int arg) {
 }
 BENCHMARK(BM_UFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
 
-static void BM_UFlatMedley(testing::benchmark::State& state) {
-  constexpr int kFiles = ARRAYSIZE(files);
+struct SourceFiles {
+  SourceFiles() {
+    for (int i = 0; i < kFiles; i++) {
+      std::string contents =
+          ReadTestDataFile(files[i].filename, files[i].size_limit);
+      max_size = std::max(max_size, contents.size());
+      sizes[i] = contents.size();
+      snappy::Compress(contents.data(), contents.size(), &zcontents[i]);
+    }
+  }
+  static constexpr int kFiles = ARRAYSIZE(files);
   std::string zcontents[kFiles];
   size_t sizes[kFiles];
   size_t max_size = 0;
-  for (int i = 0; i < kFiles; i++) {
-    std::string contents =
-        ReadTestDataFile(files[i].filename, files[i].size_limit);
-    max_size = std::max(max_size, contents.size());
-    sizes[i] = contents.size();
-    snappy::Compress(contents.data(), contents.size(), &zcontents[i]);
-  }
+};
 
-  std::vector<char> dst(max_size);
+static void BM_UFlatMedley(testing::benchmark::State& state) {
+  static const SourceFiles* const source = new SourceFiles();
+
+  std::vector<char> dst(source->max_size);
 
   size_t processed = 0;
   for (auto s : state) {
-    for (int i = 0; i < kFiles; i++) {
-      CHECK(snappy::RawUncompress(zcontents[i].data(), zcontents[i].size(),
-                                  dst.data()));
-      processed += sizes[i];
+    for (int i = 0; i < SourceFiles::kFiles; i++) {
+      CHECK(snappy::RawUncompress(source->zcontents[i].data(),
+                                  source->zcontents[i].size(), dst.data()));
+      processed += source->sizes[i];
     }
   }
   SetBenchmarkBytesProcessed(processed);
@@ -1332,7 +1338,22 @@ static void BM_UValidate(int iters, int arg) {
   }
   StopBenchmarkTiming();
 }
-BENCHMARK(BM_UValidate)->DenseRange(0, 4);
+BENCHMARK(BM_UValidate)->DenseRange(0, ARRAYSIZE(files) - 1);
+
+static void BM_UValidateMedley(testing::benchmark::State& state) {
+  static const SourceFiles* const source = new SourceFiles();
+
+  size_t processed = 0;
+  for (auto s : state) {
+    for (int i = 0; i < SourceFiles::kFiles; i++) {
+      CHECK(snappy::IsValidCompressedBuffer(source->zcontents[i].data(),
+                                            source->zcontents[i].size()));
+      processed += source->sizes[i];
+    }
+  }
+  SetBenchmarkBytesProcessed(processed);
+}
+BENCHMARK(BM_UValidateMedley);
 
 static void BM_UIOVec(int iters, int arg) {
   StopBenchmarkTiming();
