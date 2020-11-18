@@ -108,6 +108,7 @@ check_include_file("windows.h" HAVE_WINDOWS_H)
 include(CheckLibraryExists)
 check_library_exists(z zlibVersion "" HAVE_LIBZ)
 check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
+check_library_exists(lz4 LZ4_compress_default "" HAVE_LIBLZ4)
 
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("/arch:AVX" HAVE_VISUAL_STUDIO_ARCH_AVX)
@@ -268,6 +269,9 @@ if(SNAPPY_BUILD_TESTS)
   if(HAVE_LIBLZO2)
     target_link_libraries(snappy_unittest lzo2)
   endif(HAVE_LIBLZO2)
+  if(HAVE_LIBLZ4)
+    target_link_libraries(snappy_unittest lz4)
+  endif(HAVE_LIBLZ4)
 
   target_include_directories(snappy_unittest
     BEFORE PRIVATE

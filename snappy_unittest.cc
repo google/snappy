@@ -51,6 +51,7 @@ DEFINE_bool(zlib, false,
             "Run zlib compression (http://www.zlib.net)");
 DEFINE_bool(lzo, false,
             "Run LZO compression (http://www.oberhumer.com/opensource/lzo/)");
+DEFINE_bool(lz4, false, "Run LZ4 compression (https://github.com/lz4/lz4)");
 DEFINE_bool(snappy, true, "Run snappy compression");
 
 DEFINE_bool(write_compressed, false,
@@ -116,13 +117,9 @@ using DataEndingAtUnreadablePage = std::string;
 
 #endif
 
-enum CompressorType {
-  ZLIB, LZO, SNAPPY
-};
+enum CompressorType { ZLIB, LZO, LZ4, SNAPPY };
 
-const char* names[] = {
-  "ZLIB", "LZO", "SNAPPY"
-};
+const char* names[] = {"ZLIB", "LZO", "LZ4", "SNAPPY"};
 
 static size_t MinimumRequiredOutputSpace(size_t input_size,
                                          CompressorType comp) {
@@ -136,6 +133,11 @@ static size_t MinimumRequiredOutputSpace(size_t input_size,
     case LZO:
       return input_size + input_size/64 + 16 + 3;
 #endif  // LZO_VERSION
+
+#ifdef LZ4_VERSION_NUMBER
+    case LZ4:
+      return LZ4_compressBound(input_size);
+#endif  // LZ4_VERSION_NUMBER
 
     case SNAPPY:
       return snappy::MaxCompressedLength(input_size);
@@ -196,6 +198,19 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
     }
 #endif  // LZO_VERSION
 
+#ifdef LZ4_VERSION_NUMBER
+    case LZ4: {
+      lzo_uint destlen = compressed->size();
+      destlen = LZ4_compress_default(input, string_as_array(compressed),
+                                     input_size, destlen);
+      CHECK(destlen != 0);
+      if (!compressed_is_preallocated) {
+        compressed->resize(destlen);
+      }
+      break;
+    }
+#endif  // LZ4_VERSION_NUMBER
+
     case SNAPPY: {
       size_t destlen;
       snappy::RawCompress(input, input_size,
@@ -250,6 +265,18 @@ static bool Uncompress(const std::string& compressed, CompressorType comp,
     }
 #endif  // LZO_VERSION
 
+#ifdef LZ4_VERSION_NUMBER
+    case LZ4: {
+      output->resize(size);
+      ZLib zlib;
+      uLongf destlen = output->size();
+      destlen = LZ4_decompress_safe(compressed.data(), string_as_array(output),
+                                    compressed.size(), destlen);
+      CHECK(destlen != 0);
+      CHECK_EQ(size, destlen);
+      break;
+    }
+#endif  // LZ4_VERSION_NUMBER
     case SNAPPY: {
       snappy::RawUncompress(compressed.data(), compressed.size(),
                             string_as_array(output));
@@ -1223,9 +1250,10 @@ static void MeasureFile(const char* fname) {
   for (int len = start_len; len <= end_len; ++len) {
     const char* const input = fullinput.data();
     int repeats = (FLAGS_bytes + len) / (len + 1);
-    if (FLAGS_zlib)     Measure(input, len, ZLIB, repeats, 1024<<10);
-    if (FLAGS_lzo)      Measure(input, len, LZO, repeats, 1024<<10);
-    if (FLAGS_snappy)    Measure(input, len, SNAPPY, repeats, 4096<<10);
+    if (FLAGS_zlib) Measure(input, len, ZLIB, repeats, 1024 << 10);
+    if (FLAGS_lzo) Measure(input, len, LZO, repeats, 1024 << 10);
+    if (FLAGS_lz4) Measure(input, len, LZ4, repeats, 1024 << 10);
+    if (FLAGS_snappy) Measure(input, len, SNAPPY, repeats, 4096 << 10);
 
     // For block-size based measurements
     if (0 && FLAGS_snappy) {

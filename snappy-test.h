@@ -107,6 +107,10 @@
 #include "lzo/lzo1x.h"
 #endif
 
+#ifdef HAVE_LIBLZ4
+#include "lz4.h"
+#endif
+
 namespace {
 
 namespace file {
