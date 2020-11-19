@@ -69,6 +69,8 @@
 #endif
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -92,38 +94,38 @@ using internal::LITERAL;
 // in the low byte. Because length will never be 0, we use zero as an indicator
 // for an exceptional value (copy 3 tag or a literal > 60 bytes).
 constexpr size_t kLiteralOffset = 256;
+inline constexpr uint16_t MakeEntry(uint16_t len, uint16_t offset) {
+  return len | (offset << 8);
+}
+
+inline constexpr uint16_t OffsetAndLength(uint8_t tag, int type) {
+  return type == 3      ? 0                             // copy-4 (or type == 3)
+         : type == 2    ? MakeEntry((tag >> 2) + 1, 0)  // copy-2
+         : type == 1    ? MakeEntry(((tag >> 2) & 7) + 4, tag >> 5)  // copy-1
+         : tag < 60 * 4 ? MakeEntry((tag >> 2) + 1, 1)
+                        : 0;  // long literal
+}
+
 inline constexpr uint16_t OffsetAndLength(uint8_t tag) {
-  switch (tag & 3) {
-    case 0: {
-      if (tag >= 60 * 4) {
-        return 0;  // literal longer then 60 bytes is done in fallback.
-      }
-      int len = (tag >> 2) + 1;
-      // We include a spurious offset for literals explained in the code.
-      return len | kLiteralOffset;
-    }
-    case 1: {
-      int len = ((tag >> 2) & 7) + 4;
-      int off = tag >> 5;
-      return len | (off << 8);
-    }
-    case 2: {
-      int len = (tag >> 2) + 1;
-      return len;
-    }
-    default:
-      return 0;  // copy 3 tags are done in fallback.
-  }
+  return OffsetAndLength(tag, tag & 3);
 }
 
-inline constexpr std::array<uint16_t, 256> OffsetAndLengthTable() {
-  std::array<uint16_t, 256> arr{};
-  for (int i = 0; i < 256; i++) arr[i] = OffsetAndLength(i);
-  return arr;
+template <size_t... Ints>
+struct index_sequence {};
+
+template <std::size_t N, size_t... Is>
+struct make_index_sequence : make_index_sequence<N - 1, N - 1, Is...> {};
+
+template <size_t... Is>
+struct make_index_sequence<0, Is...> : index_sequence<Is...> {};
+
+template <size_t... seq>
+constexpr std::array<uint16_t, 256> MakeTable(index_sequence<seq...>) {
+  return std::array<uint16_t, 256>{OffsetAndLength(seq)...};
 }
 
-alignas(64) const std::array<uint16_t, 256> offset_and_length_table =
-    OffsetAndLengthTable();
+alignas(64) constexpr std::array<uint16_t, 256> offset_and_length_table =
+    MakeTable(make_index_sequence<256>{});
 
 // Any hash function will produce a valid compressed bitstream, but a good
 // hash function reduces the number of collisions and thus yields better
@@ -812,7 +814,6 @@ static inline bool LeftShiftOverflows(uint8_t value, uint32_t shift) {
 std::pair<const uint8_t*, char*> DecompressBranchless(
     const uint8_t* ip, const uint8_t* ip_limit, char* op_ptr, char* op_base,
     char* op_limit_min_slop_ptr) {
-  constexpr size_t kSlopBytes = 64;
   std::ptrdiff_t op = op_ptr - op_base;
   std::ptrdiff_t op_limit_min_slop = op_limit_min_slop_ptr - op_base;
   std::ptrdiff_t op_limit = op_limit_min_slop + kSlopBytes - 1;
@@ -890,7 +891,7 @@ std::pair<const uint8_t*, char*> DecompressBranchless(
       }
       // By choosing literals to have kLiteralOffset this test will
       // always succeed for literals.
-      if (SNAPPY_PREDICT_FALSE(offset < len)) {
+      if (SNAPPY_PREDICT_FALSE(std::size_t(offset) < len)) {
         assert(tag_type != 0);
         // offset 0 is an error.
         if (SNAPPY_PREDICT_FALSE(offset == 0)) break;
@@ -1111,11 +1112,12 @@ class SnappyDecompressor {
 };
 
 constexpr uint32_t CalculateNeeded(uint8_t tag) {
-  uint32_t needed = (0x05030201 >> ((tag * 8) & 31)) & 0xFF;
-  if ((tag & 3) == 0 && tag >= (60 * 4)) needed = (tag >> 2) - 58;
-  return needed;
+  return ((tag & 3) == 0 && tag >= (60 * 4))
+             ? (tag >> 2) - 58
+             : (0x05030201 >> ((tag * 8) & 31)) & 0xFF;
 }
 
+#if __cplusplus >= 201402L
 constexpr bool VerifyCalculateNeeded() {
   for (int i = 0; i < 1; i++) {
     if (CalculateNeeded(i) != (char_table[i] >> 11) + 1) return false;
@@ -1126,6 +1128,7 @@ constexpr bool VerifyCalculateNeeded() {
 // Make sure CalculateNeeded is correct by verifying it against the established
 // table encoding the number of added bytes needed.
 static_assert(VerifyCalculateNeeded(), "");
+#endif  // c++14
 
 bool SnappyDecompressor::RefillTag() {
   const char* ip = ip_;
@@ -1354,7 +1357,7 @@ class SnappyIOVecWriter {
   }
 
   char* GetOutputPtr() { return nullptr; }
-  char* GetBase(char** op_limit_min_slop) { return nullptr; }
+  char* GetBase(char**) { return nullptr; }
   void SetOutputPtr(char* op) {
     // TODO: Switch to [[maybe_unused]] when we can assume C++17.
     (void)op;
@@ -1611,7 +1614,7 @@ class SnappyDecompressionValidator {
   inline SnappyDecompressionValidator() : expected_(0), produced_(0) {}
   inline void SetExpectedLength(size_t len) { expected_ = len; }
   size_t GetOutputPtr() { return produced_; }
-  char* GetBase(char** op_limit_min_slop) { return nullptr; }
+  char* GetBase(char**) { return nullptr; }
   void SetOutputPtr(size_t op) { produced_ = op; }
   inline bool CheckLength() const { return expected_ == produced_; }
   inline bool Append(const char* ip, size_t len, size_t* produced) {

@@ -180,9 +180,9 @@ if(GTEST_FOUND)
 endif(GTEST_FOUND)
 
 find_package(Gflags QUIET)
-if(GFLAGS_FOUND)
+if(GFLAGS_FOUND OR GFLAGS_TARGET)
   set(HAVE_GFLAGS 1)
-endif(GFLAGS_FOUND)
+endif(GFLAGS_FOUND OR GFLAGS_TARGET)
 
 configure_file(
   "cmake/config.h.in"
@@ -261,7 +261,7 @@ if(SNAPPY_BUILD_TESTS)
       "snappy-test.cc"
   )
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES})
+  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES} ${GTEST_LIBRARY})
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_unittest z)

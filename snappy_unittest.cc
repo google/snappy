@@ -200,7 +200,7 @@ static bool Compress(const char* input, size_t input_size, CompressorType comp,
 
 #ifdef LZ4_VERSION_NUMBER
     case LZ4: {
-      lzo_uint destlen = compressed->size();
+      int destlen = compressed->size();
       destlen = LZ4_compress_default(input, string_as_array(compressed),
                                      input_size, destlen);
       CHECK(destlen != 0);
@@ -268,8 +268,7 @@ static bool Uncompress(const std::string& compressed, CompressorType comp,
 #ifdef LZ4_VERSION_NUMBER
     case LZ4: {
       output->resize(size);
-      ZLib zlib;
-      uLongf destlen = output->size();
+      int destlen = output->size();
       destlen = LZ4_decompress_safe(compressed.data(), string_as_array(output),
                                     compressed.size(), destlen);
       CHECK(destlen != 0);
@@ -1328,13 +1327,13 @@ struct SourceFiles {
   size_t max_size = 0;
 };
 
-static void BM_UFlatMedley(testing::benchmark::State& state) {
+static void BM_UFlatMedley(int iters, int) {
   static const SourceFiles* const source = new SourceFiles();
 
   std::vector<char> dst(source->max_size);
 
   size_t processed = 0;
-  for (auto s : state) {
+  while (iters-- > 0) {
     for (int i = 0; i < SourceFiles::kFiles; i++) {
       CHECK(snappy::RawUncompress(source->zcontents[i].data(),
                                   source->zcontents[i].size(), dst.data()));
@@ -1368,11 +1367,11 @@ static void BM_UValidate(int iters, int arg) {
 }
 BENCHMARK(BM_UValidate)->DenseRange(0, ARRAYSIZE(files) - 1);
 
-static void BM_UValidateMedley(testing::benchmark::State& state) {
+static void BM_UValidateMedley(int iters, int) {
   static const SourceFiles* const source = new SourceFiles();
 
   size_t processed = 0;
-  for (auto s : state) {
+  while (iters-- > 0) {
     for (int i = 0; i < SourceFiles::kFiles; i++) {
       CHECK(snappy::IsValidCompressedBuffer(source->zcontents[i].data(),
                                             source->zcontents[i].size()));
