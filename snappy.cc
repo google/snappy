@@ -93,7 +93,7 @@ using internal::LITERAL;
 // The returned format encodes the offset in the high byte and the length
 // in the low byte. Because length will never be 0, we use zero as an indicator
 // for an exceptional value (copy 3 tag or a literal > 60 bytes).
-constexpr size_t kLiteralOffset = 256;
+//constexpr size_t kLiteralOffset = 256;
 inline constexpr uint16_t MakeEntry(uint16_t len, uint16_t offset) {
   return len | (offset << 8);
 }
