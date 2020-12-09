@@ -695,6 +695,41 @@ TEST(Snappy, SimpleTests) {
   Verify("abcaaaaaaa" + std::string(65536, 'b') + std::string("aaaaa") + "abc");
 }
 
+// Regression test for cr/345340892.
+TEST(Snappy, AppendSelfPatternExtensionEdgeCases) {
+  Verify("abcabcabcabcabcabcab");
+  Verify("abcabcabcabcabcabcab0123456789ABCDEF");
+
+  Verify("abcabcabcabcabcabcabcabcabcabcabcabc");
+  Verify("abcabcabcabcabcabcabcabcabcabcabcabc0123456789ABCDEF");
+}
+
+// Regression test for cr/345340892.
+TEST(Snappy, AppendSelfPatternExtensionEdgeCasesExhaustive) {
+  std::mt19937 rng;
+  std::uniform_int_distribution<int> uniform_byte(0, 255);
+  for (int pattern_size = 1; pattern_size <= 18; ++pattern_size) {
+    for (int length = 1; length <= 64; ++length) {
+      for (int extra_bytes_after_pattern : {0, 1, 15, 16, 128}) {
+        const int size = pattern_size + length + extra_bytes_after_pattern;
+        std::string input;
+        input.resize(size);
+        for (int i = 0; i < pattern_size; ++i) {
+          input[i] = 'a' + i;
+        }
+        for (int i = 0; i < length; ++i) {
+          input[pattern_size + i] = input[i];
+        }
+        for (int i = 0; i < extra_bytes_after_pattern; ++i) {
+          input[pattern_size + length + i] =
+              static_cast<char>(uniform_byte(rng));
+        }
+        Verify(input);
+      }
+    }
+  }
+}
+
 // Verify max blowup (lots of four-byte copies)
 TEST(Snappy, MaxBlowup) {
   std::mt19937 rng;
@@ -1284,6 +1319,12 @@ static struct {
   { "pb", "geo.protodata", 0 },
   { "gaviota", "kppkn.gtb", 0 },
 };
+
+TEST(Snappy, TestBenchmarkFiles) {
+  for (int i = 0; i < ARRAYSIZE(files); ++i) {
+    Verify(ReadTestDataFile(files[i].filename, files[i].size_limit));
+  }
+}
 
 static void BM_UFlat(int iters, int arg) {
   StopBenchmarkTiming();
