@@ -1368,7 +1368,7 @@ struct SourceFiles {
   size_t max_size = 0;
 };
 
-static void BM_UFlatMedley(int iters, int) {
+static void BM_UFlatMedley(int iters) {
   static const SourceFiles* const source = new SourceFiles();
 
   std::vector<char> dst(source->max_size);
@@ -1408,7 +1408,7 @@ static void BM_UValidate(int iters, int arg) {
 }
 BENCHMARK(BM_UValidate)->DenseRange(0, ARRAYSIZE(files) - 1);
 
-static void BM_UValidateMedley(int iters, int) {
+static void BM_UValidateMedley(int iters) {
   static const SourceFiles* const source = new SourceFiles();
 
   size_t processed = 0;

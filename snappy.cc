@@ -70,6 +70,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -78,6 +79,8 @@
 #include <vector>
 
 namespace snappy {
+
+namespace {
 
 // The amount of slop bytes writers are using for unconditional copies.
 constexpr int kSlopBytes = 64;
@@ -90,25 +93,30 @@ using internal::kMaximumTagLength;
 using internal::LITERAL;
 
 // We translate the information encoded in a tag through a lookup table to a
-// format that requires fewer instructions to decode.
-// The returned format encodes the offset in the high byte and the length
-// in the low byte. Because length will never be 0, we use zero as an indicator
-// for an exceptional value (copy 3 tag or a literal > 60 bytes).
-constexpr size_t kLiteralOffset = 256;
-inline constexpr uint16_t MakeEntry(uint16_t len, uint16_t offset) {
-  return len | (offset << 8);
+// format that requires fewer instructions to decode. Effectively we store
+// the length minus the tag part of the offset. The lowest significant byte
+// thus stores the length. While total length - offset is given by
+// entry - ExtractOffset(type). The nice thing is that the subtraction
+// immediately sets the flags for the necessary check that offset >= length.
+// This folds the cmp with sub. We engineer the long literals and copy-4 to
+// always fail this check, so their presence doesn't affect the fast path.
+// To prevent literals from triggering the guard against offset < length (offset
+// does not apply to literals) the table is giving them a spurious offset of
+// 256.
+inline constexpr int16_t MakeEntry(int16_t len, int16_t offset) {
+  return len - (offset << 8);
 }
 
-inline constexpr uint16_t OffsetAndLength(uint8_t tag, int type) {
-  return type == 3      ? 0                             // copy-4 (or type == 3)
-         : type == 2    ? MakeEntry((tag >> 2) + 1, 0)  // copy-2
-         : type == 1    ? MakeEntry(((tag >> 2) & 7) + 4, tag >> 5)  // copy-1
-         : tag < 60 * 4 ? MakeEntry((tag >> 2) + 1, 1)
-                        : 0;  // long literal
+inline constexpr int16_t LengthMinusOffset(int data, int type) {
+  return type == 3   ? 0xFF                    // copy-4 (or type == 3)
+         : type == 2 ? MakeEntry(data + 1, 0)  // copy-2
+         : type == 1 ? MakeEntry((data & 7) + 4, data >> 3)  // copy-1
+         : data < 60 ? MakeEntry(data + 1, 1)  // note spurious offset.
+                     : 0xFF;                   // long literal
 }
 
-inline constexpr uint16_t OffsetAndLength(uint8_t tag) {
-  return OffsetAndLength(tag, tag & 3);
+inline constexpr int16_t LengthMinusOffset(uint8_t tag) {
+  return LengthMinusOffset(tag >> 2, tag & 3);
 }
 
 template <size_t... Ints>
@@ -121,22 +129,28 @@ template <size_t... Is>
 struct make_index_sequence<0, Is...> : index_sequence<Is...> {};
 
 template <size_t... seq>
-constexpr std::array<uint16_t, 256> MakeTable(index_sequence<seq...>) {
-  return std::array<uint16_t, 256>{OffsetAndLength(seq)...};
+constexpr std::array<int16_t, 256> MakeTable(index_sequence<seq...>) {
+  return std::array<int16_t, 256>{LengthMinusOffset(seq)...};
 }
 
-alignas(64) constexpr std::array<uint16_t, 256> offset_and_length_table =
-    MakeTable(make_index_sequence<256>{});
+// We maximally co-locate the two tables so that only one register needs to be
+// reserved for the table address.
+struct {
+  alignas(64) const std::array<int16_t, 256> length_minus_offset;
+  uint32_t extract_masks[4];  // Used for extracting offset based on tag type.
+} table = {MakeTable(make_index_sequence<256>{}), {0, 0xFF, 0xFFFF, 0}};
 
 // Any hash function will produce a valid compressed bitstream, but a good
 // hash function reduces the number of collisions and thus yields better
 // compression for compressible input, and more speed for incompressible
 // input. Of course, it doesn't hurt if the hash function is reasonably fast
 // either, as it gets called a lot.
-static inline uint32_t HashBytes(uint32_t bytes, uint32_t mask) {
+inline uint32_t HashBytes(uint32_t bytes, uint32_t mask) {
   constexpr uint32_t kMagic = 0x1e35a7bd;
   return ((kMagic * bytes) >> (32 - kMaxHashTableBits)) & mask;
 }
+
+}  // namespace
 
 size_t MaxCompressedLength(size_t source_bytes) {
   // Compressed data can be defined as:
@@ -967,6 +981,72 @@ static inline bool LeftShiftOverflows(uint8_t value, uint32_t shift) {
   return (value & masks[shift]) != 0;
 }
 
+inline bool Copy64BytesWithPatternExtension(ptrdiff_t dst, size_t offset) {
+  return offset != 0;
+}
+
+void MemCopy(char* dst, const uint8_t* src, size_t size) {
+  std::memcpy(dst, src, size);
+}
+
+void MemCopy(ptrdiff_t dst, const uint8_t* src, size_t size) {}
+
+void MemMove(char* dst, const void* src, size_t size) {
+  std::memmove(dst, src, size);
+}
+
+void MemMove(ptrdiff_t dst, const void* src, size_t size) {}
+
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+size_t AdvanceToNextTag(const uint8_t** ip_p, size_t* tag) {
+  const uint8_t*& ip = *ip_p;
+  // This section is crucial for the throughput of the decompression loop.
+  // The latency of an iteration is fundamentally constrained by the
+  // following data chain on ip.
+  // ip -> c = Load(ip) -> ip1 = ip + 1 + (c & 3) -> ip = ip1 or ip2
+  //                       ip2 = ip + 2 + (c >> 2)
+  // This amounts to 8 cycles.
+  // 5 (load) + 1 (c & 3) + 1 (lea ip1, [ip + (c & 3) + 1]) + 1 (cmov)
+  size_t literal_len = *tag >> 2;
+  size_t tag_type = *tag;
+  bool is_literal;
+#if defined(__GNUC__) && defined(__x86_64__)
+  // TODO clang misses the fact that the (c & 3) already correctly
+  // sets the zero flag.
+  asm("and $3, %k[tag_type]\n\t"
+      : [tag_type] "+r"(tag_type), "=@ccz"(is_literal));
+#else
+  tag_type &= 3;
+  is_literal = (tag_type == 0);
+#endif
+  // TODO
+  // This is code is subtle. Loading the values first and then cmov has less
+  // latency then cmov ip and then load. However clang would move the loads
+  // in an optimization phase, volatile prevents this transformation.
+  // Note that we have enough slop bytes (64) that the loads are always valid.
+  size_t tag_literal =
+      static_cast<const volatile uint8_t*>(ip)[1 + literal_len];
+  size_t tag_copy = static_cast<const volatile uint8_t*>(ip)[tag_type];
+  *tag = is_literal ? tag_literal : tag_copy;
+  const uint8_t* ip_copy = ip + 1 + tag_type;
+  const uint8_t* ip_literal = ip + 2 + literal_len;
+  ip = is_literal ? ip_literal : ip_copy;
+#if defined(__GNUC__) && defined(__x86_64__)
+  // TODO Clang is "optimizing" zero-extension (a totally free
+  // operation) this means that after the cmov of tag, it emits another movzb
+  // tag, byte(tag). It really matters as it's on the core chain. This dummy
+  // asm, persuades clang to do the zero-extension at the load (it's automatic)
+  // removing the expensive movzb.
+  asm("" ::"r"(tag_copy));
+#endif
+  return tag_type;
+}
+
+// Extract the offset for copy-1 and copy-2 returns 0 for literals or copy-4.
+inline uint32_t ExtractOffset(uint32_t val, size_t tag_type) {
+  return val & table.extract_masks[tag_type];
+};
+
 // Core decompression loop, when there is enough data available.
 // Decompresses the input buffer [ip, ip_limit) into the output buffer
 // [op, op_limit_min_slop). Returning when either we are too close to the end
@@ -976,113 +1056,92 @@ static inline bool LeftShiftOverflows(uint8_t value, uint32_t shift) {
 // TODO This function probably does not need to be inlined, as it
 // should decode large chunks at a time. This allows runtime dispatch to
 // implementations based on CPU capability (BMI2 / perhaps 32 / 64 byte memcpy).
-std::pair<const uint8_t*, char*> DecompressBranchless(
-    const uint8_t* ip, const uint8_t* ip_limit, char* op_ptr, char* op_base,
-    char* op_limit_min_slop_ptr) {
-  std::ptrdiff_t op = op_ptr - op_base;
-  std::ptrdiff_t op_limit_min_slop = op_limit_min_slop_ptr - op_base;
-  std::ptrdiff_t op_limit = op_limit_min_slop + kSlopBytes - 1;
-  if (kSlopBytes < ip_limit - ip && op < op_limit_min_slop) {
-    const uint8_t* const ip_limit_min_slop = ip_limit - kSlopBytes + 1;
+template <typename T>
+std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
+    const uint8_t* ip, const uint8_t* ip_limit, ptrdiff_t op, T op_base,
+    ptrdiff_t op_limit_min_slop) {
+  // We unroll the inner loop twice so we need twice the spare room.
+  op_limit_min_slop -= kSlopBytes;
+  if (2 * (kSlopBytes + 1) < ip_limit - ip && op < op_limit_min_slop) {
+    const uint8_t* const ip_limit_min_slop = ip_limit - 2 * kSlopBytes - 1;
     ip++;
     // ip points just past the tag and we are touching at maximum kSlopBytes
     // in an iteration.
+    size_t tag = ip[-1];
     do {
-      const uint8_t* old_ip = ip;
-      const uint64_t tag = ip[-1];
-      uint32_t offset_and_length = offset_and_length_table[tag];
-      if (SNAPPY_PREDICT_FALSE(offset_and_length == 0)) {
-        // Exception case (long literal or copy 4).
-        if ((tag & 3) == 3) {
-        break_loop:
-          ip = old_ip;
-          break;
+      // The throughput is limited by instructions, unrolling the inner loop
+      // twice reduces the amount of instructions checking limits and also
+      // leads to reduced mov's.
+      for (int i = 0; i < 2; i++) {
+        const uint8_t* old_ip = ip;
+        assert(tag == ip[-1]);
+        // For literals tag_type = 0, hence we will always obtain 0 from
+        // ExtractLowBytes. For literals offset will thus be kLiteralOffset.
+        ptrdiff_t len_min_offset = table.length_minus_offset[tag];
+        size_t tag_type = AdvanceToNextTag(&ip, &tag);
+        uint32_t next = LittleEndian::Load32(old_ip);
+        size_t len = len_min_offset & 0xFF;
+        len_min_offset -= ExtractOffset(next, tag_type);
+        if (SNAPPY_PREDICT_FALSE(len_min_offset > 0)) {
+          if (SNAPPY_PREDICT_FALSE(len & 0x80)) {
+            // Exceptional case (long literal or copy 4).
+            // Actually doing the copy here is negatively impacting the main
+            // loop due to compiler incorrectly allocating a register for
+            // this fallback. Hence we just break.
+          break_loop:
+            ip = old_ip;
+            goto exit;
+          }
+          // Only copy-1 or copy-2 tags can get here.
+          assert(tag_type == 1 || tag_type == 2);
+          std::ptrdiff_t delta = op + len_min_offset - len;
+          // Guard against copies before the buffer start.
+          if (SNAPPY_PREDICT_FALSE(delta < 0 ||
+                                  !Copy64BytesWithPatternExtension(
+                                      op_base + op, len - len_min_offset))) {
+            goto break_loop;
+          }
+          op += len;
+          continue;
         }
-        assert((tag & 3) == 0);  // This is a literal
-        assert(tag >= 60 * 4);   // It's a long literal
-        uint32_t next = LittleEndian::Load32(ip);
-        uint32_t length_bytes = (tag >> 2) - 59;
-        uint32_t literal_len = ExtractLowBytes(next, length_bytes) + 1;
-        ip += length_bytes;
-        // Note we use >= instead of > because we also need to increment ip
-        // because we have to leave it past the tag.
-        if (literal_len >= ip_limit - ip) goto break_loop;
-        if (literal_len > op_limit - op) goto break_loop;
-        memcpy(op_base + op, ip, literal_len);
-        ip += literal_len;
-        op += literal_len;
-        assert(ip < ip_limit);  // See above test
-        ip++;
-        continue;
-      }
-      size_t tag_type;
-      {
-        // This section is crucial for the throughput of the decompression loop.
-        // The latency of an iteration is fundamentally constrained by the
-        // following data chain on ip.
-        // ip -> c = Load(ip) -> ip1 = ip + 1 + (c & 3) -> ip = ip1 or ip2
-        //                       ip2 = ip + 2 + (c >> 2)
-        // This amounts to 8 cycles.
-        // 5 (load) + 1 (c & 3) + 1 (lea ip1, [ip + (c & 3) + 1]) + 1 (cmov)
-        size_t literal_len = tag >> 2;
+        std::ptrdiff_t delta = op + len_min_offset - len;
+        if (SNAPPY_PREDICT_FALSE(delta < 0)) {
 #if defined(__GNUC__) && defined(__x86_64__)
-        // TODO
-        // clang misses the fact that the (c & 3) already correctly sets
-        // the zero flag.
-        tag_type = tag;
-        bool is_literal;
-        asm("and $3, %0\n\t" : "+r"(tag_type), "=@ccz"(is_literal));
-        bool is_copy = !is_literal;
-#else
-        tag_type = tag & 3;
-        bool is_copy = (tag_type != 0);
+          // TODO
+          // When validating, both code path reduced to `op += len`. Ie. this
+          // becomes effectively
+          //
+          // if (delta < 0) if (tag_type != 0) goto break_loop;
+          // op += len;
+          //
+          // The compiler interchanges the predictable and almost always false
+          // first if-statement with the completely unpredictable second
+          // if-statement, putting an unpredictable branch on every iteration.
+          // This empty asm is worth almost 2x, which I think qualifies for an
+          // award for the most load-bearing empty statement.
+          asm("");
 #endif
-        const uint8_t* ip_copy = ip + 1 + tag_type;
-        const uint8_t* ip_literal = ip + 2 + literal_len;
-        ip = is_copy ? ip_copy : ip_literal;
-      }
-      uint32_t next = LittleEndian::Load32(old_ip);
-      // For literals tag_type = 0, hence we will always obtain 0 from
-      // ExtractLowBytes. For literals offset will thus be kLiteralOffset.
-      std::ptrdiff_t offset =
-          (offset_and_length & 0x700) + ExtractLowBytes(next, tag_type);
-      size_t len = offset_and_length & 0xFF;
-      std::ptrdiff_t delta = op - offset;
-      if (SNAPPY_PREDICT_FALSE(delta < 0)) {
-        if (tag_type != 0) goto break_loop;
-        std::memcpy(op_base + op, old_ip, 64);
-        op += len;
-        continue;
-      }
-      // By choosing literals to have kLiteralOffset this test will
-      // always succeed for literals.
-      if (SNAPPY_PREDICT_FALSE(std::size_t(offset) < len)) {
-        assert(tag_type != 0);
-        // offset 0 is an error.
-        if (!Copy64BytesWithPatternExtension(op_base + op, offset)) {
-          break;
-        }
-        op += len;
-        continue;
-      }
 
-      const uint8_t* from =
-          tag_type ? reinterpret_cast<const uint8_t*>(op_base + delta) : old_ip;
-      // For literals we need to copy from ip instead of from the stream.
-      // We also need to compensate for the offset in that case.
-      std::memmove(op_base + op, from, 64);
-      op += len;
+          // Due to the spurious offset in literals have this will trigger
+          // at the start of a block when op is still smaller than 256.
+          if (tag_type != 0) goto break_loop;
+          MemCopy(op_base + op, old_ip, 64);
+          op += len;
+          continue;
+        }
+
+        // For copies we need to copy from op_base + delta, for literals
+        // we need to copy from ip instead of from the stream.
+        const void* from =
+            tag_type ? reinterpret_cast<void*>(op_base + delta) : old_ip;
+        MemMove(op_base + op, from, 64);
+        op += len;
+      }
     } while (ip < ip_limit_min_slop && op < op_limit_min_slop);
+  exit:
     ip--;
     assert(ip <= ip_limit);
   }
-  return {ip, op_base + op};
-}
-
-template <typename T>
-std::pair<const uint8_t*, T> DecompressBranchless(const uint8_t* ip,
-                                                  const uint8_t*, T op, char*,
-                                                  char*) {
   return {ip, op};
 }
 
@@ -1179,15 +1238,15 @@ class SnappyDecompressor {
     MAYBE_REFILL();
     for (;;) {
       {
-        char* op_limit_min_slop;
+        ptrdiff_t op_limit_min_slop;
         auto op_base = writer->GetBase(&op_limit_min_slop);
         if (op_base) {
           auto res =
               DecompressBranchless(reinterpret_cast<const uint8_t*>(ip),
                                    reinterpret_cast<const uint8_t*>(ip_limit_),
-                                   op, op_base, op_limit_min_slop);
+                                   op - op_base, op_base, op_limit_min_slop);
           ip = reinterpret_cast<const char*>(res.first);
-          op = res.second;
+          op = op_base + res.second;
           MAYBE_REFILL();
         }
       }
@@ -1250,7 +1309,7 @@ class SnappyDecompressor {
 
           if (!writer->AppendFromSelf(copy_offset, length, &op)) goto exit;
         } else {
-          const uint32_t entry = offset_and_length_table[c];
+          const ptrdiff_t entry = table.length_minus_offset[c];
           preload = LittleEndian::Load32(ip);
           const uint32_t trailer = ExtractLowBytes(preload, c & 3);
           const uint32_t length = entry & 0xff;
@@ -1259,7 +1318,7 @@ class SnappyDecompressor {
           // copy_offset/256 is encoded in bits 8..10.  By just fetching
           // those bits, we get copy_offset (since the bit-field starts at
           // bit 8).
-          const uint32_t copy_offset = (entry & 0x700) + trailer;
+          const uint32_t copy_offset = trailer - entry + length;
           if (!writer->AppendFromSelf(copy_offset, length, &op)) goto exit;
 
           ip += (c & 3);
@@ -1523,7 +1582,7 @@ class SnappyIOVecWriter {
   }
 
   char* GetOutputPtr() { return nullptr; }
-  char* GetBase(char**) { return nullptr; }
+  char* GetBase(ptrdiff_t*) { return nullptr; }
   void SetOutputPtr(char* op) {
     // TODO: Switch to [[maybe_unused]] when we can assume C++17.
     (void)op;
@@ -1688,8 +1747,8 @@ class SnappyArrayWriter {
   inline bool CheckLength() const { return op_ == op_limit_; }
 
   char* GetOutputPtr() { return op_; }
-  char* GetBase(char** op_limit_min_slop) {
-    *op_limit_min_slop = op_limit_min_slop_;
+  char* GetBase(ptrdiff_t* op_limit_min_slop) {
+    *op_limit_min_slop = op_limit_min_slop_ - base_;
     return base_;
   }
   void SetOutputPtr(char* op) { op_ = op; }
@@ -1782,7 +1841,10 @@ class SnappyDecompressionValidator {
   inline SnappyDecompressionValidator() : expected_(0), produced_(0) {}
   inline void SetExpectedLength(size_t len) { expected_ = len; }
   size_t GetOutputPtr() { return produced_; }
-  char* GetBase(char**) { return nullptr; }
+  size_t GetBase(ptrdiff_t* op_limit_min_slop) {
+    *op_limit_min_slop = std::numeric_limits<ptrdiff_t>::max() - kSlopBytes + 1;
+    return 1;
+  }
   void SetOutputPtr(size_t op) { produced_ = op; }
   inline bool CheckLength() const { return expected_ == produced_; }
   inline bool Append(const char* ip, size_t len, size_t* produced) {
@@ -1887,8 +1949,8 @@ class SnappyScatteredWriter {
         op_limit_(NULL),
         op_limit_min_slop_(NULL) {}
   char* GetOutputPtr() { return op_ptr_; }
-  char* GetBase(char** op_limit_min_slop) {
-    *op_limit_min_slop = op_limit_min_slop_;
+  char* GetBase(ptrdiff_t* op_limit_min_slop) {
+    *op_limit_min_slop = op_limit_min_slop_ - op_base_;
     return op_base_;
   }
   void SetOutputPtr(char* op) { op_ptr_ = op; }
