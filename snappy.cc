@@ -479,7 +479,9 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       //
       // TODO: Remove pragma when when cold regions don't get
       // vectorized or unrolled.
-#pragma nounroll
+#ifdef __clang__
+#pragma clang loop unroll(disable)
+#endif
       do {
         _mm_storeu_si128(reinterpret_cast<__m128i*>(op), pattern);
         pattern = _mm_shuffle_epi8(pattern, reshuffle_mask);
@@ -540,7 +542,9 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
   //
   // TODO: Remove pragma when when cold regions don't get vectorized
   // or unrolled.
-#pragma nounroll
+#ifdef __clang__
+#pragma clang loop unroll(disable)
+#endif
   for (char* op_end = buf_limit - 16; op < op_end; op += 16, src += 16) {
     ConditionalUnalignedCopy128<use_16bytes_chunk>(src, op);
   }
