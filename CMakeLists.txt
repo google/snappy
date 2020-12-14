@@ -134,6 +134,10 @@ elseif (SNAPPY_REQUIRE_AVX)
   endif(HAVE_CLANG_MAVX)
 endif(SNAPPY_REQUIRE_AVX2)
 
+# Used by googletest.
+check_cxx_compiler_flag(-Wno-missing-field-initializers
+                        SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles("
 int main() {
@@ -173,11 +177,6 @@ int main() {
 include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
-
-find_package(GTest QUIET)
-if(GTEST_FOUND)
-  set(HAVE_GTEST 1)
-endif(GTEST_FOUND)
 
 find_package(Gflags QUIET)
 if(GFLAGS_FOUND OR GFLAGS_TARGET)
@@ -254,6 +253,28 @@ endif(BUILD_SHARED_LIBS)
 if(SNAPPY_BUILD_TESTS)
   enable_testing()
 
+  # Prevent overriding the parent project's compiler/linker settings on Windows.
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+  set(install_gtest OFF)
+  set(install_gmock OFF)
+  set(build_gmock ON)
+
+  # This project is tested using GoogleTest.
+  add_subdirectory("third_party/googletest")
+
+  # This project uses Google benchmark for benchmarking.
+  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+  set(BENCHMARK_ENABLE_EXCEPTIONS OFF CACHE BOOL "" FORCE)
+  add_subdirectory("third_party/benchmark")
+
+  # GoogleTest triggers a missing field initializers warning.
+  if(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+    set_property(TARGET gtest
+        APPEND PROPERTY COMPILE_OPTIONS -Wno-missing-field-initializers)
+    set_property(TARGET gmock
+        APPEND PROPERTY COMPILE_OPTIONS -Wno-missing-field-initializers)
+  endif(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+
   add_executable(snappy_unittest "")
   target_sources(snappy_unittest
     PRIVATE
@@ -261,7 +282,8 @@ if(SNAPPY_BUILD_TESTS)
       "snappy-test.cc"
   )
   target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES} ${GTEST_LIBRARY})
+  target_link_libraries(snappy_unittest
+                        snappy ${GFLAGS_LIBRARIES} gmock gtest benchmark)
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_unittest z)
@@ -276,7 +298,6 @@ if(SNAPPY_BUILD_TESTS)
   target_include_directories(snappy_unittest
     BEFORE PRIVATE
       "${PROJECT_SOURCE_DIR}"
-      "${GTEST_INCLUDE_DIRS}"
       "${GFLAGS_INCLUDE_DIRS}"
   )
 

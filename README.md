@@ -70,6 +70,7 @@ You need the CMake version specified in [CMakeLists.txt](./CMakeLists.txt)
 or later to build:
 
 ```bash
+git submodule update --init
 mkdir build
 cd build && cmake ../ && make
 ```
@@ -114,14 +115,10 @@ but it contains several useful components for Snappy development.
 
 First of all, it contains unit tests, verifying correctness on your machine in
 various scenarios. If you want to change or optimize Snappy, please run the
-tests to verify you have not broken anything. Note that if you have the
-Google Test library installed, unit test behavior (especially failures) will be
-significantly more user-friendly. You can find Google Test at
+tests to verify you have not broken anything.
 
-  https://github.com/google/googletest
-
-You probably also want the gflags library for handling of command-line flags;
-you can find it at
+The gflags library for handling of command-line flags is used if it's installed.
+You can find it at
 
   https://gflags.github.io/gflags/
 
@@ -145,5 +142,5 @@ test.)
 Contact
 =======
 
-Snappy is distributed through GitHub. For the latest version, a bug tracker,
-and other information, see https://github.com/google/snappy.
+Snappy is distributed through GitHub. For the latest version and other
+information, see https://github.com/google/snappy.

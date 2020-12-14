@@ -51,29 +51,10 @@
 #endif
 
 #ifdef HAVE_WINDOWS_H
+// Needed to be able to use std::max without workarounds in the source code.
+// https://support.microsoft.com/en-us/help/143208/prb-using-stl-in-windows-program-can-cause-min-max-conflicts
+#define NOMINMAX
 #include <windows.h>
-#endif
-
-#ifdef HAVE_GTEST
-
-#include <gtest/gtest.h>
-#undef TYPED_TEST
-#define TYPED_TEST TEST
-#define INIT_GTEST(argc, argv) ::testing::InitGoogleTest(argc, *argv)
-
-#else
-
-// Stubs for if the user doesn't have Google Test installed.
-
-#define TEST(test_case, test_subcase) \
-  void Test_ ## test_case ## _ ## test_subcase()
-#define INIT_GTEST(argc, argv)
-
-#define TYPED_TEST TEST
-#define EXPECT_EQ CHECK_EQ
-#define EXPECT_NE CHECK_NE
-#define EXPECT_FALSE(cond) CHECK(!(cond))
-
 #endif
 
 #ifdef HAVE_GFLAGS
@@ -84,7 +65,6 @@
 // arguments. Google Test seems to be the most happy with unknown arguments,
 // though, so we call it first and hope for the best.
 #define InitGoogle(argv0, argc, argv, remove_flags) \
-  INIT_GTEST(argc, argv); \
   google::ParseCommandLineFlags(argc, argv, remove_flags);
 
 #else
@@ -94,8 +74,7 @@
 #define DEFINE_int32(flag_name, default_value, description) \
   static int FLAGS_ ## flag_name = default_value;
 
-#define InitGoogle(argv0, argc, argv, remove_flags) \
-  INIT_GTEST(argc, argv)
+#define InitGoogle(argv0, argc, argv, remove_flags) ((void)(0))
 
 #endif
 
@@ -170,19 +149,6 @@ namespace file {
 namespace snappy {
 
 #define FLAGS_test_random_seed 301
-using TypeParam = std::string;
-
-void Test_CorruptedTest_VerifyCorrupted();
-void Test_Snappy_SimpleTests();
-void Test_Snappy_MaxBlowup();
-void Test_Snappy_RandomData();
-void Test_Snappy_FourByteOffset();
-void Test_SnappyCorruption_TruncatedVarint();
-void Test_SnappyCorruption_UnterminatedVarint();
-void Test_SnappyCorruption_OverflowingVarint();
-void Test_Snappy_ReadPastEndOfBuffer();
-void Test_Snappy_FindMatchLength();
-void Test_Snappy_FindMatchLengthRandom();
 
 std::string ReadTestDataFile(const std::string& base, size_t size_limit);
 
@@ -237,45 +203,6 @@ class CycleTimer {
   struct timeval start_;
 #endif
 };
-
-// Minimalistic microbenchmark framework.
-
-typedef void (*BenchmarkFunction)(int, int);
-
-class Benchmark {
- public:
-  Benchmark(const std::string& name, BenchmarkFunction function)
-      : name_(name), function_(function) {}
-
-  Benchmark* DenseRange(int start, int stop) {
-    start_ = start;
-    stop_ = stop;
-    return this;
-  }
-
-  void Run();
-
- private:
-  const std::string name_;
-  const BenchmarkFunction function_;
-  int start_, stop_;
-};
-#define BENCHMARK(benchmark_name) \
-  Benchmark* Benchmark_ ## benchmark_name = \
-          (new Benchmark(#benchmark_name, benchmark_name))
-
-extern Benchmark* Benchmark_BM_UFlat;
-extern Benchmark* Benchmark_BM_UIOVec;
-extern Benchmark* Benchmark_BM_UValidate;
-extern Benchmark* Benchmark_BM_ZFlat;
-extern Benchmark* Benchmark_BM_ZFlatAll;
-extern Benchmark* Benchmark_BM_ZFlatIncreasingTableSize;
-
-void ResetBenchmarkTiming();
-void StartBenchmarkTiming();
-void StopBenchmarkTiming();
-void SetBenchmarkLabel(const std::string& str);
-void SetBenchmarkBytesProcessed(int64_t bytes);
 
 #ifdef HAVE_LIBZ
 
@@ -399,57 +326,6 @@ class ZLib {
 #endif  // HAVE_LIBZ
 
 }  // namespace snappy
-
-DECLARE_bool(run_microbenchmarks);
-
-static inline void RunSpecifiedBenchmarks() {
-  if (!FLAGS_run_microbenchmarks) {
-    return;
-  }
-
-  std::fprintf(stderr, "Running microbenchmarks.\n");
-#ifndef NDEBUG
-  std::fprintf(stderr,
-               "WARNING: Compiled with assertions enabled, will be slow.\n");
-#endif
-#ifndef __OPTIMIZE__
-  std::fprintf(stderr,
-               "WARNING: Compiled without optimization, will be slow.\n");
-#endif
-  std::fprintf(stderr, "Benchmark            Time(ns)    CPU(ns) Iterations\n");
-  std::fprintf(stderr, "---------------------------------------------------\n");
-
-  snappy::Benchmark_BM_UFlat->Run();
-  snappy::Benchmark_BM_UIOVec->Run();
-  snappy::Benchmark_BM_UValidate->Run();
-  snappy::Benchmark_BM_ZFlat->Run();
-  snappy::Benchmark_BM_ZFlatAll->Run();
-  snappy::Benchmark_BM_ZFlatIncreasingTableSize->Run();
-
-  std::fprintf(stderr, "\n");
-}
-
-#ifndef HAVE_GTEST
-
-static inline int RUN_ALL_TESTS() {
-  std::fprintf(stderr, "Running correctness tests.\n");
-  snappy::Test_CorruptedTest_VerifyCorrupted();
-  snappy::Test_Snappy_SimpleTests();
-  snappy::Test_Snappy_MaxBlowup();
-  snappy::Test_Snappy_RandomData();
-  snappy::Test_Snappy_FourByteOffset();
-  snappy::Test_SnappyCorruption_TruncatedVarint();
-  snappy::Test_SnappyCorruption_UnterminatedVarint();
-  snappy::Test_SnappyCorruption_OverflowingVarint();
-  snappy::Test_Snappy_ReadPastEndOfBuffer();
-  snappy::Test_Snappy_FindMatchLength();
-  snappy::Test_Snappy_FindMatchLengthRandom();
-  std::fprintf(stderr, "All tests passed.\n");
-
-  return 0;
-}
-
-#endif  // HAVE_GTEST
 
 // For main().
 namespace snappy {
