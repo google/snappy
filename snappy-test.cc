@@ -101,7 +101,7 @@ void StartBenchmarkTiming() {
   FILETIME dummy;
   CHECK(GetProcessTimes(
       GetCurrentProcess(), &dummy, &dummy, &dummy, &benchmark_start_cpu));
-#else
+#elif defined HAVE_SYS_TIME_H
   gettimeofday(&benchmark_start_real, NULL);
   if (getrusage(RUSAGE_SELF, &benchmark_start_cpu) == -1) {
     std::perror("getrusage(RUSAGE_SELF)");
@@ -141,7 +141,7 @@ void StopBenchmarkTiming() {
 
   benchmark_cpu_time_us +=
       (stop_ulargeint.QuadPart - start_ulargeint.QuadPart + 5) / 10;
-#else  // WIN32
+#elif defined HAVE_SYS_TIME_H
   struct timeval benchmark_stop_real;
   gettimeofday(&benchmark_stop_real, NULL);
   benchmark_real_time_us +=
@@ -158,7 +158,7 @@ void StopBenchmarkTiming() {
                                       benchmark_start_cpu.ru_utime.tv_sec);
   benchmark_cpu_time_us += (benchmark_stop_cpu.ru_utime.tv_usec -
                             benchmark_start_cpu.ru_utime.tv_usec);
-#endif  // WIN32
+#endif
 
   benchmark_running = false;
 }

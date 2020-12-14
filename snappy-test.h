@@ -201,7 +201,7 @@ class CycleTimer {
   void Start() {
 #ifdef WIN32
     QueryPerformanceCounter(&start_);
-#else
+#elif defined HAVE_SYS_TIME_H
     gettimeofday(&start_, NULL);
 #endif
   }
@@ -216,7 +216,7 @@ class CycleTimer {
     double elapsed = static_cast<double>(stop.QuadPart - start_.QuadPart) /
         frequency.QuadPart;
     real_time_us_ += elapsed * 1e6 + 0.5;
-#else
+#elif defined HAVE_SYS_TIME_H
     struct timeval stop;
     gettimeofday(&stop, NULL);
 
@@ -233,7 +233,7 @@ class CycleTimer {
   int64_t real_time_us_;
 #ifdef WIN32
   LARGE_INTEGER start_;
-#else
+#elif defined HAVE_SYS_TIME_H
   struct timeval start_;
 #endif
 };
