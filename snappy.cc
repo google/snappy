@@ -260,8 +260,8 @@ MakePatternMaskBytesTable(int index_offset,
 // This is an array of shuffle control masks that can be used as the source
 // operand for PSHUFB to permute the contents of the destination XMM register
 // into a repeating byte pattern.
-alignas(16) inline constexpr std::array<std::array<char, sizeof(__m128i)>,
-                                        16> pattern_generation_masks =
+alignas(16) constexpr std::array<std::array<char, sizeof(__m128i)>,
+                                 16> pattern_generation_masks =
     MakePatternMaskBytesTable(
         /*index_offset=*/0,
         /*pattern_sizes_minus_one=*/make_index_sequence<16>());
@@ -271,8 +271,8 @@ alignas(16) inline constexpr std::array<std::array<char, sizeof(__m128i)>,
 // Basically, pattern_reshuffle_masks is a continuation of
 // pattern_generation_masks. It follows that, pattern_reshuffle_masks is same as
 // pattern_generation_masks for offsets 1, 2, 4, 8 and 16.
-alignas(16) inline constexpr std::array<std::array<char, sizeof(__m128i)>,
-                                        16> pattern_reshuffle_masks =
+alignas(16) constexpr std::array<std::array<char, sizeof(__m128i)>,
+                                 16> pattern_reshuffle_masks =
     MakePatternMaskBytesTable(
         /*index_offset=*/16,
         /*pattern_sizes_minus_one=*/make_index_sequence<16>());
