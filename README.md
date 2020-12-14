@@ -1,5 +1,6 @@
 Snappy, a fast compressor/decompressor.
 
+[![Build Status](https://travis-ci.org/google/snappy.svg?branch=master)](https://travis-ci.org/google/snappy)
 
 Introduction
 ============
