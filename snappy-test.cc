@@ -116,7 +116,7 @@ std::string ReadTestDataFile(const std::string& base, size_t size_limit) {
     prefix = std::string(srcdir) + "/";
   }
   file::GetContents(prefix + "testdata/" + base, &contents, file::Defaults()
-      ).CheckSuccess();
+      ).ok();
   if (size_limit > 0) {
     contents = contents.substr(0, size_limit);
   }

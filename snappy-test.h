@@ -382,7 +382,7 @@ class LogMessageVoidify {
 #define CHECK_NE(a, b) CRASH_UNLESS((a) != (b))
 #define CHECK_LT(a, b) CRASH_UNLESS((a) < (b))
 #define CHECK_GT(a, b) CRASH_UNLESS((a) > (b))
-#define CHECK_OK(cond) (cond).CheckSuccess()
+#define CHECK_OK(cond) (cond).ok()
 
 }  // namespace snappy
 
