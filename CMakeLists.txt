@@ -56,10 +56,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")
 else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  # Use -Wall for clang and gcc.
-  if(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-  endif(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
+  # Use -Wall for clang (really !gcc).
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+    endif(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
+  endif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
   # Use -Wextra for clang and gcc.
   if(NOT CMAKE_CXX_FLAGS MATCHES "-Wextra")
