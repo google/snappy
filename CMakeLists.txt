@@ -71,7 +71,7 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     if(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
     endif(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
-  endif(CMAKE_CXX_COMPILER_ID STREQUAL "GCC")
+  endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 
   # Disable C++ exceptions.
   string(REGEX REPLACE "-fexceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
