@@ -986,6 +986,8 @@ static inline bool LeftShiftOverflows(uint8_t value, uint32_t shift) {
 }
 
 inline bool Copy64BytesWithPatternExtension(ptrdiff_t dst, size_t offset) {
+  // TODO: Switch to [[maybe_unused]] when we can assume C++17.
+  (void)dst;
   return offset != 0;
 }
 
@@ -993,13 +995,23 @@ void MemCopy(char* dst, const uint8_t* src, size_t size) {
   std::memcpy(dst, src, size);
 }
 
-void MemCopy(ptrdiff_t dst, const uint8_t* src, size_t size) {}
+void MemCopy(ptrdiff_t dst, const uint8_t* src, size_t size) {
+  // TODO: Switch to [[maybe_unused]] when we can assume C++17.
+  (void)dst;
+  (void)src;
+  (void)size;
+}
 
 void MemMove(char* dst, const void* src, size_t size) {
   std::memmove(dst, src, size);
 }
 
-void MemMove(ptrdiff_t dst, const void* src, size_t size) {}
+void MemMove(ptrdiff_t dst, const void* src, size_t size) {
+  // TODO: Switch to [[maybe_unused]] when we can assume C++17.
+  (void)dst;
+  (void)src;
+  (void)size;
+}
 
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 size_t AdvanceToNextTag(const uint8_t** ip_p, size_t* tag) {
