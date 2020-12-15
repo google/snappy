@@ -46,6 +46,66 @@
 DEFINE_bool(run_microbenchmarks, true,
             "Run microbenchmarks before doing anything else.");
 
+namespace file {
+
+OptionsStub::OptionsStub() = default;
+OptionsStub::~OptionsStub() = default;
+
+const OptionsStub &Defaults() {
+  static OptionsStub defaults;
+  return defaults;
+}
+
+StatusStub::StatusStub() = default;
+StatusStub::StatusStub(const StatusStub &) = default;
+StatusStub &StatusStub::operator=(const StatusStub &) = default;
+StatusStub::~StatusStub() = default;
+
+bool StatusStub::ok() { return true; }
+
+StatusStub GetContents(const std::string &filename, std::string *output,
+                       const OptionsStub & /* options */) {
+  FILE *fp = std::fopen(filename.c_str(), "rb");
+  if (fp == nullptr) {
+    std::perror(filename.c_str());
+    std::exit(1);
+  }
+
+  output->clear();
+  while (!std::feof(fp)) {
+    char buffer[4096];
+    size_t bytes_read = std::fread(buffer, 1, sizeof(buffer), fp);
+    if (bytes_read == 0 && std::ferror(fp)) {
+      std::perror("fread");
+      std::exit(1);
+    }
+    output->append(buffer, bytes_read);
+  }
+
+  std::fclose(fp);
+  return StatusStub();
+}
+
+StatusStub SetContents(const std::string &file_name, const std::string &content,
+                       const OptionsStub & /* options */) {
+  FILE *fp = std::fopen(file_name.c_str(), "wb");
+  if (fp == nullptr) {
+    std::perror(file_name.c_str());
+    std::exit(1);
+  }
+
+  size_t bytes_written = std::fwrite(content.data(), 1, content.size(), fp);
+  if (bytes_written != content.size()) {
+    std::perror("fwrite");
+    std::exit(1);
+  }
+
+  std::fclose(fp);
+  return StatusStub();
+}
+
+}  // namespace file
+
 namespace snappy {
 
 std::string ReadTestDataFile(const std::string& base, size_t size_limit) {

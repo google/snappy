@@ -90,61 +90,44 @@
 #include "lz4.h"
 #endif
 
-namespace {
-
 namespace file {
-  int Defaults() { return 0; }
 
-  class DummyStatus {
-   public:
-    void CheckSuccess() { }
-  };
+// Stubs the class file::Options.
+//
+// This class should not be instantiated explicitly. It should only be used by
+// passing file::Defaults() to file::GetContents() / file::SetContents().
+class OptionsStub {
+ public:
+  OptionsStub();
+  OptionsStub(const OptionsStub &) = delete;
+  OptionsStub &operator=(const OptionsStub &) = delete;
+  ~OptionsStub();
+};
 
-  DummyStatus GetContents(
-      const std::string& filename, std::string* data, int /*unused*/) {
-    FILE* fp = std::fopen(filename.c_str(), "rb");
-    if (fp == NULL) {
-      std::perror(filename.c_str());
-      std::exit(1);
-    }
+const OptionsStub &Defaults();
 
-    data->clear();
-    while (!feof(fp)) {
-      char buf[4096];
-      size_t ret = fread(buf, 1, 4096, fp);
-      if (ret == 0 && ferror(fp)) {
-        std::perror("fread");
-        std::exit(1);
-      }
-      data->append(std::string(buf, ret));
-    }
+// Stubs the class absl::Status.
+//
+// This class should not be instantiated explicitly. It should only be used by
+// passing the result of file::GetContents() / file::SetContents() to
+// CHECK_OK().
+class StatusStub {
+ public:
+  StatusStub();
+  StatusStub(const StatusStub &);
+  StatusStub &operator=(const StatusStub &);
+  ~StatusStub();
 
-    std::fclose(fp);
+  bool ok();
+};
 
-    return DummyStatus();
-  }
+StatusStub GetContents(const std::string &file_name, std::string *output,
+                       const OptionsStub & /* options */);
 
-  inline DummyStatus SetContents(
-      const std::string& filename, const std::string& str, int /*unused*/) {
-    FILE* fp = std::fopen(filename.c_str(), "wb");
-    if (fp == NULL) {
-      std::perror(filename.c_str());
-      std::exit(1);
-    }
+StatusStub SetContents(const std::string &file_name, const std::string &content,
+                       const OptionsStub & /* options */);
 
-    int ret = std::fwrite(str.data(), str.size(), 1, fp);
-    if (ret != 1) {
-      std::perror("fwrite");
-      std::exit(1);
-    }
-
-    std::fclose(fp);
-
-    return DummyStatus();
-  }
 }  // namespace file
-
-}  // namespace
 
 namespace snappy {
 
