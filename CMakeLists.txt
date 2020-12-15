@@ -66,10 +66,13 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
   endif(NOT CMAKE_CXX_FLAGS MATCHES "-Wextra")
 
-  # Use -Werror for clang and gcc.
-  if(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
-  endif(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
+  # Use -Werror for clang only.
+  # There are many clang compiler ID's, but only one gcc.
+  if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GCC")
+    if(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+    endif(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
+  endif(CMAKE_CXX_COMPILER_ID STREQUAL "GCC")
 
   # Disable C++ exceptions.
   string(REGEX REPLACE "-fexceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
