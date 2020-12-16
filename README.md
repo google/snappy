@@ -109,34 +109,32 @@ information.
 Tests and benchmarks
 ====================
 
-When you compile Snappy, snappy_unittest is compiled in addition to the
-library itself. You do not need it to use the compressor from your own library,
-but it contains several useful components for Snappy development.
+When you compile Snappy, the following binaries are compiled in addition to the
+library itself. You do not need them to use the compressor from your own
+library, but they are useful for Snappy development.
 
-First of all, it contains unit tests, verifying correctness on your machine in
-various scenarios. If you want to change or optimize Snappy, please run the
-tests to verify you have not broken anything.
+* `snappy_benchmark` contains microbenchmarks used to tune compression and
+  decompression performance.
+* `snappy_unittests` contains unit tests, verifying correctness on your machine
+  in various scenarios.
+* `snappy_test_tool` can benchmark Snappy against a few other compression
+  libraries (zlib, LZO, LZF, and QuickLZ), if they were detected at configure
+  time. To benchmark using a given file, give the compression algorithm you want
+  to test Snappy against (e.g. --zlib) and then a list of one or more file names
+  on the command line.
+
+If you want to change or optimize Snappy, please run the tests and benchmarks to
+verify you have not broken anything.
+
+The testdata/ directory contains the files used by the microbenchmarks, which
+should provide a reasonably balanced starting point for benchmarking. (Note that
+baddata[1-3].snappy are not intended as benchmarks; they are used to verify
+correctness in the presence of corrupted data in the unit test.)
 
 The gflags library for handling of command-line flags is used if it's installed.
 You can find it at
 
   https://gflags.github.io/gflags/
-
-In addition to the unit tests, snappy contains microbenchmarks used to
-tune compression and decompression performance. These are automatically run
-before the unit tests, but you can disable them using the flag
---run_microbenchmarks=false if you have gflags installed (otherwise you will
-need to edit the source).
-
-Finally, snappy can benchmark Snappy against a few other compression libraries
-(zlib, LZO, LZF, and QuickLZ), if they were detected at configure time.
-To benchmark using a given file, give the compression algorithm you want to test
-Snappy against (e.g. --zlib) and then a list of one or more file names on the
-command line. The testdata/ directory contains the files used by the
-microbenchmark, which should provide a reasonably balanced starting point for
-benchmarking. (Note that baddata[1-3].snappy are not intended as benchmarks; they
-are used to verify correctness in the presence of corrupted data in the unit
-test.)
 
 
 Contact

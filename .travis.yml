@@ -90,6 +90,7 @@ before_script:
 
 script:
 - build/snappy_unittest
+- build/snappy_benchmark
 - if [ -f build/snappy_compress_fuzzer ]; then
     build/snappy_compress_fuzzer -runs=1000 -close_fd_mask=3;
   fi

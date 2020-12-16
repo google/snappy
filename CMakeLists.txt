@@ -88,6 +88,8 @@ option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
 option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
 
+option(SNAPPY_BUILD_BENCHMARKS "Build Snappy's benchmarks" ON)
+
 option(SNAPPY_FUZZING_BUILD "Build Snappy for fuzzing." OFF)
 
 option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
@@ -252,6 +254,39 @@ if(BUILD_SHARED_LIBS)
   set_target_properties(snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif(BUILD_SHARED_LIBS)
 
+if(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
+  add_library(snappy_test_support "")
+  target_sources(snappy_test_support
+    PRIVATE
+      "snappy-test.cc"
+      "snappy-test.h"
+      "snappy_test_data.cc"
+      "snappy_test_data.h"
+      "${PROJECT_BINARY_DIR}/config.h"
+  )
+
+  # Test files include snappy-test.h, HAVE_CONFIG_H must be defined.
+  target_compile_definitions(snappy_test_support PUBLIC -DHAVE_CONFIG_H)
+
+  target_link_libraries(snappy_test_support snappy ${GFLAGS_LIBRARIES})
+
+  if(HAVE_LIBZ)
+    target_link_libraries(snappy_test_support z)
+  endif(HAVE_LIBZ)
+  if(HAVE_LIBLZO2)
+    target_link_libraries(snappy_test_support lzo2)
+  endif(HAVE_LIBLZO2)
+  if(HAVE_LIBLZ4)
+    target_link_libraries(snappy_test_support lz4)
+  endif(HAVE_LIBLZ4)
+
+  target_include_directories(snappy_test_support
+    BEFORE PUBLIC
+      "${PROJECT_SOURCE_DIR}"
+      "${GFLAGS_INCLUDE_DIRS}"
+  )
+endif(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
+
 if(SNAPPY_BUILD_TESTS)
   enable_testing()
 
@@ -263,11 +298,6 @@ if(SNAPPY_BUILD_TESTS)
 
   # This project is tested using GoogleTest.
   add_subdirectory("third_party/googletest")
-
-  # This project uses Google benchmark for benchmarking.
-  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-  set(BENCHMARK_ENABLE_EXCEPTIONS OFF CACHE BOOL "" FORCE)
-  add_subdirectory("third_party/benchmark")
 
   # GoogleTest triggers a missing field initializers warning.
   if(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
@@ -281,33 +311,35 @@ if(SNAPPY_BUILD_TESTS)
   target_sources(snappy_unittest
     PRIVATE
       "snappy_unittest.cc"
-      "snappy-test.cc"
   )
-  target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-  target_link_libraries(snappy_unittest
-                        snappy ${GFLAGS_LIBRARIES} gmock gtest benchmark)
-
-  if(HAVE_LIBZ)
-    target_link_libraries(snappy_unittest z)
-  endif(HAVE_LIBZ)
-  if(HAVE_LIBLZO2)
-    target_link_libraries(snappy_unittest lzo2)
-  endif(HAVE_LIBLZO2)
-  if(HAVE_LIBLZ4)
-    target_link_libraries(snappy_unittest lz4)
-  endif(HAVE_LIBLZ4)
-
-  target_include_directories(snappy_unittest
-    BEFORE PRIVATE
-      "${PROJECT_SOURCE_DIR}"
-      "${GFLAGS_INCLUDE_DIRS}"
-  )
+  target_link_libraries(snappy_unittest snappy_test_support gmock_main gtest)
 
   add_test(
     NAME snappy_unittest
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMAND "${PROJECT_BINARY_DIR}/snappy_unittest")
+
+  add_executable(snappy_test_tool "")
+  target_sources(snappy_test_tool
+    PRIVATE
+      "snappy_test_tool.cc"
+  )
+  target_link_libraries(snappy_test_tool snappy_test_support)
 endif(SNAPPY_BUILD_TESTS)
+
+if(SNAPPY_BUILD_BENCHMARKS)
+  add_executable(snappy_benchmark "")
+  target_sources(snappy_benchmark
+    PRIVATE
+      "snappy_benchmark.cc"
+  )
+  target_link_libraries(snappy_benchmark snappy_test_support benchmark_main)
+
+  # This project uses Google benchmark for benchmarking.
+  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+  set(BENCHMARK_ENABLE_EXCEPTIONS OFF CACHE BOOL "" FORCE)
+  add_subdirectory("third_party/benchmark")
+endif(SNAPPY_BUILD_BENCHMARKS)
 
 if(SNAPPY_FUZZING_BUILD)
   add_executable(snappy_compress_fuzzer "")
