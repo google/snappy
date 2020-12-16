@@ -31,11 +31,12 @@
 #include <string>
 #include <vector>
 
+#include "snappy-test.h"
+
 #include "benchmark/benchmark.h"
-#include "gtest/gtest.h"
+
 #include "snappy-internal.h"
 #include "snappy-sinksource.h"
-#include "snappy-test.h"
 #include "snappy.h"
 #include "snappy_test_data.h"
 
