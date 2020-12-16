@@ -28,20 +28,14 @@
 //
 // Various stubs for the unit tests for the open-source version of Snappy.
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#ifdef HAVE_WINDOWS_H
-// Needed to be able to use std::max without workarounds in the source code.
-// https://support.microsoft.com/en-us/help/143208/prb-using-stl-in-windows-program-can-cause-min-max-conflicts
-#define NOMINMAX
-#include <windows.h>
-#endif
-
 #include "snappy-test.h"
 
 #include <algorithm>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <string>
 
 DEFINE_bool(run_microbenchmarks, true,
             "Run microbenchmarks before doing anything else.");
@@ -65,7 +59,7 @@ bool StatusStub::ok() { return true; }
 
 StatusStub GetContents(const std::string &filename, std::string *output,
                        const OptionsStub & /* options */) {
-  FILE *fp = std::fopen(filename.c_str(), "rb");
+  std::FILE *fp = std::fopen(filename.c_str(), "rb");
   if (fp == nullptr) {
     std::perror(filename.c_str());
     std::exit(1);
@@ -88,7 +82,7 @@ StatusStub GetContents(const std::string &filename, std::string *output,
 
 StatusStub SetContents(const std::string &file_name, const std::string &content,
                        const OptionsStub & /* options */) {
-  FILE *fp = std::fopen(file_name.c_str(), "wb");
+  std::FILE *fp = std::fopen(file_name.c_str(), "wb");
   if (fp == nullptr) {
     std::perror(file_name.c_str());
     std::exit(1);
@@ -123,18 +117,42 @@ std::string ReadTestDataFile(const std::string& base, size_t size_limit) {
   return contents;
 }
 
-std::string ReadTestDataFile(const std::string& base) {
-  return ReadTestDataFile(base, 0);
-}
-
 std::string StrFormat(const char* format, ...) {
-  char buf[4096];
+  char buffer[4096];
   std::va_list ap;
   va_start(ap, format);
-  std::vsnprintf(buf, sizeof(buf), format, ap);
+  std::vsnprintf(buffer, sizeof(buffer), format, ap);
   va_end(ap);
-  return buf;
+  return buffer;
 }
+
+LogMessage::~LogMessage() { std::cerr << std::endl; }
+
+LogMessage &LogMessage::operator<<(const std::string &message) {
+  std::cerr << message;
+  return *this;
+}
+
+LogMessage &LogMessage::operator<<(int number) {
+  std::cerr << number;
+  return *this;
+}
+
+#ifdef _MSC_VER
+// ~LogMessageCrash calls std::abort() and therefore never exits. This is by
+// design, so temporarily disable warning C4722.
+#pragma warning(push)
+#pragma warning(disable : 4722)
+#endif
+
+LogMessageCrash::~LogMessageCrash() {
+  std::cerr << std::endl;
+  std::abort();
+}
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #ifdef HAVE_LIBZ
 

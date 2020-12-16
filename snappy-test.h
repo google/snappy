@@ -31,10 +31,9 @@
 #ifndef THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
 #define THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_TEST_H_
 
-#include <cstdarg>
-#include <cstdio>
-#include <iostream>
-#include <string>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #include "snappy-stubs-internal.h"
 
@@ -135,8 +134,6 @@ namespace snappy {
 
 std::string ReadTestDataFile(const std::string& base, size_t size_limit);
 
-std::string ReadTestDataFile(const std::string& base);
-
 // A std::sprintf() variant that returns a std::string.
 // Not safe for general use due to truncation issues.
 std::string StrFormat(const char* format, ...);
@@ -145,17 +142,18 @@ std::string StrFormat(const char* format, ...);
 // system time changing.
 class CycleTimer {
  public:
-  CycleTimer() : real_time_us_(0) {}
+  inline CycleTimer() : real_time_us_(0) {}
+  inline ~CycleTimer() = default;
 
-  void Start() {
+  inline void Start() {
 #ifdef WIN32
     QueryPerformanceCounter(&start_);
 #else
-    gettimeofday(&start_, NULL);
+    ::gettimeofday(&start_, nullptr);
 #endif
   }
 
-  void Stop() {
+  inline void Stop() {
 #ifdef WIN32
     LARGE_INTEGER stop;
     LARGE_INTEGER frequency;
@@ -166,26 +164,76 @@ class CycleTimer {
         frequency.QuadPart;
     real_time_us_ += elapsed * 1e6 + 0.5;
 #else
-    struct timeval stop;
-    gettimeofday(&stop, NULL);
+    struct ::timeval stop;
+    ::gettimeofday(&stop, nullptr);
 
     real_time_us_ += 1000000 * (stop.tv_sec - start_.tv_sec);
     real_time_us_ += (stop.tv_usec - start_.tv_usec);
 #endif
   }
 
-  double Get() {
-    return real_time_us_ * 1e-6;
-  }
+  inline double Get() { return real_time_us_ * 1e-6; }
 
  private:
   int64_t real_time_us_;
 #ifdef WIN32
   LARGE_INTEGER start_;
 #else
-  struct timeval start_;
+  struct ::timeval start_;
 #endif
 };
+
+// Logging.
+
+class LogMessage {
+ public:
+  inline LogMessage() = default;
+  ~LogMessage();
+
+  LogMessage &operator<<(const std::string &message);
+  LogMessage &operator<<(int number);
+};
+
+class LogMessageCrash : public LogMessage {
+ public:
+  inline LogMessageCrash() = default;
+  ~LogMessageCrash();
+};
+
+// This class is used to explicitly ignore values in the conditional
+// logging macros.  This avoids compiler warnings like "value computed
+// is not used" and "statement has no effect".
+
+class LogMessageVoidify {
+ public:
+  inline LogMessageVoidify() = default;
+  inline ~LogMessageVoidify() = default;
+
+  // This has to be an operator with a precedence lower than << but
+  // higher than ?:
+  inline void operator&(const LogMessage &) {}
+};
+
+// Asserts, both versions activated in debug mode only,
+// and ones that are always active.
+
+#define CRASH_UNLESS(condition)  \
+  SNAPPY_PREDICT_TRUE(condition) \
+      ? (void)0                  \
+      : snappy::LogMessageVoidify() & snappy::LogMessageCrash()
+
+#define LOG(level) LogMessage()
+#define VLOG(level) \
+  true ? (void)0 : snappy::LogMessageVoidify() & snappy::LogMessage()
+
+#define CHECK(cond) CRASH_UNLESS(cond)
+#define CHECK_LE(a, b) CRASH_UNLESS((a) <= (b))
+#define CHECK_GE(a, b) CRASH_UNLESS((a) >= (b))
+#define CHECK_EQ(a, b) CRASH_UNLESS((a) == (b))
+#define CHECK_NE(a, b) CRASH_UNLESS((a) != (b))
+#define CHECK_LT(a, b) CRASH_UNLESS((a) < (b))
+#define CHECK_GT(a, b) CRASH_UNLESS((a) > (b))
+#define CHECK_OK(cond) (cond).ok()
 
 #ifdef HAVE_LIBZ
 
@@ -307,82 +355,6 @@ class ZLib {
 };
 
 #endif  // HAVE_LIBZ
-
-}  // namespace snappy
-
-// For main().
-namespace snappy {
-
-// Logging.
-
-#define LOG(level) LogMessage()
-#define VLOG(level) true ? (void)0 : \
-    snappy::LogMessageVoidify() & snappy::LogMessage()
-
-class LogMessage {
- public:
-  LogMessage() { }
-  ~LogMessage() {
-    std::cerr << std::endl;
-  }
-
-  LogMessage& operator<<(const std::string& msg) {
-    std::cerr << msg;
-    return *this;
-  }
-  LogMessage& operator<<(int x) {
-    std::cerr << x;
-    return *this;
-  }
-};
-
-// Asserts, both versions activated in debug mode only,
-// and ones that are always active.
-
-#define CRASH_UNLESS(condition) \
-    SNAPPY_PREDICT_TRUE(condition) ? (void)0 : \
-    snappy::LogMessageVoidify() & snappy::LogMessageCrash()
-
-#ifdef _MSC_VER
-// ~LogMessageCrash calls std::abort() and therefore never exits. This is by
-// design, so temporarily disable warning C4722.
-#pragma warning(push)
-#pragma warning(disable:4722)
-#endif
-
-class LogMessageCrash : public LogMessage {
- public:
-  LogMessageCrash() { }
-  ~LogMessageCrash() {
-    std::cerr << std::endl;
-    std::abort();
-  }
-};
-
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-
-// This class is used to explicitly ignore values in the conditional
-// logging macros.  This avoids compiler warnings like "value computed
-// is not used" and "statement has no effect".
-
-class LogMessageVoidify {
- public:
-  LogMessageVoidify() { }
-  // This has to be an operator with a precedence lower than << but
-  // higher than ?:
-  void operator&(const LogMessage&) { }
-};
-
-#define CHECK(cond) CRASH_UNLESS(cond)
-#define CHECK_LE(a, b) CRASH_UNLESS((a) <= (b))
-#define CHECK_GE(a, b) CRASH_UNLESS((a) >= (b))
-#define CHECK_EQ(a, b) CRASH_UNLESS((a) == (b))
-#define CHECK_NE(a, b) CRASH_UNLESS((a) != (b))
-#define CHECK_LT(a, b) CRASH_UNLESS((a) < (b))
-#define CHECK_GT(a, b) CRASH_UNLESS((a) > (b))
-#define CHECK_OK(cond) (cond).ok()
 
 }  // namespace snappy
 
