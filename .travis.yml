@@ -59,7 +59,8 @@ install:
     export PATH="$(brew --prefix llvm)/bin:$PATH";
   fi
 # Fuzzing is only supported on Clang. Perform fuzzing on Debug builds.
-- if [ "$CXX" = "clang++" ] && [ "$BUILD_TYPE" = "Debug" ]; then
+# LibFuzzer doesn't ship with CommandLineTools on osx.
+- if [ "$CXX" = "clang++" ] && [ "$BUILD_TYPE" = "Debug" ] && [ "$TRAVIS_OS_NAME" != "osx" ]; then
     export FUZZING=1;
   else
     export FUZZING=0;
