@@ -12,6 +12,9 @@ compiler:
 os:
 - linux
 - osx
+arch:
+- amd64
+- ppc64le
 
 env:
 - BUILD_TYPE=Debug CPU_LEVEL=AVX
