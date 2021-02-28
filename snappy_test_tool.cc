@@ -416,25 +416,21 @@ void MeasureFile(const char* fname) {
   CHECK_OK(file::GetContents(fname, &fullinput, file::Defaults()));
   std::printf("%-40s :\n", fname);
 
-  int start_len = (absl::GetFlag(FLAGS_start_len) < 0)
-                      ? fullinput.size()
-                      : absl::GetFlag(FLAGS_start_len);
+  int start_len = (FLAGS_start_len < 0) ? fullinput.size() : FLAGS_start_len;
   int end_len = fullinput.size();
-  if (absl::GetFlag(FLAGS_end_len) >= 0) {
-    end_len = std::min<int>(fullinput.size(), absl::GetFlag(FLAGS_end_len));
+  if (FLAGS_end_len >= 0) {
+    end_len = std::min<int>(fullinput.size(), FLAGS_end_len);
   }
   for (int len = start_len; len <= end_len; ++len) {
     const char* const input = fullinput.data();
-    int repeats = (absl::GetFlag(FLAGS_bytes) + len) / (len + 1);
-    if (absl::GetFlag(FLAGS_zlib))
-      Measure(input, len, ZLIB, repeats, 1024 << 10);
-    if (absl::GetFlag(FLAGS_lzo)) Measure(input, len, LZO, repeats, 1024 << 10);
-    if (absl::GetFlag(FLAGS_lz4)) Measure(input, len, LZ4, repeats, 1024 << 10);
-    if (absl::GetFlag(FLAGS_snappy))
-      Measure(input, len, SNAPPY, repeats, 4096 << 10);
+    int repeats = (FLAGS_bytes + len) / (len + 1);
+    if (FLAGS_zlib) Measure(input, len, ZLIB, repeats, 1024 << 10);
+    if (FLAGS_lzo) Measure(input, len, LZO, repeats, 1024 << 10);
+    if (FLAGS_lz4) Measure(input, len, LZ4, repeats, 1024 << 10);
+    if (FLAGS_snappy) Measure(input, len, SNAPPY, repeats, 4096 << 10);
 
     // For block-size based measurements
-    if (0 && absl::GetFlag(FLAGS_snappy)) {
+    if (0 && FLAGS_snappy) {
       Measure(input, len, SNAPPY, repeats, 8<<10);
       Measure(input, len, SNAPPY, repeats, 16<<10);
       Measure(input, len, SNAPPY, repeats, 32<<10);
@@ -453,9 +449,9 @@ int main(int argc, char** argv) {
   InitGoogle(argv[0], &argc, &argv, true);
 
   for (int arg = 1; arg < argc; ++arg) {
-    if (absl::GetFlag(FLAGS_write_compressed)) {
+    if (FLAGS_write_compressed) {
       snappy::CompressFile(argv[arg]);
-    } else if (absl::GetFlag(FLAGS_write_uncompressed)) {
+    } else if (FLAGS_write_uncompressed) {
       snappy::UncompressFile(argv[arg]);
     } else {
       snappy::MeasureFile(argv[arg]);
