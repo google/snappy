@@ -265,10 +265,13 @@ if(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
       "${PROJECT_BINARY_DIR}/config.h"
   )
 
+  # absl::flags is used since 453942b
+  add_subdirectory("third_party/abseil-cpp")
+
   # Test files include snappy-test.h, HAVE_CONFIG_H must be defined.
   target_compile_definitions(snappy_test_support PUBLIC -DHAVE_CONFIG_H)
 
-  target_link_libraries(snappy_test_support snappy ${GFLAGS_LIBRARIES})
+  target_link_libraries(snappy_test_support snappy ${GFLAGS_LIBRARIES} absl::flags)
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_test_support z)

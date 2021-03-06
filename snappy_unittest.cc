@@ -43,8 +43,11 @@
 #include "snappy.h"
 #include "snappy_test_data.h"
 
-DEFINE_bool(snappy_dump_decompression_table, false,
+ABSL_FLAG(bool, snappy_dump_decompression_table, false,
             "If true, we print the decompression table during tests.");
+
+ABSL_FLAG(int32_t, test_random_seed, 301,
+            "To specify the random seed explicitly, `test_random_seed=SEED`.");
 
 namespace snappy {
 

@@ -41,23 +41,23 @@
 #include "snappy.h"
 #include "snappy_test_data.h"
 
-DEFINE_int32(start_len, -1,
+ABSL_FLAG(int32_t, start_len, -1,
              "Starting prefix size for testing (-1: just full file contents)");
-DEFINE_int32(end_len, -1,
+ABSL_FLAG(int32_t, end_len, -1,
              "Starting prefix size for testing (-1: just full file contents)");
-DEFINE_int32(bytes, 10485760,
+ABSL_FLAG(int32_t, bytes, 10485760,
              "How many bytes to compress/uncompress per file for timing");
 
-DEFINE_bool(zlib, true,
+ABSL_FLAG(bool, zlib, true,
             "Run zlib compression (http://www.zlib.net)");
-DEFINE_bool(lzo, true,
+ABSL_FLAG(bool, lzo, true,
             "Run LZO compression (http://www.oberhumer.com/opensource/lzo/)");
-DEFINE_bool(lz4, true, "Run LZ4 compression (https://github.com/lz4/lz4)");
-DEFINE_bool(snappy, true, "Run snappy compression");
+ABSL_FLAG(bool, lz4, true, "Run LZ4 compression (https://github.com/lz4/lz4)");
+ABSL_FLAG(bool, snappy, true, "Run snappy compression");
 
-DEFINE_bool(write_compressed, false,
+ABSL_FLAG(bool, write_compressed, false,
             "Write compressed versions of each file to <file>.comp");
-DEFINE_bool(write_uncompressed, false,
+ABSL_FLAG(bool, write_uncompressed, false,
             "Write uncompressed versions of each file to <file>.uncomp");
 
 namespace snappy {

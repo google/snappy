@@ -89,6 +89,8 @@
 #include "lz4.h"
 #endif
 
+#include "absl/flags/flag.h"
+
 namespace file {
 
 // Stubs the class file::Options.
@@ -129,8 +131,6 @@ StatusStub SetContents(const std::string &file_name, const std::string &content,
 }  // namespace file
 
 namespace snappy {
-
-#define FLAGS_test_random_seed 301
 
 std::string ReadTestDataFile(const std::string& base, size_t size_limit);
 
