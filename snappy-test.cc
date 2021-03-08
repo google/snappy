@@ -37,9 +37,6 @@
 #include <iostream>
 #include <string>
 
-DEFINE_bool(run_microbenchmarks, true,
-            "Run microbenchmarks before doing anything else.");
-
 namespace file {
 
 OptionsStub::OptionsStub() = default;
