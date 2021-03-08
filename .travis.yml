@@ -12,6 +12,9 @@ compiler:
 os:
 - linux
 - osx
+arch:
+- amd64
+- ppc64le
 
 env:
 - BUILD_TYPE=Debug CPU_LEVEL=AVX
@@ -27,6 +30,11 @@ jobs:
     os: osx
   - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
     os: osx
+  # ppc64le, limit to one run per build-type
+  - env: BUILD_TYPE=Debug CPU_LEVEL=AVX2
+    arch: ppc64le
+  - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
+    arch: ppc64le    
   allow_failures:
   # Homebrew's GCC is currently broken on XCode 11.
   - compiler: gcc
@@ -63,6 +71,10 @@ install:
 - if [ "$CXX" = "clang++" ] && [ "$BUILD_TYPE" = "Debug" ] && [ "$TRAVIS_OS_NAME" != "osx" ]; then
     export FUZZING=1;
   else
+    export FUZZING=0;
+  fi
+# Fuzzing not supported on clang ppc64le.  
+- if [ "$CXX" = "clang++" ] && [ "$BUILD_TYPE" = "Debug" ] && [ "$TRAVIS_CPU_ARCH" = "ppc64le" ]; then
     export FUZZING=0;
   fi
 # /usr/bin/gcc points to an older compiler on both Linux and macOS.
