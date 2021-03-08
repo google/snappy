@@ -12,6 +12,11 @@ compiler:
 os:
 - linux
 - osx
+arch:
+- amd64
+- arm64
+- ppc64le
+- s390x
 
 env:
 - BUILD_TYPE=Debug CPU_LEVEL=AVX
@@ -27,6 +32,21 @@ jobs:
     os: osx
   - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
     os: osx
+  # arm64, limit to one run per build-type
+  - env: BUILD_TYPE=Debug CPU_LEVEL=AVX2
+    arch: arm64
+  - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
+    arch: arm64
+  # ppc64le, limit to one run per build-type
+  - env: BUILD_TYPE=Debug CPU_LEVEL=AVX2
+    arch: ppc64le
+  - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
+    arch: ppc64le
+  # s390x, limit to one run per build-type
+  - env: BUILD_TYPE=Debug CPU_LEVEL=AVX2
+    arch: s390x
+  - env: BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
+    arch: s390x    
   allow_failures:
   # Homebrew's GCC is currently broken on XCode 11.
   - compiler: gcc
@@ -64,6 +84,12 @@ install:
     export FUZZING=1;
   else
     export FUZZING=0;
+  fi
+# Fuzzing not supported on clang ppc64le and s390x.  
+- if [ "$CXX" = "clang++" ] && [ "$BUILD_TYPE" = "Debug" ]; then
+    if [ "$TRAVIS_CPU_ARCH" = "ppc64le" ] || [ "$TRAVIS_CPU_ARCH" = "s390x" ]; then
+      export FUZZING=0;
+    fi
   fi
 # /usr/bin/gcc points to an older compiler on both Linux and macOS.
 - if [ "$CXX" = "g++" ]; then export CXX="g++-10" CC="gcc-10"; fi
