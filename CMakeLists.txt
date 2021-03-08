@@ -182,11 +182,6 @@ include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
 
-find_package(Gflags QUIET)
-if(GFLAGS_FOUND OR GFLAGS_TARGET)
-  set(HAVE_GFLAGS 1)
-endif(GFLAGS_FOUND OR GFLAGS_TARGET)
-
 configure_file(
   "cmake/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"
@@ -268,7 +263,7 @@ if(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
   # Test files include snappy-test.h, HAVE_CONFIG_H must be defined.
   target_compile_definitions(snappy_test_support PUBLIC -DHAVE_CONFIG_H)
 
-  target_link_libraries(snappy_test_support snappy ${GFLAGS_LIBRARIES})
+  target_link_libraries(snappy_test_support snappy)
 
   if(HAVE_LIBZ)
     target_link_libraries(snappy_test_support z)
@@ -283,7 +278,6 @@ if(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
   target_include_directories(snappy_test_support
     BEFORE PUBLIC
       "${PROJECT_SOURCE_DIR}"
-      "${GFLAGS_INCLUDE_DIRS}"
   )
 endif(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
 

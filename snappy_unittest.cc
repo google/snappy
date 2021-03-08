@@ -43,7 +43,7 @@
 #include "snappy.h"
 #include "snappy_test_data.h"
 
-DEFINE_bool(snappy_dump_decompression_table, false,
+SNAPPY_FLAG(bool, snappy_dump_decompression_table, false,
             "If true, we print the decompression table during tests.");
 
 namespace snappy {
@@ -461,7 +461,7 @@ TEST(Snappy, MaxBlowup) {
 }
 
 TEST(Snappy, RandomData) {
-  std::minstd_rand0 rng(absl::GetFlag(FLAGS_test_random_seed));
+  std::minstd_rand0 rng(snappy::GetFlag(FLAGS_test_random_seed));
   std::uniform_int_distribution<int> uniform_0_to_3(0, 3);
   std::uniform_int_distribution<int> uniform_0_to_8(0, 8);
   std::uniform_int_distribution<int> uniform_byte(0, 255);
@@ -834,7 +834,7 @@ TEST(Snappy, FindMatchLength) {
 TEST(Snappy, FindMatchLengthRandom) {
   constexpr int kNumTrials = 10000;
   constexpr int kTypicalLength = 10;
-  std::minstd_rand0 rng(absl::GetFlag(FLAGS_test_random_seed));
+  std::minstd_rand0 rng(snappy::GetFlag(FLAGS_test_random_seed));
   std::uniform_int_distribution<int> uniform_byte(0, 255);
   std::bernoulli_distribution one_in_two(1.0 / 2);
   std::bernoulli_distribution one_in_typical_length(1.0 / kTypicalLength);
@@ -938,7 +938,7 @@ TEST(Snappy, VerifyCharTable) {
     EXPECT_NE(0xffff, dst[i]) << "Did not assign byte " << i;
   }
 
-  if (absl::GetFlag(FLAGS_snappy_dump_decompression_table)) {
+  if (snappy::GetFlag(FLAGS_snappy_dump_decompression_table)) {
     std::printf("static const uint16_t char_table[256] = {\n  ");
     for (int i = 0; i < 256; ++i) {
       std::printf("0x%04x%s",

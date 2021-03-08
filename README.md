@@ -132,11 +132,6 @@ should provide a reasonably balanced starting point for benchmarking. (Note that
 baddata[1-3].snappy are not intended as benchmarks; they are used to verify
 correctness in the presence of corrupted data in the unit test.)
 
-The gflags library for handling of command-line flags is used if it's installed.
-You can find it at
-
-  https://gflags.github.io/gflags/
-
 
 Contact
 =======

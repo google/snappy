@@ -56,26 +56,7 @@
 #include <windows.h>
 #endif
 
-#ifdef HAVE_GFLAGS
-
-#include <gflags/gflags.h>
-
-// This is tricky; both gflags and Google Test want to look at the command line
-// arguments. Google Test seems to be the most happy with unknown arguments,
-// though, so we call it first and hope for the best.
-#define InitGoogle(argv0, argc, argv, remove_flags) \
-  google::ParseCommandLineFlags(argc, argv, remove_flags);
-
-#else
-
-// If we don't have the gflags package installed, these can only be
-// changed at compile time.
-#define DEFINE_int32(flag_name, default_value, description) \
-  static int FLAGS_ ## flag_name = default_value;
-
 #define InitGoogle(argv0, argc, argv, remove_flags) ((void)(0))
-
-#endif
 
 #ifdef HAVE_LIBZ
 #include "zlib.h"

@@ -105,16 +105,17 @@
 #define SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 #endif
 
-// This is only used for recomputing the tag byte table used during
-// decompression; for simplicity we just remove it from the open-source
-// version (anyone who wants to regenerate it can just do the call
-// themselves within main()).
-#define DEFINE_bool(flag_name, default_value, description) \
-  bool FLAGS_ ## flag_name = default_value
-#define DECLARE_bool(flag_name) \
-  extern bool FLAGS_ ## flag_name
+// Stubbed version of ABSL_FLAG.
+//
+// In the open source version, flags can only be changed at compile time.
+#define SNAPPY_FLAG(flag_type, flag_name, default_value, help) \
+  flag_type FLAGS_ ## flag_name = default_value
 
 namespace snappy {
+
+// Stubbed version of absl::GetFlag().
+template <typename T>
+inline T GetFlag(T flag) { return flag; }
 
 static const uint32_t kuint32max = std::numeric_limits<uint32_t>::max();
 static const int64_t kint64max = std::numeric_limits<int64_t>::max();

@@ -16,9 +16,6 @@
 /* Define to 1 if you have a definition for sysconf() in <unistd.h>. */
 #cmakedefine HAVE_FUNC_SYSCONF 1
 
-/* Define to 1 to use the gflags package for command-line parsing. */
-#cmakedefine HAVE_GFLAGS 1
-
 /* Define to 1 if you have the `lzo2' library (-llzo2). */
 #cmakedefine HAVE_LIBLZO2 1
 
