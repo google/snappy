@@ -182,6 +182,25 @@ include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
 
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64*")
+  # Ensure -mcpu=native , many distros still default to power8
+  set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -mcpu=native")
+
+  check_cxx_source_compiles("
+  #ifndef _ARCH_PWR9
+  #error
+  #endif
+  int main() { return 0; }" SNAPPY_HAVE_PWR9)
+
+  check_cxx_source_compiles("
+  #if !defined(__VSX__)
+  #error
+  #endif
+  int main() { return 0; }" SNAPPY_HAVE_VSX)
+  
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=native")
+endif(CMAKE_SYSTEM_PROCESSOR MATCHES "ppc64*")
+
 configure_file(
   "cmake/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"
