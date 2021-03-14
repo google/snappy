@@ -68,6 +68,29 @@
 #include <immintrin.h>
 #endif
 
+#if !defined(SNAPPY_HAVE_VSX)
+#if defined(__VSX__)
+#define SNAPPY_HAVE_VSX 1
+#else
+#define SNAPPY_HAVE_VSX 0
+#endif
+#endif
+
+#if !defined(SNAPPY_HAVE_PWR9)
+#if defined(_ARCH_PWR9)
+#define SNAPPY_HAVE_PWR9 1
+#else
+#define SNAPPY_HAVE_PWR9 0
+#endif
+#endif
+
+#if SNAPPY_HAVE_VSX
+#include <altivec.h>
+typedef uint8_t  v16u8 __attribute__((vector_size(16)));
+typedef uint32_t v8u16 __attribute__((vector_size(16)));
+typedef uint32_t v4u32 __attribute__((vector_size(16)));
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -489,6 +512,36 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       } while (SNAPPY_PREDICT_TRUE(op < op_end));
     }
     return IncrementalCopySlow(op - pattern_size, op, op_limit);
+#elif SNAPPY_HAVE_PWR9
+    v16u8 vu8 = vec_xl_len((uint8_t*)src, pattern_size);
+
+    uint32_t np = 16 / pattern_size , ns = pattern_size * np;
+    for (uint32_t ix=1; ix<np; ix++)
+        vec_xst_len(vu8, (uint8_t*)&vu8+(ix*pattern_size), pattern_size);
+
+    while (uint64_t(op_limit-op) >= ns) {
+        vec_xst_len(vu8, (uint8_t*)op, ns);
+        op += ns;
+    }
+    if (SNAPPY_PREDICT_TRUE(op >= op_limit)) return op_limit;
+    return IncrementalCopySlow(src, op, op_limit);
+#elif SNAPPY_HAVE_VSX
+    if (SNAPPY_PREDICT_TRUE(op <= buf_limit - 16))
+    {
+        v16u8 vu8 = vec_vsx_ld(0, (uint8_t*)src);
+
+        uint32_t np = 16 / pattern_size , ns = pattern_size * np;	
+        for(uint32_t ix=0; ix<np; ix++)
+            memcpy((uint8_t*)&vu8+(ix*pattern_size), src, pattern_size);	// vu|=vu<<pattern_size
+
+        char* op_end = std::min(op_limit, buf_limit - 15);
+        while (op < op_end) {
+            vec_vsx_st(vu8, 0, (uint8_t*)op);
+            op += ns;
+        }
+        if (SNAPPY_PREDICT_TRUE(op >= op_limit)) return op_limit;
+    }
+    return IncrementalCopySlow(src, op, op_limit);      
 #else   // !SNAPPY_HAVE_SSSE3
     // If plenty of buffer space remains, expand the pattern to at least 8
     // bytes. The way the following loop is written, we need 8 bytes of buffer
