@@ -204,7 +204,7 @@ bool Compress(const char* input, size_t input_size, CompressorType comp,
       int destlen = compressed->size();
       destlen = LZ4_compress_default(input, string_as_array(compressed),
                                      input_size, destlen);
-      CHECK(destlen != 0);
+      CHECK_NE(destlen, 0);
       if (!compressed_is_preallocated) {
         compressed->resize(destlen);
       }
@@ -233,6 +233,8 @@ bool Compress(const char* input, size_t input_size, CompressorType comp,
 
 bool Uncompress(const std::string& compressed, CompressorType comp, int size,
                 std::string* output) {
+  // TODO: Switch to [[maybe_unused]] when we can assume C++17.
+  (void)size;
   switch (comp) {
 #ifdef ZLIB_VERSION
     case ZLIB: {
@@ -272,7 +274,7 @@ bool Uncompress(const std::string& compressed, CompressorType comp, int size,
       int destlen = output->size();
       destlen = LZ4_decompress_safe(compressed.data(), string_as_array(output),
                                     compressed.size(), destlen);
-      CHECK(destlen != 0);
+      CHECK_NE(destlen, 0);
       CHECK_EQ(size, destlen);
       break;
     }
