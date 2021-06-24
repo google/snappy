@@ -30,17 +30,6 @@
 #include "snappy-sinksource.h"
 #include "snappy.h"
 
-#if !defined(SNAPPY_HAVE_SSSE3)
-// __SSSE3__ is defined by GCC and Clang. Visual Studio doesn't target SIMD
-// support between SSE2 and AVX (so SSSE3 instructions require AVX support), and
-// defines __AVX__ when AVX support is available.
-#if defined(__SSSE3__) || defined(__AVX__)
-#define SNAPPY_HAVE_SSSE3 1
-#else
-#define SNAPPY_HAVE_SSSE3 0
-#endif
-#endif  // !defined(SNAPPY_HAVE_SSSE3)
-
 #if !defined(SNAPPY_HAVE_BMI2)
 // __BMI2__ is defined by GCC and Clang. Visual Studio doesn't target BMI2
 // specifically, but it does define __AVX2__ when AVX2 support is available.
@@ -55,12 +44,6 @@
 #define SNAPPY_HAVE_BMI2 0
 #endif
 #endif  // !defined(SNAPPY_HAVE_BMI2)
-
-#if SNAPPY_HAVE_SSSE3
-// Please do not replace with <x86intrin.h>. or with headers that assume more
-// advanced SSE versions without checking with all the OWNERS.
-#include <tmmintrin.h>
-#endif
 
 #if SNAPPY_HAVE_BMI2
 // Please do not replace with <x86intrin.h>. or with headers that assume more
@@ -91,6 +74,13 @@ using internal::COPY_2_BYTE_OFFSET;
 using internal::COPY_4_BYTE_OFFSET;
 using internal::kMaximumTagLength;
 using internal::LITERAL;
+#if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
+using internal::V128;
+using internal::V128_Load;
+using internal::V128_LoadU;
+using internal::V128_Shuffle;
+using internal::V128_StoreU;
+#endif
 
 // We translate the information encoded in a tag through a lookup table to a
 // format that requires fewer instructions to decode. Effectively we store
@@ -228,7 +218,7 @@ inline char* IncrementalCopySlow(const char* src, char* op,
   return op_limit;
 }
 
-#if SNAPPY_HAVE_SSSE3
+#if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
 // Computes the bytes for shuffle control mask (please read comments on
 // 'pattern_generation_masks' as well) for the given index_offset and
@@ -248,19 +238,19 @@ inline constexpr std::array<char, sizeof...(indexes)> MakePatternMaskBytes(
 // Computes the shuffle control mask bytes array for given pattern-sizes and
 // returns an array.
 template <size_t... pattern_sizes_minus_one>
-inline constexpr std::array<std::array<char, sizeof(__m128i)>,
+inline constexpr std::array<std::array<char, sizeof(V128)>,
                             sizeof...(pattern_sizes_minus_one)>
 MakePatternMaskBytesTable(int index_offset,
                           index_sequence<pattern_sizes_minus_one...>) {
-  return {MakePatternMaskBytes(
-      index_offset, pattern_sizes_minus_one + 1,
-      make_index_sequence</*indexes=*/sizeof(__m128i)>())...};
+  return {
+      MakePatternMaskBytes(index_offset, pattern_sizes_minus_one + 1,
+                           make_index_sequence</*indexes=*/sizeof(V128)>())...};
 }
 
 // This is an array of shuffle control masks that can be used as the source
 // operand for PSHUFB to permute the contents of the destination XMM register
 // into a repeating byte pattern.
-alignas(16) constexpr std::array<std::array<char, sizeof(__m128i)>,
+alignas(16) constexpr std::array<std::array<char, sizeof(V128)>,
                                  16> pattern_generation_masks =
     MakePatternMaskBytesTable(
         /*index_offset=*/0,
@@ -271,40 +261,40 @@ alignas(16) constexpr std::array<std::array<char, sizeof(__m128i)>,
 // Basically, pattern_reshuffle_masks is a continuation of
 // pattern_generation_masks. It follows that, pattern_reshuffle_masks is same as
 // pattern_generation_masks for offsets 1, 2, 4, 8 and 16.
-alignas(16) constexpr std::array<std::array<char, sizeof(__m128i)>,
+alignas(16) constexpr std::array<std::array<char, sizeof(V128)>,
                                  16> pattern_reshuffle_masks =
     MakePatternMaskBytesTable(
         /*index_offset=*/16,
         /*pattern_sizes_minus_one=*/make_index_sequence<16>());
 
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
-static inline __m128i LoadPattern(const char* src, const size_t pattern_size) {
-  __m128i generation_mask = _mm_load_si128(reinterpret_cast<const __m128i*>(
+static inline V128 LoadPattern(const char* src, const size_t pattern_size) {
+  V128 generation_mask = V128_Load(reinterpret_cast<const V128*>(
       pattern_generation_masks[pattern_size - 1].data()));
   // Uninitialized bytes are masked out by the shuffle mask.
   // TODO: remove annotation and macro defs once MSan is fixed.
   SNAPPY_ANNOTATE_MEMORY_IS_INITIALIZED(src + pattern_size, 16 - pattern_size);
-  return _mm_shuffle_epi8(
-      _mm_loadu_si128(reinterpret_cast<const __m128i*>(src)), generation_mask);
+  return V128_Shuffle(V128_LoadU(reinterpret_cast<const V128*>(src)),
+                      generation_mask);
 }
 
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
-static inline std::pair<__m128i /* pattern */, __m128i /* reshuffle_mask */>
+static inline std::pair<V128 /* pattern */, V128 /* reshuffle_mask */>
 LoadPatternAndReshuffleMask(const char* src, const size_t pattern_size) {
-  __m128i pattern = LoadPattern(src, pattern_size);
+  V128 pattern = LoadPattern(src, pattern_size);
 
   // This mask will generate the next 16 bytes in-place. Doing so enables us to
-  // write data by at most 4 _mm_storeu_si128.
+  // write data by at most 4 V128_StoreU.
   //
   // For example, suppose pattern is:        abcdefabcdefabcd
   // Shuffling with this mask will generate: efabcdefabcdefab
   // Shuffling again will generate:          cdefabcdefabcdef
-  __m128i reshuffle_mask = _mm_load_si128(reinterpret_cast<const __m128i*>(
+  V128 reshuffle_mask = V128_Load(reinterpret_cast<const V128*>(
       pattern_reshuffle_masks[pattern_size - 1].data()));
   return {pattern, reshuffle_mask};
 }
 
-#endif  // SNAPPY_HAVE_SSSE3
+#endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
 // Fallback for when we need to copy while extending the pattern, for example
 // copying 10 bytes from 3 positions back abc -> abcabcabcabca.
@@ -312,7 +302,7 @@ LoadPatternAndReshuffleMask(const char* src, const size_t pattern_size) {
 // REQUIRES: [dst - offset, dst + 64) is a valid address range.
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
-#if SNAPPY_HAVE_SSSE3
+#if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
   if (SNAPPY_PREDICT_TRUE(offset <= 16)) {
     switch (offset) {
       case 0:
@@ -325,20 +315,20 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
       case 4:
       case 8:
       case 16: {
-        __m128i pattern = LoadPattern(dst - offset, offset);
+        V128 pattern = LoadPattern(dst - offset, offset);
         for (int i = 0; i < 4; i++) {
-          _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + 16 * i), pattern);
+          V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
         }
         return true;
       }
       default: {
         auto pattern_and_reshuffle_mask =
             LoadPatternAndReshuffleMask(dst - offset, offset);
-        __m128i pattern = pattern_and_reshuffle_mask.first;
-        __m128i reshuffle_mask = pattern_and_reshuffle_mask.second;
+        V128 pattern = pattern_and_reshuffle_mask.first;
+        V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
         for (int i = 0; i < 4; i++) {
-          _mm_storeu_si128(reinterpret_cast<__m128i*>(dst + 16 * i), pattern);
-          pattern = _mm_shuffle_epi8(pattern, reshuffle_mask);
+          V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
+          pattern = V128_Shuffle(pattern, reshuffle_mask);
         }
         return true;
       }
@@ -361,7 +351,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
     }
     return true;
   }
-#endif  // SNAPPY_HAVE_SSSE3
+#endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
   // Very rare.
   for (int i = 0; i < 4; i++) {
@@ -375,7 +365,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
 // region of the buffer.
 inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
                              char* const buf_limit) {
-#if SNAPPY_HAVE_SSSE3
+#if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
   constexpr int big_pattern_size_lower_bound = 16;
 #else
   constexpr int big_pattern_size_lower_bound = 8;
@@ -425,14 +415,14 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
   // Handle the uncommon case where pattern is less than 16 (or 8 in non-SSE)
   // bytes.
   if (pattern_size < big_pattern_size_lower_bound) {
-#if SNAPPY_HAVE_SSSE3
+#if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
     // Load the first eight bytes into an 128-bit XMM register, then use PSHUFB
     // to permute the register's contents in-place into a repeating sequence of
     // the first "pattern_size" bytes.
     // For example, suppose:
     //    src       == "abc"
     //    op        == op + 3
-    // After _mm_shuffle_epi8(), "pattern" will have five copies of "abc"
+    // After V128_Shuffle(), "pattern" will have five copies of "abc"
     // followed by one byte of slop: abcabcabcabcabca.
     //
     // The non-SSE fallback implementation suffers from store-forwarding stalls
@@ -444,26 +434,26 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     if (SNAPPY_PREDICT_TRUE(op_limit <= buf_limit - 15)) {
       auto pattern_and_reshuffle_mask =
           LoadPatternAndReshuffleMask(src, pattern_size);
-      __m128i pattern = pattern_and_reshuffle_mask.first;
-      __m128i reshuffle_mask = pattern_and_reshuffle_mask.second;
+      V128 pattern = pattern_and_reshuffle_mask.first;
+      V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
 
       // There is at least one, and at most four 16-byte blocks. Writing four
       // conditionals instead of a loop allows FDO to layout the code with
       // respect to the actual probabilities of each length.
       // TODO: Replace with loop with trip count hint.
-      _mm_storeu_si128(reinterpret_cast<__m128i*>(op), pattern);
+      V128_StoreU(reinterpret_cast<V128*>(op), pattern);
 
       if (op + 16 < op_limit) {
-        pattern = _mm_shuffle_epi8(pattern, reshuffle_mask);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(op + 16), pattern);
+        pattern = V128_Shuffle(pattern, reshuffle_mask);
+        V128_StoreU(reinterpret_cast<V128*>(op + 16), pattern);
       }
       if (op + 32 < op_limit) {
-        pattern = _mm_shuffle_epi8(pattern, reshuffle_mask);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(op + 32), pattern);
+        pattern = V128_Shuffle(pattern, reshuffle_mask);
+        V128_StoreU(reinterpret_cast<V128*>(op + 32), pattern);
       }
       if (op + 48 < op_limit) {
-        pattern = _mm_shuffle_epi8(pattern, reshuffle_mask);
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(op + 48), pattern);
+        pattern = V128_Shuffle(pattern, reshuffle_mask);
+        V128_StoreU(reinterpret_cast<V128*>(op + 48), pattern);
       }
       return op_limit;
     }
@@ -471,8 +461,8 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     if (SNAPPY_PREDICT_TRUE(op < op_end)) {
       auto pattern_and_reshuffle_mask =
           LoadPatternAndReshuffleMask(src, pattern_size);
-      __m128i pattern = pattern_and_reshuffle_mask.first;
-      __m128i reshuffle_mask = pattern_and_reshuffle_mask.second;
+      V128 pattern = pattern_and_reshuffle_mask.first;
+      V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
 
       // This code path is relatively cold however so we save code size
       // by avoiding unrolling and vectorizing.
@@ -483,13 +473,13 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
 #pragma clang loop unroll(disable)
 #endif
       do {
-        _mm_storeu_si128(reinterpret_cast<__m128i*>(op), pattern);
-        pattern = _mm_shuffle_epi8(pattern, reshuffle_mask);
+        V128_StoreU(reinterpret_cast<V128*>(op), pattern);
+        pattern = V128_Shuffle(pattern, reshuffle_mask);
         op += 16;
       } while (SNAPPY_PREDICT_TRUE(op < op_end));
     }
     return IncrementalCopySlow(op - pattern_size, op, op_limit);
-#else   // !SNAPPY_HAVE_SSSE3
+#else   // !SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
     // If plenty of buffer space remains, expand the pattern to at least 8
     // bytes. The way the following loop is written, we need 8 bytes of buffer
     // space if pattern_size >= 4, 11 bytes if pattern_size is 1 or 3, and 10
@@ -506,7 +496,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     } else {
       return IncrementalCopySlow(src, op, op_limit);
     }
-#endif  // SNAPPY_HAVE_SSSE3
+#endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
   }
   assert(pattern_size >= big_pattern_size_lower_bound);
   constexpr bool use_16bytes_chunk = big_pattern_size_lower_bound == 16;
