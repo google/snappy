@@ -1004,7 +1004,26 @@ void MemMove(ptrdiff_t dst, const void* src, size_t size) {
 }
 
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
-size_t AdvanceToNextTag(const uint8_t** ip_p, size_t* tag) {
+size_t AdvanceToNextTagARMOptimized(const uint8_t** ip_p, size_t* tag) {
+  const uint8_t*& ip = *ip_p;
+  // This section is crucial for the throughput of the decompression loop.
+  // The latency of an iteration is fundamentally constrained by the
+  // following data chain on ip.
+  // ip -> c = Load(ip) -> delta1 = (c & 3)        -> ip += delta1 or delta2
+  //                       delta2 = ((c >> 2) + 1)    ip++
+  // This is different from X86 optimizations because ARM has conditional add
+  // instruction (csinc) and it removes several register moves.
+  const size_t literal_tag_offset = (*tag >> 2) + 1;
+  const size_t tag_type = *tag & 3;
+  const bool is_literal = (tag_type == 0);
+  *tag = is_literal ? ip[literal_tag_offset] : ip[tag_type];
+  ip += is_literal ? literal_tag_offset : tag_type;
+  ip++;
+  return tag_type;
+}
+
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+size_t AdvanceToNextTagX86Optimized(const uint8_t** ip_p, size_t* tag) {
   const uint8_t*& ip = *ip_p;
   // This section is crucial for the throughput of the decompression loop.
   // The latency of an iteration is fundamentally constrained by the
@@ -1084,7 +1103,11 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         // For literals tag_type = 0, hence we will always obtain 0 from
         // ExtractLowBytes. For literals offset will thus be kLiteralOffset.
         ptrdiff_t len_min_offset = table.length_minus_offset[tag];
-        size_t tag_type = AdvanceToNextTag(&ip, &tag);
+#if defined(__aarch64__)
+        size_t tag_type = AdvanceToNextTagARMOptimized(&ip, &tag);
+#else
+        size_t tag_type = AdvanceToNextTagX86Optimized(&ip, &tag);
+#endif
         uint32_t next = LittleEndian::Load32(old_ip);
         size_t len = len_min_offset & 0xFF;
         len_min_offset -= ExtractOffset(next, tag_type);
