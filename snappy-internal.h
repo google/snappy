@@ -33,6 +33,8 @@
 
 #include "snappy-stubs-internal.h"
 
+#include <xmmintrin.h>
+
 namespace snappy {
 namespace internal {
 
@@ -103,6 +105,9 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
                                                       uint64_t* data) {
   assert(s2_limit >= s2);
   size_t matched = 0;
+
+  _mm_prefetch(s1, _MM_HINT_T1);
+  _mm_prefetch(s2, _MM_HINT_T1);
 
   // This block isn't necessary for correctness; we could just start looping
   // immediately.  As an optimization though, it is useful.  It creates some not
