@@ -106,8 +106,18 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
   assert(s2_limit >= s2);
   size_t matched = 0;
 
-  _mm_prefetch(s1, _MM_HINT_T1);
-  _mm_prefetch(s2, _MM_HINT_T1);
+  #if defined(__has_builtin)
+    #if __has_builtin(__builtin_prefetch)
+      __builtin_prefetch(s1);
+      __builtin_prefetch(s2);
+    #endif
+  #elif defined(__SSE__) || (defined(_M_IX86_FP) && (_M_IX86_FP >= 1)
+    _mm_prefetch(s1, _MM_HINT_T1);
+    _mm_prefetch(s2, _MM_HINT_T1);
+  #elif defined(_M_ARM64) || defined(_M_ARM)
+    __prefetch(s1);
+    __prefetch(s2);
+  #endif
 
   // This block isn't necessary for correctness; we could just start looping
   // immediately.  As an optimization though, it is useful.  It creates some not
