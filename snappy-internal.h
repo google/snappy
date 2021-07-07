@@ -56,6 +56,9 @@ inline void V128_StoreU(V128* dst, V128 val);
 // Each packed integer in the shuffle mask must be in [0,16).
 inline V128 V128_Shuffle(V128 input, V128 shuffle_mask);
 
+// Constructs V128 with 16 chars |c|.
+inline V128 V128_DupChar(char c);
+
 #if SNAPPY_HAVE_SSSE3
 inline V128 V128_Load(const V128* src) { return _mm_load_si128(src); }
 
@@ -66,6 +69,9 @@ inline void V128_StoreU(V128* dst, V128 val) { _mm_storeu_si128(dst, val); }
 inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
   return _mm_shuffle_epi8(input, shuffle_mask);
 }
+
+inline V128 V128_DupChar(char c) { return _mm_set1_epi8(c); }
+
 #else
 inline V128 V128_Load(const V128* src) {
   return vld1q_u8(reinterpret_cast<const uint8_t*>(src));
@@ -83,6 +89,8 @@ inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
   assert(vminvq_u8(shuffle_mask) >= 0 && vmaxvq_u8(shuffle_mask) <= 15);
   return vqtbl1q_u8(input, shuffle_mask);
 }
+
+inline V128 V128_DupChar(char c) { return vdupq_n_u8(c); }
 #endif
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 

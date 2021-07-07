@@ -80,6 +80,7 @@ using internal::V128_Load;
 using internal::V128_LoadU;
 using internal::V128_Shuffle;
 using internal::V128_StoreU;
+using internal::V128_DupChar;
 #endif
 
 // We translate the information encoded in a tag through a lookup table to a
@@ -308,7 +309,12 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
       case 0:
         return false;
       case 1: {
-        std::memset(dst, dst[-1], 64);
+        // TODO: Ideally we should memset, move back once the
+        // codegen issues are fixed.
+        V128 pattern = V128_DupChar(dst[-1]);
+        for (int i = 0; i < 4; i++) {
+          V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
+        }
         return true;
       }
       case 2:
