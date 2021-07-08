@@ -25,8 +25,7 @@ Snappy is written in C++, but C bindings are included, and several bindings to
 other languages are maintained by third parties:
 
 * C#: [Snappy for .NET](http://snappy4net.codeplex.com/) (P/Invoke wrapper),
-  [Snappy.NET](http://snappy.angeloflogic.com/) (P/Invoke wrapper),
-  [Snappy.Sharp](https://github.com/jeffesp/Snappy.Sharp) (native
+  [Snappy.NET](http://snappy.angeloflogic.com/) (P/Invoke wrapper), [IronSnappy](https://github.com/aloneguid/IronSnappy) (fully managed), [Snappy.Sharp](https://github.com/jeffesp/Snappy.Sharp) (native
   reimplementation)
 * [C port](http://github.com/andikleen/snappy-c)
 * [C++ MSVC packaging](http://snappy.angeloflogic.com/) (plus Windows binaries,
