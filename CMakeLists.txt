@@ -90,6 +90,14 @@ option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
 
 option(SNAPPY_BUILD_BENCHMARKS "Build Snappy's benchmarks" ON)
 
+if(UNIX)
+  option(SNAPPY_USE_BUNDLED_GTEST "Build test using bundled googletest library" ON)
+  option(SNAPPY_USE_BUNDLED_BENCHMARK_LIB "Build benchmarks using bundled benchmark library" ON)
+else(UNIX)
+  set(SNAPPY_USE_BUNDLED_GTEST ON)
+  set(SNAPPY_USE_BUNDLED_BENCHMARK_LIB ON)
+endif(UNIX)
+
 option(SNAPPY_FUZZING_BUILD "Build Snappy for fuzzing." OFF)
 
 option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
@@ -284,29 +292,40 @@ endif(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
 if(SNAPPY_BUILD_TESTS)
   enable_testing()
 
-  # Prevent overriding the parent project's compiler/linker settings on Windows.
-  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-  set(install_gtest OFF)
-  set(install_gmock OFF)
-  set(build_gmock ON)
+  if(SNAPPY_USE_BUNDLED_GTEST)
+    # Prevent overriding the parent project's compiler/linker settings on Windows.
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    set(install_gtest OFF)
+    set(install_gmock OFF)
+    set(build_gmock ON)
 
-  # This project is tested using GoogleTest.
-  add_subdirectory("third_party/googletest")
+    # This project is tested using GoogleTest.
+    add_subdirectory("third_party/googletest")
 
-  # GoogleTest triggers a missing field initializers warning.
-  if(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
-    set_property(TARGET gtest
-        APPEND PROPERTY COMPILE_OPTIONS -Wno-missing-field-initializers)
-    set_property(TARGET gmock
-        APPEND PROPERTY COMPILE_OPTIONS -Wno-missing-field-initializers)
-  endif(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+    # GoogleTest triggers a missing field initializers warning.
+    if(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+      set_property(TARGET gtest
+          APPEND PROPERTY COMPILE_OPTIONS -Wno-missing-field-initializers)
+      set_property(TARGET gmock
+          APPEND PROPERTY COMPILE_OPTIONS -Wno-missing-field-initializers)
+    endif(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+  else(SNAPPY_USE_BUNDLED_GTEST)
+    find_package(PkgConfig)
+    pkg_search_module(GTEST REQUIRED gtest_main)
+  endif(SNAPPY_USE_BUNDLED_GTEST)
 
   add_executable(snappy_unittest "")
   target_sources(snappy_unittest
     PRIVATE
       "snappy_unittest.cc"
   )
-  target_link_libraries(snappy_unittest snappy_test_support gmock_main gtest)
+  target_link_libraries(snappy_unittest snappy_test_support)
+  if(SNAPPY_USE_BUNDLED_GTEST)
+    target_link_libraries(snappy_unittest gmock_main gtest)
+  else(SNAPPY_USE_BUNDLED_BENCHMARK_LIB)
+    target_link_libraries(snappy_unittest ${GTEST_LDFLAGS})
+    target_compile_options(snappy_unittest PUBLIC ${GTEST_CFLAGS})
+  endif(SNAPPY_USE_BUNDLED_GTEST)
 
   add_test(
     NAME snappy_unittest
@@ -322,17 +341,28 @@ if(SNAPPY_BUILD_TESTS)
 endif(SNAPPY_BUILD_TESTS)
 
 if(SNAPPY_BUILD_BENCHMARKS)
+  if(NOT SNAPPY_USE_BUNDLED_BENCHMARK_LIB)
+    find_package(PkgConfig)
+    pkg_search_module(BENCHMARK REQUIRED benchmark)
+  endif(NOT SNAPPY_USE_BUNDLED_BENCHMARK_LIB)
+
   add_executable(snappy_benchmark "")
   target_sources(snappy_benchmark
     PRIVATE
       "snappy_benchmark.cc"
   )
   target_link_libraries(snappy_benchmark snappy_test_support benchmark_main)
+  if(NOT SNAPPY_USE_BUNDLED_BENCHMARK_LIB)
+    target_link_libraries(snappy_benchmark ${BENCHMARK_LDFLAGS})
+    target_compile_options(snappy_benchmark PUBLIC ${BENCHMARK_CFLAGS})
+  endif(NOT SNAPPY_USE_BUNDLED_BENCHMARK_LIB)
 
   # This project uses Google benchmark for benchmarking.
   set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
   set(BENCHMARK_ENABLE_EXCEPTIONS OFF CACHE BOOL "" FORCE)
-  add_subdirectory("third_party/benchmark")
+  if(SNAPPY_USE_BUNDLED_BENCHMARK_LIB)
+    add_subdirectory("third_party/benchmark")
+  endif(SNAPPY_USE_BUNDLED_BENCHMARK_LIB)
 endif(SNAPPY_BUILD_BENCHMARKS)
 
 if(SNAPPY_FUZZING_BUILD)
