@@ -33,13 +33,44 @@
 
 #include "snappy-stubs-internal.h"
 
+#if !defined(SNAPPY_HAVE_BMI2)
+// __BMI2__ is defined by GCC and Clang. Visual Studio doesn't target BMI2
+// specifically, but it does define __AVX2__ when AVX2 support is available.
+// Fortunately, AVX2 was introduced in Haswell, just like BMI2.
+//
+// BMI2 is not defined as a subset of AVX2 (unlike SSSE3 and AVX above). So,
+// GCC and Clang can build code with AVX2 enabled but BMI2 disabled, in which
+// case issuing BMI2 instructions results in a compiler error.
+#if defined(__BMI2__) || (defined(_MSC_VER) && defined(__AVX2__))
+#define SNAPPY_HAVE_BMI2 1
+#else
+#define SNAPPY_HAVE_BMI2 0
+#endif
+#endif  // !defined(SNAPPY_HAVE_BMI2)
+
+#if SNAPPY_HAVE_BMI2
+// Please do not replace with <x86intrin.h>. or with headers that assume more
+// advanced SSE versions without checking with all the OWNERS.
+#include <immintrin.h>
+#endif
+
+#if SNAPPY_HAVE_SSSE3
+#include <tmmintrin.h>
+#endif
+#if SNAPPY_HAVE_NEON
+#include <arm_neon.h>
+#endif
+
 namespace snappy {
 namespace internal {
 
+#if (SNAPPY_HAVE_SSSE3 || SNAPPY_HAVE_NEON)
+#define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 1
+#endif
 #if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 #if SNAPPY_HAVE_SSSE3
 using V128 = __m128i;
-#else
+#elif SNAPPY_HAVE_NEON
 using V128 = uint8x16_t;
 #endif
 
@@ -72,7 +103,7 @@ inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
 
 inline V128 V128_DupChar(char c) { return _mm_set1_epi8(c); }
 
-#else
+#elif SNAPPY_HAVE_NEON
 inline V128 V128_Load(const V128* src) {
   return vld1q_u8(reinterpret_cast<const uint8_t*>(src));
 }
