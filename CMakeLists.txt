@@ -265,6 +265,9 @@ if(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
 
   target_link_libraries(snappy_test_support snappy)
 
+  if(HAVE_GTEST)
+    target_link_libraries(snappy_unittest gtest)
+  endif(HAVE_GTEST)
   if(HAVE_LIBZ)
     target_link_libraries(snappy_test_support z)
   endif(HAVE_LIBZ)
