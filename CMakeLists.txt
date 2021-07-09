@@ -178,6 +178,15 @@ int main() {
   return _bzhi_u32(0, 1);
 }" SNAPPY_HAVE_BMI2)
 
+check_cxx_source_compiles("
+#include <arm_neon.h>
+int main() {
+  uint8_t val = 3, dup[8];
+  uint8x16_t v = vld1q_dup_u8(&val);
+  vst1q_u8(dup, v);
+  return 0;
+}" SNAPPY_HAVE_NEON)
+
 include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
