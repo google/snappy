@@ -1,5 +1,5 @@
 Snappy compressed format description
-Last revised: 2011-10-05
+Last revised: 2020-10-13
 
 
 This is not a formal specification, but should suffice to explain most
@@ -76,9 +76,9 @@ yielding a form of run-length encoding (RLE). For instance,
 
   <literal: "xab"> <copy: offset=2 length=4>
 
-Note that since the current Snappy compressor works in 32 kB
+Note that since the current Snappy compressor works in 64 kB
 blocks and does not do matching across blocks, it will never produce
-a bitstream with offsets larger than about 32768. However, the
+a bitstream with offsets larger than about 65536. However, the
 decompressor should not rely on this, as it may change in the future.
 
 There are several different kinds of copy elements, depending on
