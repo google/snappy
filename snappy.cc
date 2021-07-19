@@ -1069,7 +1069,8 @@ size_t AdvanceToNextTagX86Optimized(const uint8_t** ip_p, size_t* tag) {
 
 // Extract the offset for copy-1 and copy-2 returns 0 for literals or copy-4.
 inline uint32_t ExtractOffset(uint32_t val, size_t tag_type) {
-  return val & table.extract_masks[tag_type];
+  static const uint32_t extract_masks[4] = {0, 0xFF, 0xFFFF, 0};
+  return val & extract_masks[tag_type];
 };
 
 // Core decompression loop, when there is enough data available.
