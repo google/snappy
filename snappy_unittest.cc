@@ -905,7 +905,7 @@ TEST(Snappy, VerifyCharTable) {
   // COPY_1_BYTE_OFFSET.
   //
   // The tag byte in the compressed data stores len-4 in 3 bits, and
-  // offset/256 in 5 bits.  offset%256 is stored in the next byte.
+  // offset/256 in 3 bits.  offset%256 is stored in the next byte.
   //
   // This format is used for length in range [4..11] and offset in
   // range [0..2047]

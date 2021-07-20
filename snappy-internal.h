@@ -36,6 +36,56 @@
 namespace snappy {
 namespace internal {
 
+#if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
+#if SNAPPY_HAVE_SSSE3
+using V128 = __m128i;
+#else
+using V128 = uint8x16_t;
+#endif
+
+// Load 128 bits of integer data. `src` must be 16-byte aligned.
+inline V128 V128_Load(const V128* src);
+
+// Load 128 bits of integer data. `src` does not need to be aligned.
+inline V128 V128_LoadU(const V128* src);
+
+// Store 128 bits of integer data. `dst` does not need to be aligned.
+inline void V128_StoreU(V128* dst, V128 val);
+
+// Shuffle packed 8-bit integers using a shuffle mask.
+// Each packed integer in the shuffle mask must be in [0,16).
+inline V128 V128_Shuffle(V128 input, V128 shuffle_mask);
+
+#if SNAPPY_HAVE_SSSE3
+inline V128 V128_Load(const V128* src) { return _mm_load_si128(src); }
+
+inline V128 V128_LoadU(const V128* src) { return _mm_loadu_si128(src); }
+
+inline void V128_StoreU(V128* dst, V128 val) { _mm_storeu_si128(dst, val); }
+
+inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
+  return _mm_shuffle_epi8(input, shuffle_mask);
+}
+#else
+inline V128 V128_Load(const V128* src) {
+  return vld1q_u8(reinterpret_cast<const uint8_t*>(src));
+}
+
+inline V128 V128_LoadU(const V128* src) {
+  return vld1q_u8(reinterpret_cast<const uint8_t*>(src));
+}
+
+inline void V128_StoreU(V128* dst, V128 val) {
+  vst1q_u8(reinterpret_cast<uint8_t*>(dst), val);
+}
+
+inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
+  assert(vminvq_u8(shuffle_mask) >= 0 && vmaxvq_u8(shuffle_mask) <= 15);
+  return vqtbl1q_u8(input, shuffle_mask);
+}
+#endif
+#endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
+
 // Working memory performs a single allocation to hold all scratch space
 // required for compression.
 class WorkingMemory {
