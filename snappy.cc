@@ -1141,22 +1141,6 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         }
         std::ptrdiff_t delta = op + len_min_offset - len;
         if (SNAPPY_PREDICT_FALSE(delta < 0)) {
-#if defined(__GNUC__) && defined(__x86_64__)
-          // TODO
-          // When validating, both code path reduced to `op += len`. Ie. this
-          // becomes effectively
-          //
-          // if (delta < 0) if (tag_type != 0) goto break_loop;
-          // op += len;
-          //
-          // The compiler interchanges the predictable and almost always false
-          // first if-statement with the completely unpredictable second
-          // if-statement, putting an unpredictable branch on every iteration.
-          // This empty asm is worth almost 2x, which I think qualifies for an
-          // award for the most load-bearing empty statement.
-          asm("");
-#endif
-
           // Due to the spurious offset in literals have this will trigger
           // at the start of a block when op is still smaller than 256.
           if (tag_type != 0) goto break_loop;
