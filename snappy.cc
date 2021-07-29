@@ -124,12 +124,8 @@ constexpr std::array<int16_t, 256> MakeTable(index_sequence<seq...>) {
   return std::array<int16_t, 256>{LengthMinusOffset(seq)...};
 }
 
-// We maximally co-locate the two tables so that only one register needs to be
-// reserved for the table address.
-struct {
-  alignas(64) const std::array<int16_t, 256> length_minus_offset;
-  uint32_t extract_masks[4];  // Used for extracting offset based on tag type.
-} table = {MakeTable(make_index_sequence<256>{}), {0, 0xFF, 0xFFFF, 0}};
+alignas(64) const std::array<int16_t, 256> kLengthMinusOffset =
+    MakeTable(make_index_sequence<256>{});
 
 // Any hash function will produce a valid compressed bitstream, but a good
 // hash function reduces the number of collisions and thus yields better
@@ -1075,7 +1071,20 @@ size_t AdvanceToNextTagX86Optimized(const uint8_t** ip_p, size_t* tag) {
 
 // Extract the offset for copy-1 and copy-2 returns 0 for literals or copy-4.
 inline uint32_t ExtractOffset(uint32_t val, size_t tag_type) {
-  return val & table.extract_masks[tag_type];
+  // For x86 non-static storage works better. For ARM static storage is better.
+  // TODO: Once the array is recognized as a register, improve the
+  // readability for x86.
+#if defined(__x86_64__)
+  constexpr uint64_t kExtractMasksCombined = 0x0000FFFF00FF0000ull;
+  uint16_t result;
+  memcpy(&result,
+         reinterpret_cast<const char*>(&kExtractMasksCombined) + 2 * tag_type,
+         sizeof(result));
+  return val & result;
+#else
+  static constexpr uint32_t kExtractMasks[4] = {0, 0xFF, 0xFFFF, 0};
+  return val & kExtractMasks[tag_type];
+#endif
 };
 
 // Core decompression loop, when there is enough data available.
@@ -1108,7 +1117,7 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         assert(tag == ip[-1]);
         // For literals tag_type = 0, hence we will always obtain 0 from
         // ExtractLowBytes. For literals offset will thus be kLiteralOffset.
-        ptrdiff_t len_min_offset = table.length_minus_offset[tag];
+        ptrdiff_t len_min_offset = kLengthMinusOffset[tag];
 #if defined(__aarch64__)
         size_t tag_type = AdvanceToNextTagARMOptimized(&ip, &tag);
 #else
@@ -1328,7 +1337,7 @@ class SnappyDecompressor {
 
           if (!writer->AppendFromSelf(copy_offset, length, &op)) goto exit;
         } else {
-          const ptrdiff_t entry = table.length_minus_offset[c];
+          const ptrdiff_t entry = kLengthMinusOffset[c];
           preload = LittleEndian::Load32(ip);
           const uint32_t trailer = ExtractLowBytes(preload, c & 3);
           const uint32_t length = entry & 0xff;
