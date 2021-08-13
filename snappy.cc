@@ -1081,6 +1081,10 @@ inline uint32_t ExtractOffset(uint32_t val, size_t tag_type) {
          reinterpret_cast<const char*>(&kExtractMasksCombined) + 2 * tag_type,
          sizeof(result));
   return val & result;
+#elif defined(__aarch64__)
+  constexpr uint64_t kExtractMasksCombined = 0x0000FFFF00FF0000ull;
+  return val & static_cast<uint32_t>(
+      (kExtractMasksCombined >> (tag_type * 16)) & 0xFFFF);
 #else
   static constexpr uint32_t kExtractMasks[4] = {0, 0xFF, 0xFFFF, 0};
   return val & kExtractMasks[tag_type];
