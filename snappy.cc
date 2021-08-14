@@ -1112,6 +1112,15 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
     // ip points just past the tag and we are touching at maximum kSlopBytes
     // in an iteration.
     size_t tag = ip[-1];
+#if defined(__clang__) && defined(__aarch64__)
+    // Workaround for https://bugs.llvm.org/show_bug.cgi?id=51317
+    // when loading 1 byte, clang for aarch64 doesn't realize that it(ldrb)
+    // comes with free zero-extension, so clang generates another
+    // 'and xn, xm, 0xff' before it use that as the offset. This 'and' is
+    // redundant and can be removed by adding this dummy asm, which gives
+    // clang a hint that we're doing the zero-extension at the load.
+    asm("" ::"r"(tag));
+#endif
     do {
       // The throughput is limited by instructions, unrolling the inner loop
       // twice reduces the amount of instructions checking limits and also
