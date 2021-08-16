@@ -31,7 +31,7 @@
 #ifndef THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_STUBS_INTERNAL_H_
 #define THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_STUBS_INTERNAL_H_
 
-#ifdef HAVE_CONFIG_H
+#if HAVE_CONFIG_H
 #include "config.h"
 #endif
 
@@ -43,11 +43,11 @@
 #include <limits>
 #include <string>
 
-#ifdef HAVE_SYS_MMAN_H
+#if HAVE_SYS_MMAN_H
 #include <sys/mman.h>
 #endif
 
-#ifdef HAVE_UNISTD_H
+#if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 
@@ -90,20 +90,20 @@
 #define ARRAYSIZE(a) int{sizeof(a) / sizeof(*(a))}
 
 // Static prediction hints.
-#ifdef HAVE_BUILTIN_EXPECT
+#if HAVE_BUILTIN_EXPECT
 #define SNAPPY_PREDICT_FALSE(x) (__builtin_expect(x, 0))
 #define SNAPPY_PREDICT_TRUE(x) (__builtin_expect(!!(x), 1))
 #else
 #define SNAPPY_PREDICT_FALSE(x) x
 #define SNAPPY_PREDICT_TRUE(x) x
-#endif
+#endif  // HAVE_BUILTIN_EXPECT
 
 // Inlining hints.
-#ifdef HAVE_ATTRIBUTE_ALWAYS_INLINE
+#if HAVE_ATTRIBUTE_ALWAYS_INLINE
 #define SNAPPY_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
 #else
 #define SNAPPY_ATTRIBUTE_ALWAYS_INLINE
-#endif
+#endif  // HAVE_ATTRIBUTE_ALWAYS_INLINE
 
 // Stubbed version of ABSL_FLAG.
 //
@@ -235,11 +235,11 @@ class LittleEndian {
   }
 
   static inline constexpr bool IsLittleEndian() {
-#if defined(SNAPPY_IS_BIG_ENDIAN)
+#if SNAPPY_IS_BIG_ENDIAN
     return false;
 #else
     return true;
-#endif  // defined(SNAPPY_IS_BIG_ENDIAN)
+#endif  // SNAPPY_IS_BIG_ENDIAN
   }
 };
 
@@ -265,7 +265,7 @@ class Bits {
   void operator=(const Bits&);
 };
 
-#if defined(HAVE_BUILTIN_CTZ)
+#if HAVE_BUILTIN_CTZ
 
 inline int Bits::Log2FloorNonZero(uint32_t n) {
   assert(n != 0);
@@ -354,7 +354,7 @@ inline int Bits::FindLSBSetNonZero(uint32_t n) {
 
 #endif  // End portable versions.
 
-#if defined(HAVE_BUILTIN_CTZ)
+#if HAVE_BUILTIN_CTZ
 
 inline int Bits::FindLSBSetNonZero64(uint64_t n) {
   assert(n != 0);
@@ -388,7 +388,7 @@ inline int Bits::FindLSBSetNonZero64(uint64_t n) {
   }
 }
 
-#endif  // End portable version.
+#endif  // HAVE_BUILTIN_CTZ
 
 // Variable-length integer encoding.
 class Varint {

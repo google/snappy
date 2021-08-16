@@ -50,7 +50,7 @@ namespace snappy {
 
 namespace {
 
-#if defined(HAVE_FUNC_MMAP) && defined(HAVE_FUNC_SYSCONF)
+#if HAVE_FUNC_MMAP && HAVE_FUNC_SYSCONF
 
 // To test against code that reads beyond its input, this class copies a
 // string to a newly allocated group of pages, the last of which
@@ -96,7 +96,7 @@ class DataEndingAtUnreadablePage {
   size_t size_;
 };
 
-#else  // defined(HAVE_FUNC_MMAP) && defined(HAVE_FUNC_SYSCONF)
+#else  // HAVE_FUNC_MMAP) && HAVE_FUNC_SYSCONF
 
 // Fallback for systems without mmap.
 using DataEndingAtUnreadablePage = std::string;
