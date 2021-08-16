@@ -14,10 +14,19 @@ os:
 - osx
 
 env:
-- BUILD_TYPE=Debug CPU_LEVEL=AVX
-- BUILD_TYPE=Debug CPU_LEVEL=AVX2
-- BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX
-- BUILD_TYPE=RelWithDebInfo CPU_LEVEL=AVX2
+  jobs:
+  - BUILD_TYPE: Debug
+    CPU_LEVEL: BASELINE
+  - BUILD_TYPE: Debug
+    CPU_LEVEL: AVX
+  - BUILD_TYPE: Debug
+    CPU_LEVEL: AVX2
+  - BUILD_TYPE: RelWithDebInfo
+    CPU_LEVEL: BASELINE
+  - BUILD_TYPE: RelWithDebInfo
+    CPU_LEVEL: AVX
+  - BUILD_TYPE: RelWithDebInfo
+    CPU_LEVEL: AVX2
 
 jobs:
   exclude:
