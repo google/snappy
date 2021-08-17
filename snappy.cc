@@ -1015,12 +1015,16 @@ size_t AdvanceToNextTagARMOptimized(const uint8_t** ip_p, size_t* tag) {
   //                       delta2 = ((c >> 2) + 1)    ip++
   // This is different from X86 optimizations because ARM has conditional add
   // instruction (csinc) and it removes several register moves.
-  const size_t literal_tag_offset = (*tag >> 2) + 1;
   const size_t tag_type = *tag & 3;
   const bool is_literal = (tag_type == 0);
-  *tag = is_literal ? ip[literal_tag_offset] : ip[tag_type];
-  ip += is_literal ? literal_tag_offset : tag_type;
-  ip++;
+  if (is_literal) {
+    size_t next_literal_tag = (*tag >> 2) + 1;
+    *tag = ip[next_literal_tag];
+    ip += next_literal_tag + 1;
+  } else {
+    *tag = ip[tag_type];
+    ip += tag_type + 1;
+  }
   return tag_type;
 }
 
