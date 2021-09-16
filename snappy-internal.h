@@ -33,8 +33,83 @@
 
 #include "snappy-stubs-internal.h"
 
+#if SNAPPY_HAVE_SSSE3
+// Please do not replace with <x86intrin.h> or with headers that assume more
+// advanced SSE versions without checking with all the OWNERS.
+#include <emmintrin.h>
+#include <tmmintrin.h>
+#endif
+
+#if SNAPPY_HAVE_NEON
+#include <arm_neon.h>
+#endif
+
+#if SNAPPY_HAVE_SSSE3 || SNAPPY_HAVE_NEON
+#define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 1
+#else
+#define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 0
+#endif
+
 namespace snappy {
 namespace internal {
+
+#if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
+#if SNAPPY_HAVE_SSSE3
+using V128 = __m128i;
+#elif SNAPPY_HAVE_NEON
+using V128 = uint8x16_t;
+#endif
+
+// Load 128 bits of integer data. `src` must be 16-byte aligned.
+inline V128 V128_Load(const V128* src);
+
+// Load 128 bits of integer data. `src` does not need to be aligned.
+inline V128 V128_LoadU(const V128* src);
+
+// Store 128 bits of integer data. `dst` does not need to be aligned.
+inline void V128_StoreU(V128* dst, V128 val);
+
+// Shuffle packed 8-bit integers using a shuffle mask.
+// Each packed integer in the shuffle mask must be in [0,16).
+inline V128 V128_Shuffle(V128 input, V128 shuffle_mask);
+
+// Constructs V128 with 16 chars |c|.
+inline V128 V128_DupChar(char c);
+
+#if SNAPPY_HAVE_SSSE3
+inline V128 V128_Load(const V128* src) { return _mm_load_si128(src); }
+
+inline V128 V128_LoadU(const V128* src) { return _mm_loadu_si128(src); }
+
+inline void V128_StoreU(V128* dst, V128 val) { _mm_storeu_si128(dst, val); }
+
+inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
+  return _mm_shuffle_epi8(input, shuffle_mask);
+}
+
+inline V128 V128_DupChar(char c) { return _mm_set1_epi8(c); }
+
+#elif SNAPPY_HAVE_NEON
+inline V128 V128_Load(const V128* src) {
+  return vld1q_u8(reinterpret_cast<const uint8_t*>(src));
+}
+
+inline V128 V128_LoadU(const V128* src) {
+  return vld1q_u8(reinterpret_cast<const uint8_t*>(src));
+}
+
+inline void V128_StoreU(V128* dst, V128 val) {
+  vst1q_u8(reinterpret_cast<uint8_t*>(dst), val);
+}
+
+inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
+  assert(vminvq_u8(shuffle_mask) >= 0 && vmaxvq_u8(shuffle_mask) <= 15);
+  return vqtbl1q_u8(input, shuffle_mask);
+}
+
+inline V128 V128_DupChar(char c) { return vdupq_n_u8(c); }
+#endif
+#endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
 // Working memory performs a single allocation to hold all scratch space
 // required for compression.
@@ -95,8 +170,9 @@ char* CompressFragment(const char* input,
 // loading from s2 + n.
 //
 // Separate implementation for 64-bit, little-endian cpus.
-#if !defined(SNAPPY_IS_BIG_ENDIAN) && \
-    (defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM))
+#if !SNAPPY_IS_BIG_ENDIAN && \
+    (defined(__x86_64__) || defined(_M_X64) || defined(ARCH_PPC) || \
+     defined(ARCH_ARM))
 static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
                                                       const char* s2,
                                                       const char* s2_limit,
@@ -274,7 +350,8 @@ static const int kMaximumTagLength = 5;  // COPY_4_BYTE_OFFSET plus the actual o
 // because of efficiency reasons:
 //      (1) Extracting a byte is faster than a bit-field
 //      (2) It properly aligns copy offset so we do not need a <<8
-static const uint16_t char_table[256] = {
+static constexpr uint16_t char_table[256] = {
+    // clang-format off
   0x0001, 0x0804, 0x1001, 0x2001, 0x0002, 0x0805, 0x1002, 0x2002,
   0x0003, 0x0806, 0x1003, 0x2003, 0x0004, 0x0807, 0x1004, 0x2004,
   0x0005, 0x0808, 0x1005, 0x2005, 0x0006, 0x0809, 0x1006, 0x2006,
@@ -306,7 +383,8 @@ static const uint16_t char_table[256] = {
   0x0039, 0x0f04, 0x1039, 0x2039, 0x003a, 0x0f05, 0x103a, 0x203a,
   0x003b, 0x0f06, 0x103b, 0x203b, 0x003c, 0x0f07, 0x103c, 0x203c,
   0x0801, 0x0f08, 0x103d, 0x203d, 0x1001, 0x0f09, 0x103e, 0x203e,
-  0x1801, 0x0f0a, 0x103f, 0x203f, 0x2001, 0x0f0b, 0x1040, 0x2040
+  0x1801, 0x0f0a, 0x103f, 0x203f, 0x2001, 0x0f0b, 0x1040, 0x2040,
+    // clang-format on
 };
 
 }  // end namespace internal

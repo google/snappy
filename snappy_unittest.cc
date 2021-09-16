@@ -26,44 +26,31 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
-
-#include <algorithm>
 #include <random>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "snappy.h"
-#include "snappy-internal.h"
 #include "snappy-test.h"
+
+#include "gtest/gtest.h"
+
+#include "snappy-internal.h"
 #include "snappy-sinksource.h"
+#include "snappy.h"
+#include "snappy_test_data.h"
 
-DEFINE_int32(start_len, -1,
-             "Starting prefix size for testing (-1: just full file contents)");
-DEFINE_int32(end_len, -1,
-             "Starting prefix size for testing (-1: just full file contents)");
-DEFINE_int32(bytes, 10485760,
-             "How many bytes to compress/uncompress per file for timing");
-
-DEFINE_bool(zlib, false,
-            "Run zlib compression (http://www.zlib.net)");
-DEFINE_bool(lzo, false,
-            "Run LZO compression (http://www.oberhumer.com/opensource/lzo/)");
-DEFINE_bool(snappy, true, "Run snappy compression");
-
-DEFINE_bool(write_compressed, false,
-            "Write compressed versions of each file to <file>.comp");
-DEFINE_bool(write_uncompressed, false,
-            "Write uncompressed versions of each file to <file>.uncomp");
-
-DEFINE_bool(snappy_dump_decompression_table, false,
+SNAPPY_FLAG(bool, snappy_dump_decompression_table, false,
             "If true, we print the decompression table during tests.");
 
 namespace snappy {
 
-#if defined(HAVE_FUNC_MMAP) && defined(HAVE_FUNC_SYSCONF)
+namespace {
+
+#if HAVE_FUNC_MMAP && HAVE_FUNC_SYSCONF
 
 // To test against code that reads beyond its input, this class copies a
 // string to a newly allocated group of pages, the last of which
@@ -109,260 +96,14 @@ class DataEndingAtUnreadablePage {
   size_t size_;
 };
 
-#else  // defined(HAVE_FUNC_MMAP) && defined(HAVE_FUNC_SYSCONF)
+#else  // HAVE_FUNC_MMAP) && HAVE_FUNC_SYSCONF
 
 // Fallback for systems without mmap.
 using DataEndingAtUnreadablePage = std::string;
 
 #endif
 
-enum CompressorType {
-  ZLIB, LZO, SNAPPY
-};
-
-const char* names[] = {
-  "ZLIB", "LZO", "SNAPPY"
-};
-
-static size_t MinimumRequiredOutputSpace(size_t input_size,
-                                         CompressorType comp) {
-  switch (comp) {
-#ifdef ZLIB_VERSION
-    case ZLIB:
-      return ZLib::MinCompressbufSize(input_size);
-#endif  // ZLIB_VERSION
-
-#ifdef LZO_VERSION
-    case LZO:
-      return input_size + input_size/64 + 16 + 3;
-#endif  // LZO_VERSION
-
-    case SNAPPY:
-      return snappy::MaxCompressedLength(input_size);
-
-    default:
-      LOG(FATAL) << "Unknown compression type number " << comp;
-      return 0;
-  }
-}
-
-// Returns true if we successfully compressed, false otherwise.
-//
-// If compressed_is_preallocated is set, do not resize the compressed buffer.
-// This is typically what you want for a benchmark, in order to not spend
-// time in the memory allocator. If you do set this flag, however,
-// "compressed" must be preinitialized to at least MinCompressbufSize(comp)
-// number of bytes, and may contain junk bytes at the end after return.
-static bool Compress(const char* input, size_t input_size, CompressorType comp,
-                     std::string* compressed, bool compressed_is_preallocated) {
-  if (!compressed_is_preallocated) {
-    compressed->resize(MinimumRequiredOutputSpace(input_size, comp));
-  }
-
-  switch (comp) {
-#ifdef ZLIB_VERSION
-    case ZLIB: {
-      ZLib zlib;
-      uLongf destlen = compressed->size();
-      int ret = zlib.Compress(
-          reinterpret_cast<Bytef*>(string_as_array(compressed)),
-          &destlen,
-          reinterpret_cast<const Bytef*>(input),
-          input_size);
-      CHECK_EQ(Z_OK, ret);
-      if (!compressed_is_preallocated) {
-        compressed->resize(destlen);
-      }
-      return true;
-    }
-#endif  // ZLIB_VERSION
-
-#ifdef LZO_VERSION
-    case LZO: {
-      unsigned char* mem = new unsigned char[LZO1X_1_15_MEM_COMPRESS];
-      lzo_uint destlen;
-      int ret = lzo1x_1_15_compress(
-          reinterpret_cast<const uint8_t*>(input),
-          input_size,
-          reinterpret_cast<uint8_t*>(string_as_array(compressed)),
-          &destlen,
-          mem);
-      CHECK_EQ(LZO_E_OK, ret);
-      delete[] mem;
-      if (!compressed_is_preallocated) {
-        compressed->resize(destlen);
-      }
-      break;
-    }
-#endif  // LZO_VERSION
-
-    case SNAPPY: {
-      size_t destlen;
-      snappy::RawCompress(input, input_size,
-                          string_as_array(compressed),
-                          &destlen);
-      CHECK_LE(destlen, snappy::MaxCompressedLength(input_size));
-      if (!compressed_is_preallocated) {
-        compressed->resize(destlen);
-      }
-      break;
-    }
-
-    default: {
-      return false;     // the asked-for library wasn't compiled in
-    }
-  }
-  return true;
-}
-
-static bool Uncompress(const std::string& compressed, CompressorType comp,
-                       int size, std::string* output) {
-  switch (comp) {
-#ifdef ZLIB_VERSION
-    case ZLIB: {
-      output->resize(size);
-      ZLib zlib;
-      uLongf destlen = output->size();
-      int ret = zlib.Uncompress(
-          reinterpret_cast<Bytef*>(string_as_array(output)),
-          &destlen,
-          reinterpret_cast<const Bytef*>(compressed.data()),
-          compressed.size());
-      CHECK_EQ(Z_OK, ret);
-      CHECK_EQ(static_cast<uLongf>(size), destlen);
-      break;
-    }
-#endif  // ZLIB_VERSION
-
-#ifdef LZO_VERSION
-    case LZO: {
-      output->resize(size);
-      lzo_uint destlen;
-      int ret = lzo1x_decompress(
-          reinterpret_cast<const uint8_t*>(compressed.data()),
-          compressed.size(),
-          reinterpret_cast<uint8_t*>(string_as_array(output)),
-          &destlen,
-          NULL);
-      CHECK_EQ(LZO_E_OK, ret);
-      CHECK_EQ(static_cast<lzo_uint>(size), destlen);
-      break;
-    }
-#endif  // LZO_VERSION
-
-    case SNAPPY: {
-      snappy::RawUncompress(compressed.data(), compressed.size(),
-                            string_as_array(output));
-      break;
-    }
-
-    default: {
-      return false;     // the asked-for library wasn't compiled in
-    }
-  }
-  return true;
-}
-
-static void Measure(const char* data,
-                    size_t length,
-                    CompressorType comp,
-                    int repeats,
-                    int block_size) {
-  // Run tests a few time and pick median running times
-  static const int kRuns = 5;
-  double ctime[kRuns];
-  double utime[kRuns];
-  int compressed_size = 0;
-
-  {
-    // Chop the input into blocks
-    int num_blocks = (length + block_size - 1) / block_size;
-    std::vector<const char*> input(num_blocks);
-    std::vector<size_t> input_length(num_blocks);
-    std::vector<std::string> compressed(num_blocks);
-    std::vector<std::string> output(num_blocks);
-    for (int b = 0; b < num_blocks; ++b) {
-      int input_start = b * block_size;
-      int input_limit = std::min<int>((b+1)*block_size, length);
-      input[b] = data+input_start;
-      input_length[b] = input_limit-input_start;
-    }
-
-    // Pre-grow the output buffers so we don't measure string append time.
-    for (std::string& compressed_block : compressed) {
-      compressed_block.resize(MinimumRequiredOutputSpace(block_size, comp));
-    }
-
-    // First, try one trial compression to make sure the code is compiled in
-    if (!Compress(input[0], input_length[0], comp, &compressed[0], true)) {
-      LOG(WARNING) << "Skipping " << names[comp] << ": "
-                   << "library not compiled in";
-      return;
-    }
-
-    for (int run = 0; run < kRuns; ++run) {
-      CycleTimer ctimer, utimer;
-
-      // Pre-grow the output buffers so we don't measure string append time.
-      for (std::string& compressed_block : compressed) {
-        compressed_block.resize(MinimumRequiredOutputSpace(block_size, comp));
-      }
-
-      ctimer.Start();
-      for (int b = 0; b < num_blocks; ++b) {
-        for (int i = 0; i < repeats; ++i)
-          Compress(input[b], input_length[b], comp, &compressed[b], true);
-      }
-      ctimer.Stop();
-
-      // Compress once more, with resizing, so we don't leave junk
-      // at the end that will confuse the decompressor.
-      for (int b = 0; b < num_blocks; ++b) {
-        Compress(input[b], input_length[b], comp, &compressed[b], false);
-      }
-
-      for (int b = 0; b < num_blocks; ++b) {
-        output[b].resize(input_length[b]);
-      }
-
-      utimer.Start();
-      for (int i = 0; i < repeats; ++i) {
-        for (int b = 0; b < num_blocks; ++b)
-          Uncompress(compressed[b], comp, input_length[b], &output[b]);
-      }
-      utimer.Stop();
-
-      ctime[run] = ctimer.Get();
-      utime[run] = utimer.Get();
-    }
-
-    compressed_size = 0;
-    for (const std::string& compressed_item : compressed) {
-      compressed_size += compressed_item.size();
-    }
-  }
-
-  std::sort(ctime, ctime + kRuns);
-  std::sort(utime, utime + kRuns);
-  const int med = kRuns/2;
-
-  float comp_rate = (length / ctime[med]) * repeats / 1048576.0;
-  float uncomp_rate = (length / utime[med]) * repeats / 1048576.0;
-  std::string x = names[comp];
-  x += ":";
-  std::string urate = (uncomp_rate >= 0) ? StrFormat("%.1f", uncomp_rate)
-                                         : std::string("?");
-  std::printf("%-7s [b %dM] bytes %6d -> %6d %4.1f%%  "
-              "comp %5.1f MB/s  uncomp %5s MB/s\n",
-              x.c_str(),
-              block_size/(1<<20),
-              static_cast<int>(length), static_cast<uint32_t>(compressed_size),
-              (compressed_size * 100.0) / std::max<int>(1, length),
-              comp_rate,
-              urate.c_str());
-}
-
-static int VerifyString(const std::string& input) {
+int VerifyString(const std::string& input) {
   std::string compressed;
   DataEndingAtUnreadablePage i(input);
   const size_t written = snappy::Compress(i.data(), i.size(), &compressed);
@@ -378,7 +119,7 @@ static int VerifyString(const std::string& input) {
   return uncompressed.size();
 }
 
-static void VerifyStringSink(const std::string& input) {
+void VerifyStringSink(const std::string& input) {
   std::string compressed;
   DataEndingAtUnreadablePage i(input);
   const size_t written = snappy::Compress(i.data(), i.size(), &compressed);
@@ -396,7 +137,7 @@ static void VerifyStringSink(const std::string& input) {
   CHECK_EQ(uncompressed, input);
 }
 
-static void VerifyIOVec(const std::string& input) {
+void VerifyIOVec(const std::string& input) {
   std::string compressed;
   DataEndingAtUnreadablePage i(input);
   const size_t written = snappy::Compress(i.data(), i.size(), &compressed);
@@ -443,7 +184,7 @@ static void VerifyIOVec(const std::string& input) {
 
 // Test that data compressed by a compressor that does not
 // obey block sizes is uncompressed properly.
-static void VerifyNonBlockedCompression(const std::string& input) {
+void VerifyNonBlockedCompression(const std::string& input) {
   if (input.length() > snappy::kBlockSize) {
     // We cannot test larger blocks than the maximum block size, obviously.
     return;
@@ -496,7 +237,7 @@ static void VerifyNonBlockedCompression(const std::string& input) {
 }
 
 // Expand the input so that it is at least K times as big as block size
-static std::string Expand(const std::string& input) {
+std::string Expand(const std::string& input) {
   static const int K = 3;
   std::string data = input;
   while (data.size() < K * snappy::kBlockSize) {
@@ -505,7 +246,7 @@ static std::string Expand(const std::string& input) {
   return data;
 }
 
-static int Verify(const std::string& input) {
+int Verify(const std::string& input) {
   VLOG(1) << "Verifying input of size " << input.size();
 
   // Compress using string based routines
@@ -525,10 +266,10 @@ static int Verify(const std::string& input) {
   return result;
 }
 
-static bool IsValidCompressedBuffer(const std::string& c) {
+bool IsValidCompressedBuffer(const std::string& c) {
   return snappy::IsValidCompressedBuffer(c.data(), c.size());
 }
-static bool Uncompress(const std::string& c, std::string* u) {
+bool Uncompress(const std::string& c, std::string* u) {
   return snappy::Uncompress(c.data(), c.size(), u);
 }
 
@@ -605,7 +346,7 @@ TEST(CorruptedTest, VerifyCorrupted) {
 // These mirror the compression code in snappy.cc, but are copied
 // here so that we can bypass some limitations in the how snappy.cc
 // invokes these routines.
-static void AppendLiteral(std::string* dst, const std::string& literal) {
+void AppendLiteral(std::string* dst, const std::string& literal) {
   if (literal.empty()) return;
   int n = literal.size() - 1;
   if (n < 60) {
@@ -625,7 +366,7 @@ static void AppendLiteral(std::string* dst, const std::string& literal) {
   *dst += literal;
 }
 
-static void AppendCopy(std::string* dst, int offset, int length) {
+void AppendCopy(std::string* dst, int offset, int length) {
   while (length > 0) {
     // Figure out how much to copy in one shot
     int to_copy;
@@ -669,6 +410,41 @@ TEST(Snappy, SimpleTests) {
   Verify("abcaaaaaaa" + std::string(65536, 'b') + std::string("aaaaa") + "abc");
 }
 
+// Regression test for cr/345340892.
+TEST(Snappy, AppendSelfPatternExtensionEdgeCases) {
+  Verify("abcabcabcabcabcabcab");
+  Verify("abcabcabcabcabcabcab0123456789ABCDEF");
+
+  Verify("abcabcabcabcabcabcabcabcabcabcabcabc");
+  Verify("abcabcabcabcabcabcabcabcabcabcabcabc0123456789ABCDEF");
+}
+
+// Regression test for cr/345340892.
+TEST(Snappy, AppendSelfPatternExtensionEdgeCasesExhaustive) {
+  std::mt19937 rng;
+  std::uniform_int_distribution<int> uniform_byte(0, 255);
+  for (int pattern_size = 1; pattern_size <= 18; ++pattern_size) {
+    for (int length = 1; length <= 64; ++length) {
+      for (int extra_bytes_after_pattern : {0, 1, 15, 16, 128}) {
+        const int size = pattern_size + length + extra_bytes_after_pattern;
+        std::string input;
+        input.resize(size);
+        for (int i = 0; i < pattern_size; ++i) {
+          input[i] = 'a' + i;
+        }
+        for (int i = 0; i < length; ++i) {
+          input[pattern_size + i] = input[i];
+        }
+        for (int i = 0; i < extra_bytes_after_pattern; ++i) {
+          input[pattern_size + length + i] =
+              static_cast<char>(uniform_byte(rng));
+        }
+        Verify(input);
+      }
+    }
+  }
+}
+
 // Verify max blowup (lots of four-byte copies)
 TEST(Snappy, MaxBlowup) {
   std::mt19937 rng;
@@ -685,7 +461,7 @@ TEST(Snappy, MaxBlowup) {
 }
 
 TEST(Snappy, RandomData) {
-  std::minstd_rand0 rng(FLAGS_test_random_seed);
+  std::minstd_rand0 rng(snappy::GetFlag(FLAGS_test_random_seed));
   std::uniform_int_distribution<int> uniform_0_to_3(0, 3);
   std::uniform_int_distribution<int> uniform_0_to_8(0, 8);
   std::uniform_int_distribution<int> uniform_byte(0, 255);
@@ -876,8 +652,7 @@ TEST(Snappy, IOVecCopyOverflow) {
   }
 }
 
-static bool CheckUncompressedLength(const std::string& compressed,
-                                    size_t* ulength) {
+bool CheckUncompressedLength(const std::string& compressed, size_t* ulength) {
   const bool result1 = snappy::GetUncompressedLength(compressed.data(),
                                                      compressed.size(),
                                                      ulength);
@@ -958,8 +733,6 @@ TEST(Snappy, ZeroOffsetCopyValidation) {
   EXPECT_FALSE(snappy::IsValidCompressedBuffer(compressed, 4));
 }
 
-namespace {
-
 int TestFindMatchLength(const char* s1, const char *s2, unsigned length) {
   uint64_t data;
   std::pair<size_t, bool> p =
@@ -967,8 +740,6 @@ int TestFindMatchLength(const char* s1, const char *s2, unsigned length) {
   CHECK_EQ(p.first < 8, p.second);
   return p.first;
 }
-
-}  // namespace
 
 TEST(Snappy, FindMatchLength) {
   // Exercise all different code paths through the function.
@@ -1063,7 +834,7 @@ TEST(Snappy, FindMatchLength) {
 TEST(Snappy, FindMatchLengthRandom) {
   constexpr int kNumTrials = 10000;
   constexpr int kTypicalLength = 10;
-  std::minstd_rand0 rng(FLAGS_test_random_seed);
+  std::minstd_rand0 rng(snappy::GetFlag(FLAGS_test_random_seed));
   std::uniform_int_distribution<int> uniform_byte(0, 255);
   std::bernoulli_distribution one_in_two(1.0 / 2);
   std::bernoulli_distribution one_in_typical_length(1.0 / kTypicalLength);
@@ -1090,9 +861,8 @@ TEST(Snappy, FindMatchLengthRandom) {
   }
 }
 
-static uint16_t MakeEntry(unsigned int extra,
-                        unsigned int len,
-                        unsigned int copy_offset) {
+uint16_t MakeEntry(unsigned int extra, unsigned int len,
+                   unsigned int copy_offset) {
   // Check that all of the fields fit within the allocated space
   assert(extra       == (extra & 0x7));          // At most 3 bits
   assert(copy_offset == (copy_offset & 0x7));    // At most 3 bits
@@ -1135,7 +905,7 @@ TEST(Snappy, VerifyCharTable) {
   // COPY_1_BYTE_OFFSET.
   //
   // The tag byte in the compressed data stores len-4 in 3 bits, and
-  // offset/256 in 5 bits.  offset%256 is stored in the next byte.
+  // offset/256 in 3 bits.  offset%256 is stored in the next byte.
   //
   // This format is used for length in range [4..11] and offset in
   // range [0..2047]
@@ -1168,7 +938,7 @@ TEST(Snappy, VerifyCharTable) {
     EXPECT_NE(0xffff, dst[i]) << "Did not assign byte " << i;
   }
 
-  if (FLAGS_snappy_dump_decompression_table) {
+  if (snappy::GetFlag(FLAGS_snappy_dump_decompression_table)) {
     std::printf("static const uint16_t char_table[256] = {\n  ");
     for (int i = 0; i < 256; ++i) {
       std::printf("0x%04x%s",
@@ -1184,329 +954,13 @@ TEST(Snappy, VerifyCharTable) {
   }
 }
 
-static void CompressFile(const char* fname) {
-  std::string fullinput;
-  CHECK_OK(file::GetContents(fname, &fullinput, file::Defaults()));
-
-  std::string compressed;
-  Compress(fullinput.data(), fullinput.size(), SNAPPY, &compressed, false);
-
-  CHECK_OK(file::SetContents(std::string(fname).append(".comp"), compressed,
-                             file::Defaults()));
-}
-
-static void UncompressFile(const char* fname) {
-  std::string fullinput;
-  CHECK_OK(file::GetContents(fname, &fullinput, file::Defaults()));
-
-  size_t uncompLength;
-  CHECK(CheckUncompressedLength(fullinput, &uncompLength));
-
-  std::string uncompressed;
-  uncompressed.resize(uncompLength);
-  CHECK(snappy::Uncompress(fullinput.data(), fullinput.size(), &uncompressed));
-
-  CHECK_OK(file::SetContents(std::string(fname).append(".uncomp"), uncompressed,
-                             file::Defaults()));
-}
-
-static void MeasureFile(const char* fname) {
-  std::string fullinput;
-  CHECK_OK(file::GetContents(fname, &fullinput, file::Defaults()));
-  std::printf("%-40s :\n", fname);
-
-  int start_len = (FLAGS_start_len < 0) ? fullinput.size() : FLAGS_start_len;
-  int end_len = fullinput.size();
-  if (FLAGS_end_len >= 0) {
-    end_len = std::min<int>(fullinput.size(), FLAGS_end_len);
-  }
-  for (int len = start_len; len <= end_len; ++len) {
-    const char* const input = fullinput.data();
-    int repeats = (FLAGS_bytes + len) / (len + 1);
-    if (FLAGS_zlib)     Measure(input, len, ZLIB, repeats, 1024<<10);
-    if (FLAGS_lzo)      Measure(input, len, LZO, repeats, 1024<<10);
-    if (FLAGS_snappy)    Measure(input, len, SNAPPY, repeats, 4096<<10);
-
-    // For block-size based measurements
-    if (0 && FLAGS_snappy) {
-      Measure(input, len, SNAPPY, repeats, 8<<10);
-      Measure(input, len, SNAPPY, repeats, 16<<10);
-      Measure(input, len, SNAPPY, repeats, 32<<10);
-      Measure(input, len, SNAPPY, repeats, 64<<10);
-      Measure(input, len, SNAPPY, repeats, 256<<10);
-      Measure(input, len, SNAPPY, repeats, 1024<<10);
-    }
+TEST(Snappy, TestBenchmarkFiles) {
+  for (int i = 0; i < ARRAYSIZE(kTestDataFiles); ++i) {
+    Verify(ReadTestDataFile(kTestDataFiles[i].filename,
+                            kTestDataFiles[i].size_limit));
   }
 }
 
-static struct {
-  const char* label;
-  const char* filename;
-  size_t size_limit;
-} files[] = {
-  { "html", "html", 0 },
-  { "urls", "urls.10K", 0 },
-  { "jpg", "fireworks.jpeg", 0 },
-  { "jpg_200", "fireworks.jpeg", 200 },
-  { "pdf", "paper-100k.pdf", 0 },
-  { "html4", "html_x_4", 0 },
-  { "txt1", "alice29.txt", 0 },
-  { "txt2", "asyoulik.txt", 0 },
-  { "txt3", "lcet10.txt", 0 },
-  { "txt4", "plrabn12.txt", 0 },
-  { "pb", "geo.protodata", 0 },
-  { "gaviota", "kppkn.gtb", 0 },
-};
-
-static void BM_UFlat(int iters, int arg) {
-  StopBenchmarkTiming();
-
-  // Pick file to process based on "arg"
-  CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
-  std::string contents =
-      ReadTestDataFile(files[arg].filename, files[arg].size_limit);
-
-  std::string zcontents;
-  snappy::Compress(contents.data(), contents.size(), &zcontents);
-  char* dst = new char[contents.size()];
-
-  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
-                             static_cast<int64_t>(contents.size()));
-  SetBenchmarkLabel(files[arg].label);
-  StartBenchmarkTiming();
-  while (iters-- > 0) {
-    CHECK(snappy::RawUncompress(zcontents.data(), zcontents.size(), dst));
-  }
-  StopBenchmarkTiming();
-
-  delete[] dst;
-}
-BENCHMARK(BM_UFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
-
-static void BM_UValidate(int iters, int arg) {
-  StopBenchmarkTiming();
-
-  // Pick file to process based on "arg"
-  CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
-  std::string contents =
-      ReadTestDataFile(files[arg].filename, files[arg].size_limit);
-
-  std::string zcontents;
-  snappy::Compress(contents.data(), contents.size(), &zcontents);
-
-  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
-                             static_cast<int64_t>(contents.size()));
-  SetBenchmarkLabel(files[arg].label);
-  StartBenchmarkTiming();
-  while (iters-- > 0) {
-    CHECK(snappy::IsValidCompressedBuffer(zcontents.data(), zcontents.size()));
-  }
-  StopBenchmarkTiming();
-}
-BENCHMARK(BM_UValidate)->DenseRange(0, 4);
-
-static void BM_UIOVec(int iters, int arg) {
-  StopBenchmarkTiming();
-
-  // Pick file to process based on "arg"
-  CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
-  std::string contents =
-      ReadTestDataFile(files[arg].filename, files[arg].size_limit);
-
-  std::string zcontents;
-  snappy::Compress(contents.data(), contents.size(), &zcontents);
-
-  // Uncompress into an iovec containing ten entries.
-  const int kNumEntries = 10;
-  struct iovec iov[kNumEntries];
-  char *dst = new char[contents.size()];
-  size_t used_so_far = 0;
-  for (int i = 0; i < kNumEntries; ++i) {
-    iov[i].iov_base = dst + used_so_far;
-    if (used_so_far == contents.size()) {
-      iov[i].iov_len = 0;
-      continue;
-    }
-
-    if (i == kNumEntries - 1) {
-      iov[i].iov_len = contents.size() - used_so_far;
-    } else {
-      iov[i].iov_len = contents.size() / kNumEntries;
-    }
-    used_so_far += iov[i].iov_len;
-  }
-
-  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
-                             static_cast<int64_t>(contents.size()));
-  SetBenchmarkLabel(files[arg].label);
-  StartBenchmarkTiming();
-  while (iters-- > 0) {
-    CHECK(snappy::RawUncompressToIOVec(zcontents.data(), zcontents.size(), iov,
-                                       kNumEntries));
-  }
-  StopBenchmarkTiming();
-
-  delete[] dst;
-}
-BENCHMARK(BM_UIOVec)->DenseRange(0, 4);
-
-static void BM_UFlatSink(int iters, int arg) {
-  StopBenchmarkTiming();
-
-  // Pick file to process based on "arg"
-  CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
-  std::string contents =
-      ReadTestDataFile(files[arg].filename, files[arg].size_limit);
-
-  std::string zcontents;
-  snappy::Compress(contents.data(), contents.size(), &zcontents);
-  char* dst = new char[contents.size()];
-
-  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
-                             static_cast<int64_t>(contents.size()));
-  SetBenchmarkLabel(files[arg].label);
-  StartBenchmarkTiming();
-  while (iters-- > 0) {
-    snappy::ByteArraySource source(zcontents.data(), zcontents.size());
-    snappy::UncheckedByteArraySink sink(dst);
-    CHECK(snappy::Uncompress(&source, &sink));
-  }
-  StopBenchmarkTiming();
-
-  std::string s(dst, contents.size());
-  CHECK_EQ(contents, s);
-
-  delete[] dst;
-}
-
-BENCHMARK(BM_UFlatSink)->DenseRange(0, ARRAYSIZE(files) - 1);
-
-static void BM_ZFlat(int iters, int arg) {
-  StopBenchmarkTiming();
-
-  // Pick file to process based on "arg"
-  CHECK_GE(arg, 0);
-  CHECK_LT(arg, ARRAYSIZE(files));
-  std::string contents =
-      ReadTestDataFile(files[arg].filename, files[arg].size_limit);
-
-  char* dst = new char[snappy::MaxCompressedLength(contents.size())];
-
-  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) *
-                             static_cast<int64_t>(contents.size()));
-  StartBenchmarkTiming();
-
-  size_t zsize = 0;
-  while (iters-- > 0) {
-    snappy::RawCompress(contents.data(), contents.size(), dst, &zsize);
-  }
-  StopBenchmarkTiming();
-  const double compression_ratio =
-      static_cast<double>(zsize) / std::max<size_t>(1, contents.size());
-  SetBenchmarkLabel(StrFormat("%s (%.2f %%)", files[arg].label,
-                              100.0 * compression_ratio));
-  VLOG(0) << StrFormat("compression for %s: %zd -> %zd bytes",
-                       files[arg].label, static_cast<int>(contents.size()),
-                       static_cast<int>(zsize));
-  delete[] dst;
-}
-BENCHMARK(BM_ZFlat)->DenseRange(0, ARRAYSIZE(files) - 1);
-
-static void BM_ZFlatAll(int iters, int arg) {
-  StopBenchmarkTiming();
-
-  CHECK_EQ(arg, 0);
-  const int num_files = ARRAYSIZE(files);
-
-  std::vector<std::string> contents(num_files);
-  std::vector<char*> dst(num_files);
-
-  int64_t total_contents_size = 0;
-  for (int i = 0; i < num_files; ++i) {
-    contents[i] = ReadTestDataFile(files[i].filename, files[i].size_limit);
-    dst[i] = new char[snappy::MaxCompressedLength(contents[i].size())];
-    total_contents_size += contents[i].size();
-  }
-
-  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) * total_contents_size);
-  StartBenchmarkTiming();
-
-  size_t zsize = 0;
-  while (iters-- > 0) {
-    for (int i = 0; i < num_files; ++i) {
-      snappy::RawCompress(contents[i].data(), contents[i].size(), dst[i],
-                          &zsize);
-    }
-  }
-  StopBenchmarkTiming();
-
-  for (char* dst_item : dst) {
-    delete[] dst_item;
-  }
-  SetBenchmarkLabel(StrFormat("%d files", num_files));
-}
-BENCHMARK(BM_ZFlatAll)->DenseRange(0, 0);
-
-static void BM_ZFlatIncreasingTableSize(int iters, int arg) {
-  StopBenchmarkTiming();
-
-  CHECK_EQ(arg, 0);
-  CHECK_GT(ARRAYSIZE(files), 0);
-  const std::string base_content =
-      ReadTestDataFile(files[0].filename, files[0].size_limit);
-
-  std::vector<std::string> contents;
-  std::vector<char*> dst;
-  int64_t total_contents_size = 0;
-  for (int table_bits = kMinHashTableBits; table_bits <= kMaxHashTableBits;
-       ++table_bits) {
-    std::string content = base_content;
-    content.resize(1 << table_bits);
-    dst.push_back(new char[snappy::MaxCompressedLength(content.size())]);
-    total_contents_size += content.size();
-    contents.push_back(std::move(content));
-  }
-
-  size_t zsize = 0;
-  SetBenchmarkBytesProcessed(static_cast<int64_t>(iters) * total_contents_size);
-  StartBenchmarkTiming();
-  while (iters-- > 0) {
-    for (size_t i = 0; i < contents.size(); ++i) {
-      snappy::RawCompress(contents[i].data(), contents[i].size(), dst[i],
-                          &zsize);
-    }
-  }
-  StopBenchmarkTiming();
-
-  for (char* dst_item : dst) {
-    delete[] dst_item;
-  }
-  SetBenchmarkLabel(StrFormat("%zd tables", contents.size()));
-}
-BENCHMARK(BM_ZFlatIncreasingTableSize)->DenseRange(0, 0);
+}  // namespace
 
 }  // namespace snappy
-
-int main(int argc, char** argv) {
-  InitGoogle(argv[0], &argc, &argv, true);
-  RunSpecifiedBenchmarks();
-
-  if (argc >= 2) {
-    for (int arg = 1; arg < argc; ++arg) {
-      if (FLAGS_write_compressed) {
-        snappy::CompressFile(argv[arg]);
-      } else if (FLAGS_write_uncompressed) {
-        snappy::UncompressFile(argv[arg]);
-      } else {
-        snappy::MeasureFile(argv[arg]);
-      }
-    }
-    return 0;
-  }
-
-  return RUN_ALL_TESTS();
-}
