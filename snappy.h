@@ -200,4 +200,4 @@ namespace snappy {
   static const size_t kMaxHashTableSize = 1 << kMaxHashTableBits;
 }  // end namespace snappy
 
-#endif  // THIRD_PARTY_SNAPPY_SNAPPY_H__
+#endif  // THIRD_PARTY_SNAPPY_SNAPPY_H_
