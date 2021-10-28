@@ -36,8 +36,8 @@
 // using BMDiff and then compressing the output of BMDiff with
 // Snappy.
 
-#ifndef THIRD_PARTY_SNAPPY_SNAPPY_H__
-#define THIRD_PARTY_SNAPPY_SNAPPY_H__
+#ifndef THIRD_PARTY_SNAPPY_SNAPPY_H_
+#define THIRD_PARTY_SNAPPY_SNAPPY_H_
 
 #include <cstddef>
 #include <string>
