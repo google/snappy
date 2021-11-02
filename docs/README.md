@@ -11,11 +11,11 @@ Snappy is widely used inside Google, in everything from BigTable and MapReduce
 to our internal RPC systems. (Snappy has previously been referred to as "Zippy"
 in some presentations and the likes.)
 
-For more information, please see the [README](../README.md). Benchmarks against
+For more information, please see the [README](https://github.com/google/snappy/blob/master/README.md). Benchmarks against
 a few other compression libraries (zlib, LZO, LZF, FastLZ, and QuickLZ) are
 included in the source code distribution. The source code also contains a
-[formal format specification](../format_description.txt), as well
-as a specification for a [framing format](../framing_format.txt) useful for
+[formal format specification](https://github.com/google/snappy/blob/master/format_description.txt), as well
+as a specification for a [framing format](https://github.com/google/snappy/blob/master/framing_format.txt) useful for
 higher-level framing and encapsulation of Snappy data, e.g. for transporting
 Snappy-compressed data across HTTP in a streaming fashion. Note that the Snappy
 distribution currently has no code implementing the latter, but some of the
