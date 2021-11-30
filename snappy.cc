@@ -340,7 +340,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
   if (SNAPPY_PREDICT_TRUE(offset < 16)) {
     if (SNAPPY_PREDICT_FALSE(offset == 0)) return false;
     // Extend the pattern to the first 16 bytes.
-    for (int i = 0; i < 16; i++) dst[i] = dst[i - offset];
+    for (int i = 0; i < 16; i++) dst[i] = (dst - offset)[i];
     // Find a multiple of pattern >= 16.
     static std::array<uint8_t, 16> pattern_sizes = []() {
       std::array<uint8_t, 16> res;
