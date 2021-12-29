@@ -1224,7 +1224,7 @@ class SnappyDecompressor {
     reader_->Skip(peeked_);
   }
 
-  // Returns true iff we have hit the end of the input without an error.
+  // Returns true if we have hit the end of the input without an error.
   bool eof() const { return eof_; }
 
   // Read the uncompressed length stored at the start of the compressed data.
