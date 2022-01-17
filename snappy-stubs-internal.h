@@ -171,27 +171,37 @@ class LittleEndian {
  public:
   // Functions to do unaligned loads and stores in little-endian order.
   static inline uint16_t Load16(const void *ptr) {
-    const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
-
     // Compiles to a single mov/str on recent clang and gcc.
+#if SNAPPY_IS_BIG_ENDIAN
+    const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
     return (static_cast<uint16_t>(buffer[0])) |
             (static_cast<uint16_t>(buffer[1]) << 8);
+#else
+    uint16_t x;
+    memcpy(&x, ptr, 2);
+    return x;
+#endif
   }
 
   static inline uint32_t Load32(const void *ptr) {
-    const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
-
     // Compiles to a single mov/str on recent clang and gcc.
+#if SNAPPY_IS_BIG_ENDIAN
+    const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
     return (static_cast<uint32_t>(buffer[0])) |
             (static_cast<uint32_t>(buffer[1]) << 8) |
             (static_cast<uint32_t>(buffer[2]) << 16) |
             (static_cast<uint32_t>(buffer[3]) << 24);
+#else
+    uint32_t x;
+    memcpy(&x, ptr, 4);
+    return x;
+#endif
   }
 
   static inline uint64_t Load64(const void *ptr) {
-    const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
-
     // Compiles to a single mov/str on recent clang and gcc.
+#if SNAPPY_IS_BIG_ENDIAN
+    const uint8_t* const buffer = reinterpret_cast<const uint8_t*>(ptr);
     return (static_cast<uint64_t>(buffer[0])) |
             (static_cast<uint64_t>(buffer[1]) << 8) |
             (static_cast<uint64_t>(buffer[2]) << 16) |
@@ -200,30 +210,41 @@ class LittleEndian {
             (static_cast<uint64_t>(buffer[5]) << 40) |
             (static_cast<uint64_t>(buffer[6]) << 48) |
             (static_cast<uint64_t>(buffer[7]) << 56);
+#else
+    uint64_t x;
+    memcpy(&x, ptr, 8);
+    return x;
+#endif
   }
 
   static inline void Store16(void *dst, uint16_t value) {
-    uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
-
     // Compiles to a single mov/str on recent clang and gcc.
+#if SNAPPY_IS_BIG_ENDIAN
+    uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
     buffer[0] = static_cast<uint8_t>(value);
     buffer[1] = static_cast<uint8_t>(value >> 8);
+#else
+    memcpy(dst, &value, 2);
+#endif
   }
 
   static void Store32(void *dst, uint32_t value) {
-    uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
-
     // Compiles to a single mov/str on recent clang and gcc.
+#if SNAPPY_IS_BIG_ENDIAN
+    uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
     buffer[0] = static_cast<uint8_t>(value);
     buffer[1] = static_cast<uint8_t>(value >> 8);
     buffer[2] = static_cast<uint8_t>(value >> 16);
     buffer[3] = static_cast<uint8_t>(value >> 24);
+#else
+    memcpy(dst, &value, 4);
+#endif
   }
 
   static void Store64(void* dst, uint64_t value) {
-    uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
-
     // Compiles to a single mov/str on recent clang and gcc.
+#if SNAPPY_IS_BIG_ENDIAN
+    uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
     buffer[0] = static_cast<uint8_t>(value);
     buffer[1] = static_cast<uint8_t>(value >> 8);
     buffer[2] = static_cast<uint8_t>(value >> 16);
@@ -232,6 +253,9 @@ class LittleEndian {
     buffer[5] = static_cast<uint8_t>(value >> 40);
     buffer[6] = static_cast<uint8_t>(value >> 48);
     buffer[7] = static_cast<uint8_t>(value >> 56);
+#else
+    memcpy(dst, &value, 8);
+#endif
   }
 
   static inline constexpr bool IsLittleEndian() {
