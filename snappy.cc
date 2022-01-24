@@ -1041,7 +1041,7 @@ size_t AdvanceToNextTagX86Optimized(const uint8_t** ip_p, size_t* tag) {
   size_t literal_len = *tag >> 2;
   size_t tag_type = *tag;
   bool is_literal;
-#if defined(__GNUC__) && defined(__x86_64__)
+#if defined(__GCC_ASM_FLAG_OUTPUTS__) && defined(__x86_64__)
   // TODO clang misses the fact that the (c & 3) already correctly
   // sets the zero flag.
   asm("and $3, %k[tag_type]\n\t"
