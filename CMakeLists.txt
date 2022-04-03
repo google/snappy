@@ -68,9 +68,15 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 
   # Use -Werror for clang only.
   if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    if(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
-    endif(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
+    EXECUTE_PROCESS( COMMAND ${CMAKE_CXX_COMPILER} --version OUTPUT_VARIABLE clang_full_version_string )
+    string (REGEX REPLACE ".*clang version ([0-9]+\\.[0-9]+).*" "\\1" CLANG_VERSION_STRING ${clang_full_version_string})
+    if(CLANG_VERSION_STRING GREATER_EQUAL 13.0)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-but-set-variable")
+    else()
+      if(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+      endif(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
+    endif()
   endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 
   # Disable C++ exceptions.
