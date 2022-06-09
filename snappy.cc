@@ -983,22 +983,35 @@ inline bool Copy64BytesWithPatternExtension(ptrdiff_t dst, size_t offset) {
   return offset != 0;
 }
 
-void MemCopy(char* dst, const uint8_t* src, size_t size) {
-  std::memcpy(dst, src, size);
+// Copies between size bytes and 64 bytes from src to dest.  size cannot exceed
+// 64.  More than size bytes, but never exceeding 64, might be copied if doing
+// so gives better performance.
+void MemCopy64(char* dst, const void* src, size_t size) {
+  // Always copy this many bytes, test if we need to copy more.
+  constexpr int kShortMemCopy = 32;
+  // We're always allowed to copy 64 bytes, so if we exceed kShortMemCopy just
+  // copy 64 rather than the exact amount.
+  constexpr int kLongMemCopy = 64;
+
+  assert(size <= kLongMemCopy);
+  // [src, src + size) must not overlap with [dst, dst + size)
+  assert(std::less_equal<const void*>()(static_cast<const char*>(src) + size,
+                                        dst) ||
+         std::less_equal<const void*>()(dst + size, src));
+
+  // We know that src and dst are at least size bytes apart. However, because we
+  // might copy more than size bytes the copy still might overlap past size.
+  // E.g. if src and dst appear consecutively in memory (src + size == dst).
+  std::memmove(dst, src, kShortMemCopy);
+  // Profiling shows that nearly all copies are short.
+  if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
+    std::memmove(dst + kShortMemCopy,
+                 static_cast<const uint8_t*>(src) + kShortMemCopy,
+                 kLongMemCopy - kShortMemCopy);
+  }
 }
 
-void MemCopy(ptrdiff_t dst, const uint8_t* src, size_t size) {
-  // TODO: Switch to [[maybe_unused]] when we can assume C++17.
-  (void)dst;
-  (void)src;
-  (void)size;
-}
-
-void MemMove(char* dst, const void* src, size_t size) {
-  std::memmove(dst, src, size);
-}
-
-void MemMove(ptrdiff_t dst, const void* src, size_t size) {
+void MemCopy64(ptrdiff_t dst, const void* src, size_t size) {
   // TODO: Switch to [[maybe_unused]] when we can assume C++17.
   (void)dst;
   (void)src;
@@ -1170,7 +1183,7 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
           // Due to the spurious offset in literals have this will trigger
           // at the start of a block when op is still smaller than 256.
           if (tag_type != 0) goto break_loop;
-          MemCopy(op_base + op, old_ip, 64);
+          MemCopy64(op_base + op, old_ip, len);
           op += len;
           continue;
         }
@@ -1179,7 +1192,7 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         // we need to copy from ip instead of from the stream.
         const void* from =
             tag_type ? reinterpret_cast<void*>(op_base + delta) : old_ip;
-        MemMove(op_base + op, from, 64);
+        MemCopy64(op_base + op, from, len);
         op += len;
       }
     } while (ip < ip_limit_min_slop && op < op_limit_min_slop);
