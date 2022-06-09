@@ -985,7 +985,8 @@ inline bool Copy64BytesWithPatternExtension(ptrdiff_t dst, size_t offset) {
 
 // Copies between size bytes and 64 bytes from src to dest.  size cannot exceed
 // 64.  More than size bytes, but never exceeding 64, might be copied if doing
-// so gives better performance.
+// so gives better performance.  [src, src + size) must not overlap with
+// [dst, dst + size), but [src, src + 64) may overlap with [dst, dst + 64).
 void MemCopy64(char* dst, const void* src, size_t size) {
   // Always copy this many bytes, test if we need to copy more.
   constexpr int kShortMemCopy = 32;
@@ -994,7 +995,6 @@ void MemCopy64(char* dst, const void* src, size_t size) {
   constexpr int kLongMemCopy = 64;
 
   assert(size <= kLongMemCopy);
-  // [src, src + size) must not overlap with [dst, dst + size)
   assert(std::less_equal<const void*>()(static_cast<const char*>(src) + size,
                                         dst) ||
          std::less_equal<const void*>()(dst + size, src));
