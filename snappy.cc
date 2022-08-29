@@ -1523,29 +1523,11 @@ size_t Compress(Source* reader, Sink* writer) {
     const char* fragment = reader->Peek(&fragment_size);
     assert(fragment_size != 0);  // premature end of input
     const size_t num_to_read = std::min(N, kBlockSize);
-    size_t bytes_read = fragment_size;
 
     size_t pending_advance = 0;
-    if (bytes_read >= num_to_read) {
-      // Buffer returned by reader is large enough
-      pending_advance = num_to_read;
-      fragment_size = num_to_read;
-    } else {
-      char* scratch = wmem.GetScratchInput();
-      std::memcpy(scratch, fragment, bytes_read);
-      reader->Skip(bytes_read);
-
-      while (bytes_read < num_to_read) {
-        fragment = reader->Peek(&fragment_size);
-        size_t n = std::min<size_t>(fragment_size, num_to_read - bytes_read);
-        std::memcpy(scratch + bytes_read, fragment, n);
-        bytes_read += n;
-        reader->Skip(n);
-      }
-      assert(bytes_read == num_to_read);
-      fragment = scratch;
-      fragment_size = num_to_read;
-    }
+    // Buffer returned by reader is large enough
+    pending_advance = num_to_read;
+    fragment_size = num_to_read;
     assert(fragment_size == num_to_read);
 
     // Get encoding table for compression
