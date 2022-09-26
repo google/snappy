@@ -137,21 +137,10 @@ void VerifyStringSink(const std::string& input) {
   CHECK_EQ(uncompressed, input);
 }
 
-void VerifyIOVec(const std::string& input) {
-  std::string compressed;
-  DataEndingAtUnreadablePage i(input);
-  const size_t written = snappy::Compress(i.data(), i.size(), &compressed);
-  CHECK_EQ(written, compressed.size());
-  CHECK_LE(compressed.size(),
-           snappy::MaxCompressedLength(input.size()));
-  CHECK(snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
-
-  // Try uncompressing into an iovec containing a random number of entries
-  // ranging from 1 to 10.
-  char* buf = new char[input.size()];
+struct iovec* GetIOVec(const std::string& input, char*& buf, size_t& num) {
   std::minstd_rand0 rng(input.size());
   std::uniform_int_distribution<size_t> uniform_1_to_10(1, 10);
-  size_t num = uniform_1_to_10(rng);
+  num = uniform_1_to_10(rng);
   if (input.size() < num) {
     num = input.size();
   }
@@ -175,8 +164,40 @@ void VerifyIOVec(const std::string& input) {
     }
     used_so_far += iov[i].iov_len;
   }
-  CHECK(snappy::RawUncompressToIOVec(
-      compressed.data(), compressed.size(), iov, num));
+  return iov;
+}
+
+int VerifyIOVecSource(const std::string& input) {
+  std::string compressed;
+  std::string copy = input;
+  char* buf = copy.data();
+  size_t num = 0;
+  struct iovec* iov = GetIOVec(input, buf, num);
+  const size_t written = snappy::CompressFromIOVec(iov, num, &compressed);
+  CHECK_EQ(written, compressed.size());
+  CHECK_LE(compressed.size(), snappy::MaxCompressedLength(input.size()));
+  CHECK(snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
+
+  std::string uncompressed;
+  DataEndingAtUnreadablePage c(compressed);
+  CHECK(snappy::Uncompress(c.data(), c.size(), &uncompressed));
+  CHECK_EQ(uncompressed, input);
+  delete[] iov;
+  return uncompressed.size();
+}
+
+void VerifyIOVecSink(const std::string& input) {
+  std::string compressed;
+  DataEndingAtUnreadablePage i(input);
+  const size_t written = snappy::Compress(i.data(), i.size(), &compressed);
+  CHECK_EQ(written, compressed.size());
+  CHECK_LE(compressed.size(), snappy::MaxCompressedLength(input.size()));
+  CHECK(snappy::IsValidCompressedBuffer(compressed.data(), compressed.size()));
+  char* buf = new char[input.size()];
+  size_t num = 0;
+  struct iovec* iov = GetIOVec(input, buf, num);
+  CHECK(snappy::RawUncompressToIOVec(compressed.data(), compressed.size(), iov,
+                                     num));
   CHECK(!memcmp(buf, input.data(), input.size()));
   delete[] iov;
   delete[] buf;
@@ -252,15 +273,18 @@ int Verify(const std::string& input) {
   // Compress using string based routines
   const int result = VerifyString(input);
 
+  // Compress using `iovec`-based routines.
+  CHECK_EQ(VerifyIOVecSource(input), result);
+
   // Verify using sink based routines
   VerifyStringSink(input);
 
   VerifyNonBlockedCompression(input);
-  VerifyIOVec(input);
+  VerifyIOVecSink(input);
   if (!input.empty()) {
     const std::string expanded = Expand(input);
     VerifyNonBlockedCompression(expanded);
-    VerifyIOVec(input);
+    VerifyIOVecSink(input);
   }
 
   return result;
@@ -540,7 +564,27 @@ TEST(Snappy, FourByteOffset) {
   CHECK_EQ(uncompressed, src);
 }
 
-TEST(Snappy, IOVecEdgeCases) {
+TEST(Snappy, IOVecSourceEdgeCases) {
+  // Validate that empty leading, trailing, and in-between iovecs are handled:
+  // [] [] ['a'] [] ['b'] [].
+  std::string data = "ab";
+  char* buf = data.data();
+  size_t used_so_far = 0;
+  static const int kLengths[] = {0, 0, 1, 0, 1, 0};
+  struct iovec iov[ARRAYSIZE(kLengths)];
+  for (int i = 0; i < ARRAYSIZE(kLengths); ++i) {
+    iov[i].iov_base = buf + used_so_far;
+    iov[i].iov_len = kLengths[i];
+    used_so_far += kLengths[i];
+  }
+  std::string compressed;
+  snappy::CompressFromIOVec(iov, ARRAYSIZE(kLengths), &compressed);
+  std::string uncompressed;
+  snappy::Uncompress(compressed.data(), compressed.size(), &uncompressed);
+  CHECK_EQ(data, uncompressed);
+}
+
+TEST(Snappy, IOVecSinkEdgeCases) {
   // Test some tricky edge cases in the iovec output that are not necessarily
   // exercised by random tests.
 

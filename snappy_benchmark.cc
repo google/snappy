@@ -149,7 +149,55 @@ void BM_UValidateMedley(benchmark::State& state) {
 }
 BENCHMARK(BM_UValidateMedley);
 
-void BM_UIOVec(benchmark::State& state) {
+void BM_UIOVecSource(benchmark::State& state) {
+  // Pick file to process based on state.range(0).
+  int file_index = state.range(0);
+
+  CHECK_GE(file_index, 0);
+  CHECK_LT(file_index, ARRAYSIZE(kTestDataFiles));
+  std::string contents =
+      ReadTestDataFile(kTestDataFiles[file_index].filename,
+                       kTestDataFiles[file_index].size_limit);
+
+  // Create `iovec`s of the `contents`.
+  const int kNumEntries = 10;
+  struct iovec iov[kNumEntries];
+  size_t used_so_far = 0;
+  for (int i = 0; i < kNumEntries; ++i) {
+    iov[i].iov_base = contents.data() + used_so_far;
+    if (used_so_far == contents.size()) {
+      iov[i].iov_len = 0;
+      continue;
+    }
+    if (i == kNumEntries - 1) {
+      iov[i].iov_len = contents.size() - used_so_far;
+    } else {
+      iov[i].iov_len = contents.size() / kNumEntries;
+    }
+    used_so_far += iov[i].iov_len;
+  }
+
+  char* dst = new char[snappy::MaxCompressedLength(contents.size())];
+  size_t zsize = 0;
+  for (auto s : state) {
+    snappy::RawCompressFromIOVec(iov, contents.size(), dst, &zsize);
+    benchmark::DoNotOptimize(iov);
+  }
+  state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
+                          static_cast<int64_t>(contents.size()));
+  const double compression_ratio =
+      static_cast<double>(zsize) / std::max<size_t>(1, contents.size());
+  state.SetLabel(StrFormat("%s (%.2f %%)", kTestDataFiles[file_index].label,
+                           100.0 * compression_ratio));
+  VLOG(0) << StrFormat("compression for %s: %d -> %d bytes",
+                       kTestDataFiles[file_index].label, contents.size(),
+                       zsize);
+
+  delete[] dst;
+}
+BENCHMARK(BM_UIOVecSource)->DenseRange(0, ARRAYSIZE(kTestDataFiles) - 1);
+
+void BM_UIOVecSink(benchmark::State& state) {
   // Pick file to process based on state.range(0).
   int file_index = state.range(0);
 
@@ -193,7 +241,7 @@ void BM_UIOVec(benchmark::State& state) {
 
   delete[] dst;
 }
-BENCHMARK(BM_UIOVec)->DenseRange(0, 4);
+BENCHMARK(BM_UIOVecSink)->DenseRange(0, 4);
 
 void BM_UFlatSink(benchmark::State& state) {
   // Pick file to process based on state.range(0).

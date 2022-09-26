@@ -1580,6 +1580,67 @@ size_t Compress(Source* reader, Sink* writer) {
 // IOVec interfaces
 // -----------------------------------------------------------------------
 
+// A `Source` implementation that yields the contents of an `iovec` array. Note
+// that `total_size` is the total number of bytes to be read from the elements
+// of `iov` (_not_ the total number of elements in `iov`).
+class SnappyIOVecReader : public Source {
+ public:
+  SnappyIOVecReader(const struct iovec* iov, size_t total_size)
+      : curr_iov_(iov),
+        curr_pos_(total_size > 0 ? reinterpret_cast<const char*>(iov->iov_base)
+                                 : nullptr),
+        curr_size_remaining_(total_size > 0 ? iov->iov_len : 0),
+        total_size_remaining_(total_size) {
+    // Skip empty leading `iovec`s.
+    if (total_size > 0 && curr_size_remaining_ == 0) Advance();
+  }
+
+  ~SnappyIOVecReader() = default;
+
+  size_t Available() const { return total_size_remaining_; }
+
+  const char* Peek(size_t* len) {
+    *len = curr_size_remaining_;
+    return curr_pos_;
+  }
+
+  void Skip(size_t n) {
+    while (n >= curr_size_remaining_ && n > 0) {
+      n -= curr_size_remaining_;
+      Advance();
+    }
+    curr_size_remaining_ -= n;
+    total_size_remaining_ -= n;
+    curr_pos_ += n;
+  }
+
+ private:
+  // Advances to the next nonempty `iovec` and updates related variables.
+  void Advance() {
+    do {
+      assert(total_size_remaining_ >= curr_size_remaining_);
+      total_size_remaining_ -= curr_size_remaining_;
+      if (total_size_remaining_ == 0) {
+        curr_pos_ = nullptr;
+        curr_size_remaining_ = 0;
+        return;
+      }
+      ++curr_iov_;
+      curr_pos_ = reinterpret_cast<const char*>(curr_iov_->iov_base);
+      curr_size_remaining_ = curr_iov_->iov_len;
+    } while (curr_size_remaining_ == 0);
+  }
+
+  // The `iovec` currently being read.
+  const struct iovec* curr_iov_;
+  // The location in `curr_iov_` currently being read.
+  const char* curr_pos_;
+  // The amount of unread data in `curr_iov_`.
+  size_t curr_size_remaining_;
+  // The amount of unread data in the entire input array.
+  size_t total_size_remaining_;
+};
+
 // A type that writes to an iovec.
 // Note that this is not a "ByteSink", but a type that matches the
 // Writer template argument to SnappyDecompressor::DecompressAllTags().
@@ -1954,6 +2015,16 @@ void RawCompress(const char* input, size_t input_length, char* compressed,
   *compressed_length = (writer.CurrentDestination() - compressed);
 }
 
+void RawCompressFromIOVec(const struct iovec* iov, size_t uncompressed_length,
+                          char* compressed, size_t* compressed_length) {
+  SnappyIOVecReader reader(iov, uncompressed_length);
+  UncheckedByteArraySink writer(compressed);
+  Compress(&reader, &writer);
+
+  // Compute how many bytes were added.
+  *compressed_length = writer.CurrentDestination() - compressed;
+}
+
 size_t Compress(const char* input, size_t input_length,
                 std::string* compressed) {
   // Pre-grow the buffer to the max length of the compressed output
@@ -1962,7 +2033,26 @@ size_t Compress(const char* input, size_t input_length,
   size_t compressed_length;
   RawCompress(input, input_length, string_as_array(compressed),
               &compressed_length);
-  compressed->resize(compressed_length);
+  compressed->erase(compressed_length);
+  return compressed_length;
+}
+
+size_t CompressFromIOVec(const struct iovec* iov, size_t iov_cnt,
+                         std::string* compressed) {
+  // Compute the number of bytes to be compressed.
+  size_t uncompressed_length = 0;
+  for (int i = 0; i < iov_cnt; ++i) {
+    uncompressed_length += iov[i].iov_len;
+  }
+
+  // Pre-grow the buffer to the max length of the compressed output.
+  STLStringResizeUninitialized(compressed, MaxCompressedLength(
+      uncompressed_length));
+
+  size_t compressed_length;
+  RawCompressFromIOVec(iov, uncompressed_length, string_as_array(compressed),
+                       &compressed_length);
+  compressed->erase(compressed_length);
   return compressed_length;
 }
 
