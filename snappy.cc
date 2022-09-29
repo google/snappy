@@ -2041,7 +2041,7 @@ size_t CompressFromIOVec(const struct iovec* iov, size_t iov_cnt,
                          std::string* compressed) {
   // Compute the number of bytes to be compressed.
   size_t uncompressed_length = 0;
-  for (int i = 0; i < iov_cnt; ++i) {
+  for (size_t i = 0; i < iov_cnt; ++i) {
     uncompressed_length += iov[i].iov_len;
   }
 

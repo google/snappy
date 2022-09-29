@@ -158,21 +158,22 @@ void BM_UIOVecSource(benchmark::State& state) {
   std::string contents =
       ReadTestDataFile(kTestDataFiles[file_index].filename,
                        kTestDataFiles[file_index].size_limit);
+  std::vector<char> contents_copy(contents.begin(), contents.end());
 
   // Create `iovec`s of the `contents`.
   const int kNumEntries = 10;
   struct iovec iov[kNumEntries];
   size_t used_so_far = 0;
   for (int i = 0; i < kNumEntries; ++i) {
-    iov[i].iov_base = contents.data() + used_so_far;
-    if (used_so_far == contents.size()) {
+    iov[i].iov_base = contents_copy.data() + used_so_far;
+    if (used_so_far == contents_copy.size()) {
       iov[i].iov_len = 0;
       continue;
     }
     if (i == kNumEntries - 1) {
-      iov[i].iov_len = contents.size() - used_so_far;
+      iov[i].iov_len = contents_copy.size() - used_so_far;
     } else {
-      iov[i].iov_len = contents.size() / kNumEntries;
+      iov[i].iov_len = contents_copy.size() / kNumEntries;
     }
     used_so_far += iov[i].iov_len;
   }

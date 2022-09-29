@@ -169,7 +169,7 @@ struct iovec* GetIOVec(const std::string& input, char*& buf, size_t& num) {
 
 int VerifyIOVecSource(const std::string& input) {
   std::string compressed;
-  std::string copy = input;
+  std::vector<char> copy(input.begin(), input.end());
   char* buf = copy.data();
   size_t num = 0;
   struct iovec* iov = GetIOVec(input, buf, num);
@@ -567,8 +567,8 @@ TEST(Snappy, FourByteOffset) {
 TEST(Snappy, IOVecSourceEdgeCases) {
   // Validate that empty leading, trailing, and in-between iovecs are handled:
   // [] [] ['a'] [] ['b'] [].
-  std::string data = "ab";
-  char* buf = data.data();
+  char data[3] = "ab";
+  char* buf = data;
   size_t used_so_far = 0;
   static const int kLengths[] = {0, 0, 1, 0, 1, 0};
   struct iovec iov[ARRAYSIZE(kLengths)];
