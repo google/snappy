@@ -568,7 +568,7 @@ TEST(Snappy, IOVecSourceEdgeCases) {
   // Validate that empty leading, trailing, and in-between iovecs are handled:
   // [] [] ['a'] [] ['b'] [].
   std::string data = "ab";
-  char* buf = data.data();
+  char* buf = const_cast<char*>(data.data());
   size_t used_so_far = 0;
   static const int kLengths[] = {0, 0, 1, 0, 1, 0};
   struct iovec iov[ARRAYSIZE(kLengths)];
