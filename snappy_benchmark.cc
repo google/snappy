@@ -164,7 +164,7 @@ void BM_UIOVecSource(benchmark::State& state) {
   struct iovec iov[kNumEntries];
   size_t used_so_far = 0;
   for (int i = 0; i < kNumEntries; ++i) {
-    iov[i].iov_base = contents.data() + used_so_far;
+    iov[i].iov_base = const_cast<char*>(contents.data()) + used_so_far;
     if (used_so_far == contents.size()) {
       iov[i].iov_len = 0;
       continue;

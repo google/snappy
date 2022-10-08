@@ -170,7 +170,7 @@ struct iovec* GetIOVec(const std::string& input, char*& buf, size_t& num) {
 int VerifyIOVecSource(const std::string& input) {
   std::string compressed;
   std::string copy = input;
-  char* buf = copy.data();
+  char* buf = const_cast<char*>(copy.data());
   size_t num = 0;
   struct iovec* iov = GetIOVec(input, buf, num);
   const size_t written = snappy::CompressFromIOVec(iov, num, &compressed);
