@@ -39,13 +39,11 @@
 // GCC and Clang can build code with AVX2 enabled but BMI2 disabled, in which
 // case issuing BMI2 instructions results in a compiler error.
 #if defined(__BMI2__) || (defined(_MSC_VER) && defined(__AVX2__))
-#define SNAPPY_HAVE_BMI2 1
-#else
-#define SNAPPY_HAVE_BMI2 0
+#define SNAPPY_HAVE_BMI2
 #endif
 #endif  // !defined(SNAPPY_HAVE_BMI2)
 
-#if SNAPPY_HAVE_BMI2
+#if defined(SNAPPY_HAVE_BMI2)
 // Please do not replace with <x86intrin.h>. or with headers that assume more
 // advanced SSE versions without checking with all the OWNERS.
 #include <immintrin.h>
@@ -958,7 +956,7 @@ static inline void Report(const char *algorithm, size_t compressed_size,
 static inline uint32_t ExtractLowBytes(const uint32_t& v, int n) {
   assert(n >= 0);
   assert(n <= 4);
-#if SNAPPY_HAVE_BMI2
+#if defined(SNAPPY_HAVE_BMI2)
   return _bzhi_u32(v, 8 * n);
 #else
   // This needs to be wider than uint32_t otherwise `mask << 32` will be

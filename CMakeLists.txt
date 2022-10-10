@@ -172,11 +172,13 @@ int main() {
   return 0;
 }" SNAPPY_HAVE_SSSE3)
 
-check_cxx_source_compiles("
-#include <immintrin.h>
-int main() {
-  return _bzhi_u32(0, 1);
-}" SNAPPY_HAVE_BMI2)
+if(SNAPPY_REQUIRE_AVX2)
+  check_cxx_source_compiles("
+  #include <immintrin.h>
+  int main() {
+    return _bzhi_u32(0, 1);
+  }" SNAPPY_HAVE_BMI2)
+endif(SNAPPY_REQUIRE_AVX2)
 
 check_cxx_source_compiles("
 #include <arm_neon.h>
