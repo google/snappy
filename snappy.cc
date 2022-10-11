@@ -989,27 +989,36 @@ inline bool Copy64BytesWithPatternExtension(ptrdiff_t dst, size_t offset) {
 // so gives better performance.  [src, src + size) must not overlap with
 // [dst, dst + size), but [src, src + 64) may overlap with [dst, dst + 64).
 void MemCopy64(char* dst, const void* src, size_t size) {
-  // Always copy this many bytes, test if we need to copy more.
+  // Always copy this many bytes.  If that's below size then copy the full 64.
   constexpr int kShortMemCopy = 32;
-  // We're always allowed to copy 64 bytes, so if we exceed kShortMemCopy just
-  // copy 64 rather than the exact amount.
-  constexpr int kLongMemCopy = 64;
 
-  assert(size <= kLongMemCopy);
+  assert(size <= 64);
   assert(std::less_equal<const void*>()(static_cast<const char*>(src) + size,
                                         dst) ||
          std::less_equal<const void*>()(dst + size, src));
 
   // We know that src and dst are at least size bytes apart. However, because we
   // might copy more than size bytes the copy still might overlap past size.
-  // E.g. if src and dst appear consecutively in memory (src + size == dst).
+  // E.g. if src and dst appear consecutively in memory (src + size >= dst).
+  // TODO: Investigate wider copies on other platforms.
+#if defined(__x86_64__) && defined(__AVX__)
+  assert(kShortMemCopy <= 32);
+  __m256i data = _mm256_lddqu_si256(static_cast<const __m256i *>(src));
+  _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst), data);
+  // Profiling shows that nearly all copies are short.
+  if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
+    data = _mm256_lddqu_si256(static_cast<const __m256i *>(src) + 1);
+    _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst) + 1, data);
+  }
+#else
   std::memmove(dst, src, kShortMemCopy);
   // Profiling shows that nearly all copies are short.
   if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
     std::memmove(dst + kShortMemCopy,
                  static_cast<const uint8_t*>(src) + kShortMemCopy,
-                 kLongMemCopy - kShortMemCopy);
+                 64 - kShortMemCopy);
   }
+#endif
 }
 
 void MemCopy64(ptrdiff_t dst, const void* src, size_t size) {
