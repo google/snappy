@@ -232,22 +232,32 @@ inline constexpr std::array<char, sizeof...(indexes)> MakePatternMaskBytes(
   return {static_cast<char>((index_offset + indexes) % pattern_size)...};
 }
 
+template <typename V>
+struct SizeOfV128 {
+  static constexpr uint64_t size = sizeof(V);
+};
+
+template <>
+struct SizeOfV128<vuint8m1_t> {
+  static constexpr uint64_t size = 128;
+};
+
 // Computes the shuffle control mask bytes array for given pattern-sizes and
 // returns an array.
 template <size_t... pattern_sizes_minus_one>
-inline constexpr std::array<std::array<char, sizeof(V128)>,
+inline constexpr std::array<std::array<char, SizeOfV128<V128>::size>,
                             sizeof...(pattern_sizes_minus_one)>
 MakePatternMaskBytesTable(int index_offset,
                           index_sequence<pattern_sizes_minus_one...>) {
   return {
       MakePatternMaskBytes(index_offset, pattern_sizes_minus_one + 1,
-                           make_index_sequence</*indexes=*/sizeof(V128)>())...};
+                           make_index_sequence</*indexes=*/SizeOfV128<V128>::size>())...};
 }
 
 // This is an array of shuffle control masks that can be used as the source
 // operand for PSHUFB to permute the contents of the destination XMM register
 // into a repeating byte pattern.
-alignas(16) constexpr std::array<std::array<char, sizeof(V128)>,
+alignas(16) constexpr std::array<std::array<char, SizeOfV128<V128>::size>()>,
                                  16> pattern_generation_masks =
     MakePatternMaskBytesTable(
         /*index_offset=*/0,
@@ -258,7 +268,7 @@ alignas(16) constexpr std::array<std::array<char, sizeof(V128)>,
 // Basically, pattern_reshuffle_masks is a continuation of
 // pattern_generation_masks. It follows that, pattern_reshuffle_masks is same as
 // pattern_generation_masks for offsets 1, 2, 4, 8 and 16.
-alignas(16) constexpr std::array<std::array<char, sizeof(V128)>,
+alignas(16) constexpr std::array<std::array<char, SizeOfV128<V128>::size>()>,
                                  16> pattern_reshuffle_masks =
     MakePatternMaskBytesTable(
         /*index_offset=*/16,
@@ -275,6 +285,15 @@ static inline V128 LoadPattern(const char* src, const size_t pattern_size) {
                       generation_mask);
 }
 
+// fix sizeless compiler issue
+#if SNAPPY_HAVE_RVV
+#define LoadPatternAndReshuffleMask(src, pattern_size) \
+  V128 pattern = LoadPattern(src, pattern_size);\
+  V128 reshuffle_mask = V128_Load(reinterpret_cast<const V128*>(\
+      pattern_reshuffle_masks[pattern_size - 1].data()));
+
+#else
+
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 static inline std::pair<V128 /* pattern */, V128 /* reshuffle_mask */>
 LoadPatternAndReshuffleMask(const char* src, const size_t pattern_size) {
@@ -290,6 +309,7 @@ LoadPatternAndReshuffleMask(const char* src, const size_t pattern_size) {
       pattern_reshuffle_masks[pattern_size - 1].data()));
   return {pattern, reshuffle_mask};
 }
+#endif
 
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
@@ -324,10 +344,14 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
         return true;
       }
       default: {
+        #if SNAPPY_HAVE_RVV
+        LoadPatternAndReshuffleMask(dst - offset, offset)
+        #else
         auto pattern_and_reshuffle_mask =
             LoadPatternAndReshuffleMask(dst - offset, offset);
         V128 pattern = pattern_and_reshuffle_mask.first;
         V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
+        #endif
         for (int i = 0; i < 4; i++) {
           V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
           pattern = V128_Shuffle(pattern, reshuffle_mask);
@@ -435,10 +459,14 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     // Typically, the op_limit is the gating factor so try to simplify the loop
     // based on that.
     if (SNAPPY_PREDICT_TRUE(op_limit <= buf_limit - 15)) {
+      #if SNAPPY_HAVE_RVV
+      LoadPatternAndReshuffleMask(src, pattern_size)
+      #else
       auto pattern_and_reshuffle_mask =
           LoadPatternAndReshuffleMask(src, pattern_size);
       V128 pattern = pattern_and_reshuffle_mask.first;
       V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
+      #endif
 
       // There is at least one, and at most four 16-byte blocks. Writing four
       // conditionals instead of a loop allows FDO to layout the code with
@@ -462,10 +490,14 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     }
     char* const op_end = buf_limit - 15;
     if (SNAPPY_PREDICT_TRUE(op < op_end)) {
+      #if SNAPPY_HAVE_RVV
+      LoadPatternAndReshuffleMask(src, pattern_size)
+      #else
       auto pattern_and_reshuffle_mask =
           LoadPatternAndReshuffleMask(src, pattern_size);
       V128 pattern = pattern_and_reshuffle_mask.first;
       V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
+      #endif
 
       // This code path is relatively cold however so we save code size
       // by avoiding unrolling and vectorizing.
@@ -1099,7 +1131,7 @@ inline uint32_t ExtractOffset(uint32_t val, size_t tag_type) {
          reinterpret_cast<const char*>(&kExtractMasksCombined) + 2 * tag_type,
          sizeof(result));
   return val & result;
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
   constexpr uint64_t kExtractMasksCombined = 0x0000FFFF00FF0000ull;
   return val & static_cast<uint32_t>(
       (kExtractMasksCombined >> (tag_type * 16)) & 0xFFFF);
@@ -1149,7 +1181,7 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         // For literals tag_type = 0, hence we will always obtain 0 from
         // ExtractLowBytes. For literals offset will thus be kLiteralOffset.
         ptrdiff_t len_min_offset = kLengthMinusOffset[tag];
-#if defined(__aarch64__)
+#if defined(__aarch64__) || defined(__riscv)
         size_t tag_type = AdvanceToNextTagARMOptimized(&ip, &tag);
 #else
         size_t tag_type = AdvanceToNextTagX86Optimized(&ip, &tag);

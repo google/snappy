@@ -56,4 +56,7 @@
    first (like Motorola and SPARC, unlike Intel and VAX). */
 #cmakedefine01 SNAPPY_IS_BIG_ENDIAN
 
+/* Define to 1 if you target processors with RVV and have <riscv_vector.h>. */
+#cmakedefine01 SNAPPY_HAVE_RVV
+
 #endif  // THIRD_PARTY_SNAPPY_OPENSOURCE_CMAKE_CONFIG_H_
