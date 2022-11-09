@@ -246,7 +246,8 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
       asm("testl %k2, %k2\n\t"
           "cmovzq %1, %0\n\t"
           : "+r"(a2)
-          : "r"(a3), "r"(xorval));
+          : "r"(a3), "r"(xorval)
+          : "cc");
 #endif
       *data = a2 >> (shift & (3 * 8));
       return std::pair<size_t, bool>(matched_bytes, true);
@@ -277,7 +278,8 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
       asm("testl %k2, %k2\n\t"
           "cmovzq %1, %0\n\t"
           : "+r"(a2)
-          : "r"(a3), "r"(xorval));
+          : "r"(a3), "r"(xorval)
+          : "cc");
 #endif
       *data = a2 >> (shift & (3 * 8));
       matched += matched_bytes;

@@ -1107,7 +1107,8 @@ inline size_t AdvanceToNextTagX86Optimized(const uint8_t** ip_p, size_t* tag) {
   // TODO clang misses the fact that the (c & 3) already correctly
   // sets the zero flag.
   asm("and $3, %k[tag_type]\n\t"
-      : [tag_type] "+r"(tag_type), "=@ccz"(is_literal));
+      : [tag_type] "+r"(tag_type), "=@ccz"(is_literal)
+      :: "cc");
 #else
   tag_type &= 3;
   is_literal = (tag_type == 0);
