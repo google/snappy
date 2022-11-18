@@ -69,6 +69,12 @@
 #include <arm_acle.h>
 #endif
 
+#if defined(__GNUC__)
+#define SNAPPY_PREFETCH(ptr) __builtin_prefetch(ptr, 0, 3)
+#else
+#define SNAPPY_PREFETCH(ptr) (void)(ptr)
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -1192,6 +1198,8 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
       // The throughput is limited by instructions, unrolling the inner loop
       // twice reduces the amount of instructions checking limits and also
       // leads to reduced mov's.
+
+      SNAPPY_PREFETCH(ip+128);
       for (int i = 0; i < 2; i++) {
         const uint8_t* old_ip = ip;
         assert(tag == ip[-1]);
