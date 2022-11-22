@@ -636,7 +636,19 @@ static inline char* EmitLiteral(char* op, const char* literal, int len) {
     LittleEndian::Store32(op, n);
     op += count;
   }
-  std::memcpy(op, literal, len);
+  // When allow_fast_path is true, we can overwrite up to 16 bytes.
+  if (allow_fast_path) {
+    char* destination = op;
+    const char* source = literal;
+    const char* end = destination + len;
+    do {
+      std::memcpy(destination, source, 16);
+      destination += 16;
+      source += 16;
+    } while (destination < end);
+  } else {
+    std::memcpy(op, literal, len);
+  }
   return op + len;
 }
 
