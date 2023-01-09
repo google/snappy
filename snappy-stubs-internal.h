@@ -213,16 +213,21 @@ class LittleEndian {
   static void Store32(void *dst, uint32_t value) {
     uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
 
+#if SNAPPY_IS_BIG_ENDIAN
     // Compiles to a single mov/str on recent clang and gcc.
     buffer[0] = static_cast<uint8_t>(value);
     buffer[1] = static_cast<uint8_t>(value >> 8);
     buffer[2] = static_cast<uint8_t>(value >> 16);
     buffer[3] = static_cast<uint8_t>(value >> 24);
+#else
+    std::memcpy(buffer, &value, sizeof(uint32_t));
+#endif
   }
 
   static void Store64(void* dst, uint64_t value) {
     uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
 
+#if SNAPPY_IS_BIG_ENDIAN
     // Compiles to a single mov/str on recent clang and gcc.
     buffer[0] = static_cast<uint8_t>(value);
     buffer[1] = static_cast<uint8_t>(value >> 8);
@@ -232,6 +237,9 @@ class LittleEndian {
     buffer[5] = static_cast<uint8_t>(value >> 40);
     buffer[6] = static_cast<uint8_t>(value >> 48);
     buffer[7] = static_cast<uint8_t>(value >> 56);
+#else
+    std::memcpy(buffer, &value, sizeof(uint64_t));
+#endif
   }
 
   static inline constexpr bool IsLittleEndian() {
