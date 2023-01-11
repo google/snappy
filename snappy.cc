@@ -697,13 +697,13 @@ static inline char* EmitCopy(char* op, size_t offset, size_t len) {
     }
 
     // One or two copies will now finish the job.
-    if (len > 64) {
+    if (SNAPPY_PREDICT_FALSE(len > 64)) {
       op = EmitCopyAtMost64</*len_less_than_12=*/false>(op, offset, 60);
       len -= 60;
     }
 
     // Emit remainder.
-    if (len < 12) {
+    if (SNAPPY_PREDICT_FALSE(len < 12)) {
       op = EmitCopyAtMost64</*len_less_than_12=*/true>(op, offset, len);
     } else {
       op = EmitCopyAtMost64</*len_less_than_12=*/false>(op, offset, len);
