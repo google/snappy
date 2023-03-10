@@ -1290,7 +1290,7 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         DeferMemCopy(&deferred_src, &deferred_length, from, len);
       }
     } while (ip < ip_limit_min_slop &&
-             (op + deferred_length) < op_limit_min_slop);
+             (op + static_cast<ptrdiff_t>(deferred_length)) < op_limit_min_slop);
   exit:
     ip--;
     assert(ip <= ip_limit);
