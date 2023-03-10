@@ -200,6 +200,16 @@ int main() {
   return 0;
 }" SNAPPY_HAVE_NEON)
 
+check_cxx_source_compiles("
+#include <riscv_vector.h>
+int main() {
+  uint8_t val = 3, dup[8];
+  vuint8m1_t v = vmv_v_x_u8m1(val, 128);
+  vuint64m1_t vv = vreinterpret_v_u8m1_u64m1(v);
+  vse64_v_u64m1(reinterpret_cast<uint64_t*>(dup), vv, 128);
+  return 0;
+}" SNAPPY_HAVE_RVV)
+
 include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
