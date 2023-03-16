@@ -31,6 +31,8 @@
 #ifndef THIRD_PARTY_SNAPPY_SNAPPY_INTERNAL_H_
 #define THIRD_PARTY_SNAPPY_SNAPPY_INTERNAL_H_
 
+#include <utility>
+
 #include "snappy-stubs-internal.h"
 
 #if SNAPPY_HAVE_SSSE3
