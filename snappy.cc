@@ -1234,16 +1234,21 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         assert(tag == ip[-1]);
         // For literals tag_type = 0, hence we will always obtain 0 from
         // ExtractLowBytes. For literals offset will thus be kLiteralOffset.
-        ptrdiff_t len_min_offset = kLengthMinusOffset[tag];
+        ptrdiff_t len_minus_offset = kLengthMinusOffset[tag];
+        uint32_t next;
 #if defined(__aarch64__)
         size_t tag_type = AdvanceToNextTagARMOptimized(&ip, &tag);
+        // We never need more than 16 bits. Doing a Load16 allows the compiler
+        // to elide the masking operation in ExtractOffset.
+        next = LittleEndian::Load16(old_ip);
 #else
         size_t tag_type = AdvanceToNextTagX86Optimized(&ip, &tag);
+        next = LittleEndian::Load32(old_ip);
 #endif
-        uint32_t next = LittleEndian::Load32(old_ip);
-        size_t len = len_min_offset & 0xFF;
-        len_min_offset -= ExtractOffset(next, tag_type);
-        if (SNAPPY_PREDICT_FALSE(len_min_offset > 0)) {
+        size_t len = len_minus_offset & 0xFF;
+        ptrdiff_t extracted = ExtractOffset(next, tag_type);
+        ptrdiff_t len_min_offset = len_minus_offset - extracted;
+        if (SNAPPY_PREDICT_FALSE(len_minus_offset > extracted)) {
           if (SNAPPY_PREDICT_FALSE(len & 0x80)) {
             // Exceptional case (long literal or copy 4).
             // Actually doing the copy here is negatively impacting the main
