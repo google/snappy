@@ -68,12 +68,6 @@
 #include <arm_acle.h>
 #endif
 
-#if defined(__GNUC__)
-#define SNAPPY_PREFETCH(ptr) __builtin_prefetch(ptr, 0, 3)
-#else
-#define SNAPPY_PREFETCH(ptr) (void)(ptr)
-#endif
-
 #include <algorithm>
 #include <array>
 #include <cstddef>

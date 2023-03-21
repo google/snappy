@@ -258,6 +258,8 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
       s2 += 8;
     }
   }
+  SNAPPY_PREFETCH(s1 + 64);
+  SNAPPY_PREFETCH(s2 + 64);
 
   // Find out how long the match is. We loop over the data 64 bits at a
   // time until we find a 64-bit block that doesn't match; then we find
