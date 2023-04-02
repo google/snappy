@@ -52,6 +52,12 @@
 #define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 0
 #endif
 
+#if defined(__GNUC__)
+#define SNAPPY_PREFETCH(ptr) __builtin_prefetch(ptr, 0, 3)
+#else
+#define SNAPPY_PREFETCH(ptr) (void)(ptr)
+#endif
+
 namespace snappy {
 namespace internal {
 
