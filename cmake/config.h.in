@@ -10,6 +10,9 @@
 /* Define to 1 if the compiler supports __builtin_expect. */
 #cmakedefine01 HAVE_BUILTIN_EXPECT
 
+/* Define to 1 if the compiler supports __builtin_prefetch. */
+#cmakedefine01 HAVE_BUILTIN_PREFETCH
+
 /* Define to 1 if you have a definition for mmap() in <sys/mman.h>. */
 #cmakedefine01 HAVE_FUNC_MMAP
 

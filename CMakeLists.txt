@@ -154,6 +154,12 @@ int main() {
 }" HAVE_BUILTIN_CTZ)
 
 check_cxx_source_compiles("
+int main() {
+  __builtin_prefetch(0, 0, 3);
+  return 0;
+}" HAVE_BUILTIN_PREFETCH)
+
+check_cxx_source_compiles("
 __attribute__((always_inline)) int zero() { return 0; }
 
 int main() {
