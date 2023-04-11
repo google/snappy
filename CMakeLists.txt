@@ -73,6 +73,11 @@ else(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     endif(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
   endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 
+  # Disable sign comparison warnings. Matches upcoming Bazel setup.
+  if(NOT CMAKE_CXX_FLAGS MATCHES "-Wno-sign-compare")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-sign-compare")
+  endif(NOT CMAKE_CXX_FLAGS MATCHES "-Wno-sign-compare")
+
   # Disable C++ exceptions.
   string(REGEX REPLACE "-fexceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
