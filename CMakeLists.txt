@@ -146,6 +146,8 @@ endif(SNAPPY_REQUIRE_AVX2)
 # Used by googletest.
 check_cxx_compiler_flag(-Wno-missing-field-initializers
                         SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+check_cxx_compiler_flag(-Wno-implicit-int-float-conversion
+                        SNAPPY_HAVE_NO_IMPLICIT_INT_FLOAT_CONVERSION)
 
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles("
@@ -333,6 +335,11 @@ if(SNAPPY_BUILD_TESTS)
     set_property(TARGET gmock
         APPEND PROPERTY COMPILE_OPTIONS -Wno-missing-field-initializers)
   endif(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+
+  if(SNAPPY_HAVE_NO_IMPLICIT_INT_FLOAT_CONVERSION)
+    set_property(TARGET gtest
+        APPEND PROPERTY COMPILE_OPTIONS -Wno-implicit-int-float-conversion)
+  endif(SNAPPY_HAVE_NO_IMPLICIT_INT_FLOAT_CONVERSION)
 
   add_executable(snappy_unittest "")
   target_sources(snappy_unittest
