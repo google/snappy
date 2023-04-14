@@ -32,6 +32,11 @@ licenses(["notice"])
 
 SNAPPY_VERSION = (1, 1, 10)
 
+config_setting(
+    name = "windows",
+    constraint_values = ["@platforms//os:windows"],
+)
+
 cc_library(
     name = "config",
     hdrs = ["config.h"],
@@ -64,9 +69,11 @@ cc_library(
         "snappy.h",
         "snappy-sinksource.h",
     ],
-    copts = [
+    copts = select({
+      ":windows": [],
+      "//conditions:default": [
         "-Wno-sign-compare",
-    ],
+    ]}),
     deps = [
         ":config",
         ":snappy-stubs-internal",
@@ -153,6 +160,10 @@ genrule(
 #  endif
 #endif
 
+#if defined(_WIN32) && !defined(HAVE_WINDOWS_H)
+#define HAVE_WINDOWS_H 1
+#endif
+
 #ifdef __has_include
 #  if !defined(HAVE_BYTESWAP_H) && __has_include(<byteswap.h>)
 #    define HAVE_BYTESWAP_H 1
@@ -189,9 +200,9 @@ genrule(
     name = "snappy_stubs_public_h",
     srcs = ["snappy-stubs-public.h.in"],
     outs = ["snappy-stubs-public.h"],
-    # Define HAVE_SYS_UIO_H_01 to 1; we just assume it's available.
+    # Assume sys/uio.h is available on non-Windows.
     # Set the version numbers.
-    cmd = ("""sed -e 's/$${\\(.*\\)_01}/1/g' \
+    cmd = ("""sed -e 's/$${HAVE_SYS_UIO_H_01}/!_WIN32/g' \
            -e 's/$${PROJECT_VERSION_MAJOR}/%d/g' \
            -e 's/$${PROJECT_VERSION_MINOR}/%d/g' \
            -e 's/$${PROJECT_VERSION_PATCH}/%d/g' \
