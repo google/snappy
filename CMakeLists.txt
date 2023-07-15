@@ -207,9 +207,9 @@ int main() {
 check_cxx_source_compiles("
 #include <arm_neon.h>
 int main() {
-  uint8_t val = 3, dup[8];
+  uint8_t val = 3;
   uint8x16_t v = vld1q_dup_u8(&val);
-  vst1q_u8(dup, v);
+  val = vmaxvq_u8(v);
   return 0;
 }" SNAPPY_HAVE_NEON)
 
