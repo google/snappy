@@ -653,9 +653,9 @@ static inline char* EmitCopyAtMost64(char* op, size_t offset, size_t len) {
   assert(len_less_than_12 == (len < 12));
 
   if (len_less_than_12) {
-    uint32_t u = (len << 2) + (offset << 8);
-    uint32_t copy1 = COPY_1_BYTE_OFFSET - (4 << 2) + ((offset >> 3) & 0xe0);
-    uint32_t copy2 = COPY_2_BYTE_OFFSET - (1 << 2);
+    auto u = static_cast<uint32_t>((len << 2) + (offset << 8));
+    uint32_t copy1 = static_cast<uint32_t>(COPY_1_BYTE_OFFSET) - (4 << 2) + ((offset >> 3) & 0xe0);
+    uint32_t copy2 = static_cast<uint32_t>(COPY_2_BYTE_OFFSET) - (1 << 2);
     // It turns out that offset < 2048 is a difficult to predict branch.
     // `perf record` shows this is the highest percentage of branch misses in
     // benchmarks. This code produces branch free code, the data dependency
@@ -667,7 +667,7 @@ static inline char* EmitCopyAtMost64(char* op, size_t offset, size_t len) {
   } else {
     // Write 4 bytes, though we only care about 3 of them.  The output buffer
     // is required to have some slack, so the extra byte won't overrun it.
-    uint32_t u = COPY_2_BYTE_OFFSET + ((len - 1) << 2) + (offset << 8);
+    auto u = static_cast<uint32_t>(COPY_2_BYTE_OFFSET + ((len - 1) << 2) + (offset << 8));
     LittleEndian::Store32(op, u);
     op += 3;
   }
@@ -736,7 +736,7 @@ uint32_t CalculateTableSize(uint32_t input_size) {
 namespace internal {
 WorkingMemory::WorkingMemory(size_t input_size) {
   const size_t max_fragment_size = std::min(input_size, kBlockSize);
-  const size_t table_size = CalculateTableSize(max_fragment_size);
+  const size_t table_size = CalculateTableSize(static_cast<uint32_t>(max_fragment_size));
   size_ = table_size * sizeof(*table_) + max_fragment_size +
           MaxCompressedLength(max_fragment_size);
   mem_ = std::allocator<char>().allocate(size_);
@@ -751,9 +751,9 @@ WorkingMemory::~WorkingMemory() {
 
 uint16_t* WorkingMemory::GetHashTable(size_t fragment_size,
                                       int* table_size) const {
-  const size_t htsize = CalculateTableSize(fragment_size);
+  const size_t htsize = CalculateTableSize(static_cast<uint32_t>(fragment_size));
   memset(table_, 0, htsize * sizeof(*table_));
-  *table_size = htsize;
+  *table_size = static_cast<uint16_t>(htsize);
   return table_;
 }
 }  // end namespace internal
@@ -848,7 +848,7 @@ char* CompressFragment(const char* input, size_t input_size, char* op,
       }
       while (true) {
         assert(static_cast<uint32_t>(data) == LittleEndian::Load32(ip));
-        uint16_t* table_entry = TableEntry(table, data, mask);
+        uint16_t* table_entry = static_cast<uint16_t*>(TableEntry(table, static_cast<uint32_t>(data), mask));
         uint32_t bytes_between_hash_lookups = skip >> 5;
         skip += bytes_between_hash_lookups;
         const char* next_ip = ip + bytes_between_hash_lookups;
@@ -873,7 +873,7 @@ char* CompressFragment(const char* input, size_t input_size, char* op,
       // than 4 bytes match.  But, prior to the match, input
       // bytes [next_emit, ip) are unmatched.  Emit them as "literal bytes."
       assert(next_emit + 16 <= ip_end);
-      op = EmitLiteral</*allow_fast_path=*/true>(op, next_emit, ip - next_emit);
+      op = EmitLiteral</*allow_fast_path=*/true>(op, next_emit, static_cast<int>(ip - next_emit));
 
       // Step 3: Call EmitCopy, and then see if another EmitCopy could
       // be our next move.  Repeat until we find no match for the
@@ -910,7 +910,7 @@ char* CompressFragment(const char* input, size_t input_size, char* op,
         // we also update table[Hash(ip - 1, mask)] and table[Hash(ip, mask)].
         *TableEntry(table, LittleEndian::Load32(ip - 1), mask) =
             ip - base_ip - 1;
-        uint16_t* table_entry = TableEntry(table, data, mask);
+        auto* table_entry = static_cast<uint16_t*>(TableEntry(table, static_cast<uint32_t>(data), mask));
         candidate = base_ip + *table_entry;
         *table_entry = ip - base_ip;
         // Measurements on the benchmarks have shown the following probabilities
@@ -926,14 +926,14 @@ char* CompressFragment(const char* input, size_t input_size, char* op,
       } while (static_cast<uint32_t>(data) == LittleEndian::Load32(candidate));
       // Because the least significant 5 bytes matched, we can utilize data
       // for the next iteration.
-      preload = data >> 8;
+      preload = static_cast<uint32_t>(data >> 8);
     }
   }
 
 emit_remainder:
   // Emit the remaining bytes as a literal
   if (ip < ip_end) {
-    op = EmitLiteral</*allow_fast_path=*/false>(op, ip, ip_end - ip);
+    op = EmitLiteral</*allow_fast_path=*/false>(op, ip, static_cast<int>(ip_end - ip));
   }
 
   return op;
@@ -1439,7 +1439,7 @@ class SnappyDecompressor {
           // Long literal.
           const size_t literal_length_length = literal_length - 60;
           literal_length =
-              ExtractLowBytes(LittleEndian::Load32(ip), literal_length_length) +
+              ExtractLowBytes(LittleEndian::Load32(ip), static_cast<int>(literal_length_length)) +
               1;
           ip += literal_length_length;
         }
@@ -1452,7 +1452,7 @@ class SnappyDecompressor {
           size_t n;
           ip = reader_->Peek(&n);
           avail = n;
-          peeked_ = avail;
+          peeked_ = static_cast<uint32_t>(avail);
           if (avail == 0) goto exit;
           ip_limit_ = ip + avail;
           ResetLimit(ip);
@@ -1477,7 +1477,7 @@ class SnappyDecompressor {
           // copy_offset/256 is encoded in bits 8..10.  By just fetching
           // those bits, we get copy_offset (since the bit-field starts at
           // bit 8).
-          const uint32_t copy_offset = trailer - entry + length;
+          const uint32_t copy_offset = trailer - static_cast<uint32_t>(entry) + length;
           if (!writer->AppendFromSelf(copy_offset, length, &op)) goto exit;
 
           ip += (c & 3);
@@ -1521,7 +1521,7 @@ bool SnappyDecompressor::RefillTag() {
     reader_->Skip(peeked_);  // All peeked bytes are used up
     size_t n;
     ip = reader_->Peek(&n);
-    peeked_ = n;
+    peeked_ = static_cast<uint32_t>(n);
     eof_ = (n == 0);
     if (eof_) return false;
     ip_limit_ = ip + n;
@@ -1540,7 +1540,7 @@ bool SnappyDecompressor::RefillTag() {
   assert(needed <= sizeof(scratch_));
 
   // Read more bytes from reader if needed
-  uint32_t nbuf = ip_limit_ - ip;
+  uint32_t nbuf = static_cast<uint32_t>(ip_limit_ - ip);
   if (nbuf < needed) {
     // Stitch together bytes from ip and reader to form the word
     // contents.  We store the needed bytes in "scratch_".  They
@@ -1553,7 +1553,7 @@ bool SnappyDecompressor::RefillTag() {
       size_t length;
       const char* src = reader_->Peek(&length);
       if (length == 0) return false;
-      uint32_t to_add = std::min<uint32_t>(needed - nbuf, length);
+      uint32_t to_add = std::min<uint32_t>(needed - nbuf, static_cast<uint32_t>(length));
       std::memcpy(scratch_ + nbuf, src, to_add);
       nbuf += to_add;
       reader_->Skip(to_add);
@@ -1583,8 +1583,8 @@ static bool InternalUncompress(Source* r, Writer* writer) {
   uint32_t uncompressed_len = 0;
   if (!decompressor.ReadUncompressedLength(&uncompressed_len)) return false;
 
-  return InternalUncompressAllTags(&decompressor, writer, r->Available(),
-                                   uncompressed_len);
+  return InternalUncompressAllTags(&decompressor, writer, static_cast<uint32_t>(r->Available()),
+                                   static_cast<uint32_t>(uncompressed_len));
 }
 
 template <typename Writer>
@@ -1611,7 +1611,7 @@ size_t Compress(Source* reader, Sink* writer) {
   size_t N = reader->Available();
   const size_t uncompressed_size = N;
   char ulength[Varint::kMax32];
-  char* p = Varint::Encode32(ulength, N);
+  char* p = Varint::Encode32(ulength, static_cast<uint32_t>(N));
   writer->Append(ulength, p - ulength);
   written += (p - ulength);
 
@@ -1653,7 +1653,7 @@ size_t Compress(Source* reader, Sink* writer) {
     uint16_t* table = wmem.GetHashTable(num_to_read, &table_size);
 
     // Compress input_fragment and append to dest
-    const int max_output = MaxCompressedLength(num_to_read);
+    const auto max_output = static_cast<int>(MaxCompressedLength(num_to_read));
 
     // Need a scratch buffer for the output, in case the byte sink doesn't
     // have room for us directly.
@@ -2233,7 +2233,7 @@ class SnappyScatteredWriter {
   inline bool TryFastAppend(const char* ip, size_t available, size_t length,
                             char** op_p) {
     char* op = *op_p;
-    const int space_left = op_limit_ - op;
+    const int space_left = static_cast<int>(op_limit_ - op);
     if (length <= 16 && available >= 16 + kMaximumTagLength &&
         space_left >= 16) {
       // Fast path, used for the majority (about 95%) of invocations.
@@ -2292,7 +2292,7 @@ bool SnappyScatteredWriter<Allocator>::SlowAppend(const char* ip, size_t len) {
 
     // Make new block
     size_t bsize = std::min<size_t>(kBlockSize, expected_ - full_size_);
-    op_base_ = allocator_.Allocate(bsize);
+    op_base_ = allocator_.Allocate(static_cast<int>(bsize));
     op_ptr_ = op_base_;
     op_limit_ = op_base_ + bsize;
     op_limit_min_slop_ = op_limit_ - std::min<size_t>(kSlopBytes - 1, bsize);
@@ -2412,14 +2412,14 @@ bool Uncompress(Source* compressed, Sink* uncompressed) {
   if (allocated_size >= uncompressed_len) {
     SnappyArrayWriter writer(buf);
     bool result = InternalUncompressAllTags(&decompressor, &writer,
-                                            compressed_len, uncompressed_len);
+                                            static_cast<uint32_t>(compressed_len), static_cast<uint32_t>(uncompressed_len));
     uncompressed->Append(buf, writer.Produced());
     return result;
   } else {
     SnappySinkAllocator allocator(uncompressed);
     SnappyScatteredWriter<SnappySinkAllocator> writer(allocator);
-    return InternalUncompressAllTags(&decompressor, &writer, compressed_len,
-                                     uncompressed_len);
+    return InternalUncompressAllTags(&decompressor, &writer, static_cast<uint32_t>(compressed_len),
+                                     static_cast<uint32_t>(uncompressed_len));
   }
 }
 
