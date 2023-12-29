@@ -1695,16 +1695,16 @@ class SnappyIOVecReader : public Source {
     if (total_size > 0 && curr_size_remaining_ == 0) Advance();
   }
 
-  ~SnappyIOVecReader() = default;
+  ~SnappyIOVecReader() override = default;
 
-  size_t Available() const { return total_size_remaining_; }
+  size_t Available() const override { return total_size_remaining_; }
 
-  const char* Peek(size_t* len) {
+  const char* Peek(size_t* len) override {
     *len = curr_size_remaining_;
     return curr_pos_;
   }
 
-  void Skip(size_t n) {
+  void Skip(size_t n) override {
     while (n >= curr_size_remaining_ && n > 0) {
       n -= curr_size_remaining_;
       Advance();
