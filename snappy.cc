@@ -940,10 +940,10 @@ emit_remainder:
 }
 }  // end namespace internal
 
-// Called back at avery compression call to trace parameters and sizes.
-static inline void Report(const char *algorithm, size_t compressed_size,
-                          size_t uncompressed_size) {
+static inline void Report(int token, const char *algorithm, size_t
+compressed_size, size_t uncompressed_size) {
   // TODO: Switch to [[maybe_unused]] when we can assume C++17.
+  (void)token;
   (void)algorithm;
   (void)compressed_size;
   (void)uncompressed_size;
@@ -1591,7 +1591,8 @@ template <typename Writer>
 static bool InternalUncompressAllTags(SnappyDecompressor* decompressor,
                                       Writer* writer, uint32_t compressed_len,
                                       uint32_t uncompressed_len) {
-  Report("snappy_uncompress", compressed_len, uncompressed_len);
+    int token = 0;
+  Report(token, "snappy_uncompress", compressed_len, uncompressed_len);
 
   writer->SetExpectedLength(uncompressed_len);
 
@@ -1607,6 +1608,7 @@ bool GetUncompressedLength(Source* source, uint32_t* result) {
 }
 
 size_t Compress(Source* reader, Sink* writer) {
+  int token = 0;
   size_t written = 0;
   size_t N = reader->Available();
   const size_t uncompressed_size = N;
@@ -1671,7 +1673,7 @@ size_t Compress(Source* reader, Sink* writer) {
     reader->Skip(pending_advance);
   }
 
-  Report("snappy_compress", written, uncompressed_size);
+  Report(token, "snappy_compress", written, uncompressed_size);
 
   return written;
 }
