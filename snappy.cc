@@ -74,7 +74,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -1656,13 +1655,14 @@ size_t Compress(Source* reader, Sink* writer) {
     uint16_t* table = wmem.GetHashTable(num_to_read, &table_size);
 
     // Compress input_fragment and append to dest
-    int max_output = MaxCompressedLength(num_to_read);
+    const int max_output = MaxCompressedLength(num_to_read);
+
+    // Need a scratch buffer for the output, in case the byte sink doesn't
+    // have room for us directly.
 
     // Since we encode kBlockSize regions followed by a region
     // which is <= kBlockSize in length, a previously allocated
     // scratch_output[] region is big enough for this iteration.
-    // Need a scratch buffer for the output, in case the byte sink doesn't
-    // have room for us directly.
     char* dest = writer->GetAppendBuffer(max_output, wmem.GetScratchOutput());
     char* end = internal::CompressFragment(fragment, fragment_size, dest, table,
                                            table_size);
@@ -1674,6 +1674,7 @@ size_t Compress(Source* reader, Sink* writer) {
   }
 
   Report(token, "snappy_compress", written, uncompressed_size);
+
   return written;
 }
 
