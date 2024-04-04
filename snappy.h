@@ -64,6 +64,9 @@ namespace snappy {
     // faster decompression speeds than snappy:1 and zstd:-3.
     int level = DefaultCompressionLevel();
 
+    constexpr CompressionOptions() = default;
+    constexpr CompressionOptions(int compression_level)
+        : level(compression_level) {}
     static constexpr int MinCompressionLevel() { return 1; }
     static constexpr int MaxCompressionLevel() { return 2; }
     static constexpr int DefaultCompressionLevel() { return 1; }
