@@ -959,6 +959,8 @@ emit_remainder:
 char* CompressFragmentDoubleHash(const char* input, size_t input_size, char* op,
                                  uint16_t* table, const int table_size,
                                  uint16_t* table2, const int table_size2) {
+  (void)table_size2;
+  assert(table_size == table_size2);
   // "ip" is the input pointer, and "op" is the output pointer.
   const char* ip = input;
   assert(input_size <= kBlockSize);
@@ -1791,7 +1793,7 @@ bool GetUncompressedLength(Source* source, uint32_t* result) {
 }
 
 size_t Compress(Source* reader, Sink* writer, CompressionOptions options) {
-  CHECK(options.level == 1 || options.level == 2);
+  assert(options.level == 1 || options.level == 2);
   int token = 0;
   size_t written = 0;
   size_t N = reader->Available();
