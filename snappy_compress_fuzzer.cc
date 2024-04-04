@@ -44,7 +44,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     std::string compressed;
     size_t compressed_size =
         snappy::Compress(input.data(), input.size(), &compressed,
-                         snappy::CompressionOptions{.level = level});
+                         snappy::CompressionOptions{/*level=*/level});
 
     (void)compressed_size;  // Variable only used in debug builds.
     assert(compressed_size == compressed.size());
