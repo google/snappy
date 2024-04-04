@@ -46,7 +46,7 @@ namespace {
 
 void FilesAndLevels(::testing::Benchmark* benchmark) {
   for (int i = 0; i < ARRAYSIZE(kTestDataFiles); ++i) {
-    for (int/*level=*/snappy::CompressionOptions::MinCompressionLevel();
+    for (int level = snappy::CompressionOptions::MinCompressionLevel();
          level <= snappy::CompressionOptions::MaxCompressionLevel(); ++level) {
       benchmark->ArgPair(i, level);
     }
@@ -163,7 +163,7 @@ BENCHMARK(BM_UValidateMedley);
 void BM_UIOVecSource(benchmark::State& state) {
   // Pick file to process based on state.range(0).
   int file_index = state.range(0);
-  int/*level=*/state.range(1);
+  int level = state.range(1);
 
   CHECK_GE(file_index, 0);
   CHECK_LT(file_index, ARRAYSIZE(kTestDataFiles));
@@ -292,7 +292,7 @@ BENCHMARK(BM_UFlatSink)->Apply(FilesAndLevels);
 void BM_ZFlat(benchmark::State& state) {
   // Pick file to process based on state.range(0).
   int file_index = state.range(0);
-  int/*level=*/state.range(1);
+  int level = state.range(1);
 
   CHECK_GE(file_index, 0);
   CHECK_LT(file_index, ARRAYSIZE(kTestDataFiles));
@@ -357,7 +357,7 @@ BENCHMARK(BM_ZFlatAll)->DenseRange(1, 2);
 
 void BM_ZFlatIncreasingTableSize(benchmark::State& state) {
   CHECK_GT(ARRAYSIZE(kTestDataFiles), 0);
-  int/*level=*/state.range(0);
+  int level = state.range(0);
   const std::string base_content = ReadTestDataFile(
       kTestDataFiles[0].filename, kTestDataFiles[0].size_limit);
 
