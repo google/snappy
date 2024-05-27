@@ -40,7 +40,7 @@ config_setting(
 cc_library(
     name = "config",
     hdrs = ["config.h"],
-    defines = ["HAVE_CONFIG_H"]
+    defines = ["HAVE_CONFIG_H"],
 )
 
 cc_library(
@@ -70,10 +70,11 @@ cc_library(
         "snappy-sinksource.h",
     ],
     copts = select({
-      ":windows": [],
-      "//conditions:default": [
-        "-Wno-sign-compare",
-    ]}),
+        ":windows": [],
+        "//conditions:default": [
+            "-Wno-sign-compare",
+        ],
+    }),
     deps = [
         ":config",
         ":snappy-stubs-internal",
@@ -114,7 +115,7 @@ cc_test(
     deps = [
         ":snappy",
         ":snappy-test",
-        "//third_party/benchmark:benchmark_main",
+        "@com_google_benchmark//:benchmark_main",
     ],
 )
 
@@ -127,7 +128,7 @@ cc_test(
     deps = [
         ":snappy",
         ":snappy-test",
-        "//third_party/googletest:gtest_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
