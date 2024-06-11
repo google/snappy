@@ -46,7 +46,7 @@
 #include <arm_neon.h>
 #endif
 
-#if SNAPPY_HAVE_SSSE3 || SNAPPY_HAVE_NEON
+#if SNAPPY_HAVE_SSSE3 || (SNAPPY_HAVE_NEON && defined(__aarch64__))
 #define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 1
 #else
 #define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 0
