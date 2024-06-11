@@ -220,14 +220,14 @@ namespace snappy {
   bool GetUncompressedLength(const char* compressed, size_t compressed_length,
                              size_t* result);
 
-  // Returns true iff the contents of "compressed[]" can be uncompressed
+  // Returns true if the contents of "compressed" can be uncompressed
   // successfully.  Does not return the uncompressed data.  Takes
   // time proportional to compressed_length, but is usually at least
   // a factor of four faster than actual decompression.
   bool IsValidCompressedBuffer(const char* compressed,
                                size_t compressed_length);
 
-  // Returns true iff the contents of "compressed" can be uncompressed
+  // Returns true if the contents of "compressed" can be uncompressed
   // successfully.  Does not return the uncompressed data.  Takes
   // time proportional to *compressed length, but is usually at least
   // a factor of four faster than actual decompression.
