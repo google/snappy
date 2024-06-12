@@ -44,6 +44,7 @@ other languages are maintained by third parties:
   [other native reimplementation](https://github.com/dain/snappy) (including
   the framing format)
 * [Lua](https://github.com/forhappy/lua-snappy)
+* [Nim](https://github.com/status-im/nim-snappy) (including the framing format)
 * [Node.js](https://github.com/kesla/node-snappy) (including the [framing
   format](https://github.com/kesla/node-snappy-stream))
 * [Perl](http://search.cpan.org/dist/Compress-Snappy/)
