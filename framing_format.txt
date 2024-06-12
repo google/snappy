@@ -1,7 +1,7 @@
 Snappy framing format description
 Last revised: 2013-10-25
 
-This format decribes a framing format for Snappy, allowing compressing to
+This document describes a framing format for Snappy, allowing compression of
 files or streams that can then more easily be decompressed without having
 to hold the entire stream in memory. It also provides data checksums to
 help verify integrity. It does not provide metadata checksums, so it does
@@ -95,7 +95,7 @@ easily use small fixed-size buffers.
 4.3. Uncompressed data (chunk type 0x01)
 
 Uncompressed data chunks allow a compressor to send uncompressed,
-raw data; this is useful if, for instance, uncompressible or
+raw data; this is useful if, for instance, incompressible or
 near-incompressible data is detected, and faster decompression is desired.
 
 As in the compressed chunks, the data is preceded by its own masked
