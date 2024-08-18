@@ -206,10 +206,13 @@ int main() {
 
 check_cxx_source_compiles("
 #include <arm_neon.h>
+#include <stdint.h>
 int main() {
   uint8_t val = 3, dup[8];
-  uint8x16_t v = vld1q_dup_u8(&val);
-  vst1q_u8(dup, v);
+  uint8x16_t v1 = vld1q_dup_u8(&val);
+  uint8x16_t v2 = vqtbl1q_u8(v1, v1);
+  vst1q_u8(dup, v1);
+  vst1q_u8(dup, v2);
   return 0;
 }" SNAPPY_HAVE_NEON)
 
