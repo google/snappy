@@ -233,9 +233,7 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
       int shift = Bits::FindLSBSetNonZero64(xorval);
       size_t matched_bytes = shift >> 3;
       uint64_t a3 = UNALIGNED_LOAD64(s2 + 4);
-#ifndef __x86_64__
-      a2 = static_cast<uint32_t>(xorval) == 0 ? a3 : a2;
-#else
+#ifdef __x86_64__
       // Ideally this would just be
       //
       // a2 = static_cast<uint32_t>(xorval) == 0 ? a3 : a2;
@@ -250,6 +248,14 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
           : "+r"(a2)
           : "r"(a3), "r"(xorval)
           : "cc");
+#elif defined(__aarch64__)
+      asm("cmp %w[xorval], 0\n\t"
+          "csel %x[a2], %[a3], %[a2], eq\n\t"
+          : [a2] "+r" (a2)
+          : [a3] "r" (a3) , [xorval] "r" (xorval)
+          : "cc");
+#else
+      a2 = static_cast<uint32_t>(xorval) == 0 ? a3 : a2;
 #endif
       *data = a2 >> (shift & (3 * 8));
       return std::pair<size_t, bool>(matched_bytes, true);
@@ -276,14 +282,20 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
       int shift = Bits::FindLSBSetNonZero64(xorval);
       size_t matched_bytes = shift >> 3;
       uint64_t a3 = UNALIGNED_LOAD64(s2 + 4);
-#ifndef __x86_64__
-      a2 = static_cast<uint32_t>(xorval) == 0 ? a3 : a2;
-#else
+#ifdef __x86_64__
       asm("testl %k2, %k2\n\t"
           "cmovzq %1, %0\n\t"
           : "+r"(a2)
           : "r"(a3), "r"(xorval)
           : "cc");
+#elif defined(__aarch64__)
+      asm("cmp %w[xorval], 0\n\t"
+          "csel %x[a2], %[a3], %[a2], eq\n\t"
+          : [a2] "+r" (a2)
+          : [a3] "r" (a3) , [xorval] "r" (xorval)
+          : "cc");
+#else
+      a2 = static_cast<uint32_t>(xorval) == 0 ? a3 : a2;
 #endif
       *data = a2 >> (shift & (3 * 8));
       matched += matched_bytes;
