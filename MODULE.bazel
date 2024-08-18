@@ -1,6 +1,6 @@
 module(
     name = "snappy",
-    version = "1.2.0",
+    version = "1.2.1",
     compatibility_level = 1,
 )
 
@@ -12,7 +12,7 @@ bazel_dep(
 )
 bazel_dep(
     name = "google_benchmark",
-    version = "1.8.3",
+    version = "1.9.0",
     dev_dependency = True,
     repo_name = "com_google_benchmark",
 )
