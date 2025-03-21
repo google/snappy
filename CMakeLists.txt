@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.10)
 project(Snappy VERSION 1.2.1 LANGUAGES C CXX)
 
 # C++ standard can be overridden when this is used as a sub-project.
@@ -261,9 +261,7 @@ target_sources(snappy
     "snappy-stubs-internal.cc"
     "snappy.cc"
     "${PROJECT_BINARY_DIR}/config.h"
-
-  # Only CMake 3.3+ supports PUBLIC sources in targets exported by "install".
-  $<$<VERSION_GREATER:CMAKE_VERSION,3.2>:PUBLIC>
+  PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/snappy-c.h>
     $<INSTALL_INTERFACE:include/snappy-c.h>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/snappy-sinksource.h>
