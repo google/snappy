@@ -298,6 +298,9 @@ if(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
 
   # Test files include snappy-test.h, HAVE_CONFIG_H must be defined.
   target_compile_definitions(snappy_test_support PUBLIC -DHAVE_CONFIG_H)
+  if(BUILD_SHARED_LIBS)
+    set_target_properties(snappy_test_support PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+  endif(BUILD_SHARED_LIBS)
 
   target_link_libraries(snappy_test_support snappy)
 
