@@ -30,7 +30,7 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-SNAPPY_VERSION = (1, 1, 10)
+SNAPPY_VERSION = (1, 2, 2)
 
 config_setting(
     name = "windows",
