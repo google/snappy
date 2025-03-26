@@ -27,6 +27,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
+#include <cinttypes>
 #include <cmath>
 #include <cstdlib>
 #include <random>
@@ -481,6 +482,18 @@ TEST(Snappy, MaxBlowup) {
     std::string four_bytes(input.end() - i - 4, input.end() - i);
     input.append(four_bytes);
   }
+  Verify(input);
+}
+
+// Issue #201, when output is more than 4GB, we had a data corruption bug.
+// We cannot run this test always because of CI constraints.
+TEST(Snappy, DISABLED_MoreThan4GB) {
+  std::mt19937 rng;
+  std::uniform_int_distribution<int> uniform_byte(0, 255);
+  std::string input;
+  input.resize((1ull << 32) - 1);
+  for (uint64_t i = 0; i < ((1ull << 32) - 1); ++i)
+    input[i] = static_cast<char>(uniform_byte(rng));
   Verify(input);
 }
 
