@@ -174,7 +174,7 @@ char* CompressFragment(const char* input,
 // Separate implementation for 64-bit, little-endian cpus.
 #if !SNAPPY_IS_BIG_ENDIAN && \
     (defined(__x86_64__) || defined(_M_X64) || defined(ARCH_PPC) || \
-     defined(ARCH_ARM))
+     defined(ARCH_ARM) || defined(__riscv))
 static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
                                                       const char* s2,
                                                       const char* s2_limit,
