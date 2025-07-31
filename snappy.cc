@@ -102,6 +102,57 @@ using internal::V128_StoreU;
 using internal::V128_DupChar;
 #endif
 
+// GCC dispatches to libc for memmoves > 16 bytes, so we need to
+// do some work to get good code from that compiler. Clang handles
+// powers-of-2 at least up to 64 well.
+#if !defined(__GNUC__) || defined(__clang__)
+template <size_t SIZE>
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline void FixedSizeMemMove(void* dest, const void* src) {
+  memmove(dest, src, SIZE);
+}
+#else
+
+template <size_t SIZE>
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline void FixedSizeMemMove(void* dest, const void* src) {
+  if (SIZE <= 16) {
+    // gcc has patterns for memmove up to 16 bytes
+    memmove(dest, src, SIZE);
+  } else {
+    // This generates reasonable code on x86_64, but on aarch64 this produces a
+    // dead store to tmp, plus takes up stack space.
+    char tmp[SIZE];
+    memcpy(tmp, src, SIZE);
+    memcpy(dest, tmp, SIZE);
+  }
+}
+
+#ifdef __aarch64__ // Implies neon support
+template <>
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline void FixedSizeMemMove<32>(void* dest, const void* src) {
+  V128 a = V128_LoadU(reinterpret_cast<const V128*>(src));
+  V128 b = V128_LoadU(reinterpret_cast<const V128*>(src) + 1);
+  V128_StoreU(reinterpret_cast<V128*>(dest), a);
+  V128_StoreU(reinterpret_cast<V128*>(dest) + 1, b);
+}
+
+template <>
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline void FixedSizeMemMove<64>(void* dest, const void* src) {
+  V128 a = V128_LoadU(reinterpret_cast<const V128*>(src));
+  V128 b = V128_LoadU(reinterpret_cast<const V128*>(src) + 1);
+  V128 c = V128_LoadU(reinterpret_cast<const V128*>(src) + 2);
+  V128 d = V128_LoadU(reinterpret_cast<const V128*>(src) + 3);
+  V128_StoreU(reinterpret_cast<V128*>(dest), a);
+  V128_StoreU(reinterpret_cast<V128*>(dest) + 1, b);
+  V128_StoreU(reinterpret_cast<V128*>(dest) + 2, c);
+  V128_StoreU(reinterpret_cast<V128*>(dest) + 3, d);
+}
+#endif
+#endif
+
 // We translate the information encoded in a tag through a lookup table to a
 // format that requires fewer instructions to decode. Effectively we store
 // the length minus the tag part of the offset. The lowest significant byte
@@ -1246,13 +1297,18 @@ void MemCopy64(char* dst, const void* src, size_t size) {
     data = _mm256_lddqu_si256(static_cast<const __m256i *>(src) + 1);
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst) + 1, data);
   }
+#elif defined(__aarch64__)
+  // Emperically it is faster to just copy all 64 rather than branching.
+  (void)kShortMemCopy;
+  (void)size;
+  FixedSizeMemMove<64>(dst, src);
 #else
-  std::memmove(dst, src, kShortMemCopy);
+  FixedSizeMemMove<kShortMemCopy>(dst, src);
   // Profiling shows that nearly all copies are short.
   if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
-    std::memmove(dst + kShortMemCopy,
-                 static_cast<const uint8_t*>(src) + kShortMemCopy,
-                 64 - kShortMemCopy);
+    FixedSizeMemMove<kShortMemCopy>(
+        dst + kShortMemCopy,
+        static_cast<const uint8_t*>(src) + kShortMemCopy);
   }
 #endif
 }
@@ -1288,14 +1344,9 @@ inline size_t AdvanceToNextTagARMOptimized(const uint8_t** ip_p, size_t* tag) {
   // instruction (csinc) and it removes several register moves.
   const size_t tag_type = *tag & 3;
   const bool is_literal = (tag_type == 0);
-  if (is_literal) {
-    size_t next_literal_tag = (*tag >> 2) + 1;
-    *tag = ip[next_literal_tag];
-    ip += next_literal_tag + 1;
-  } else {
-    *tag = ip[tag_type];
-    ip += tag_type + 1;
-  }
+  const size_t next_tag = is_literal ? (*tag >> 2) + 1 : tag_type;
+  *tag = ip[next_tag];
+  ip += (next_tag) + 1;
   return tag_type;
 }
 
@@ -2213,7 +2264,7 @@ class SnappyArrayWriter {
       *op_p = IncrementalCopy(op - offset, op, op_end, op_limit_);
       return true;
     }
-    std::memmove(op, op - offset, kSlopBytes);
+    FixedSizeMemMove<kSlopBytes>(op, op - offset);
     *op_p = op_end;
     return true;
   }
@@ -2488,7 +2539,7 @@ class SnappyScatteredWriter {
     }
     // Fast path
     char* const op_end = op + len;
-    std::memmove(op, op - offset, kSlopBytes);
+    FixedSizeMemMove<kSlopBytes>(op, op - offset);
     *op_p = op_end;
     return true;
   }
