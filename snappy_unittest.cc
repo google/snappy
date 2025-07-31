@@ -918,6 +918,25 @@ TEST(Snappy, FindMatchLengthRandom) {
   }
 }
 
+TEST(Snappy, UncompressAsMuchAsPossible) {
+  std::string input;
+  const uint8_t preamble[] = { 128, 192, 206, 254, 1 };
+  input.append(reinterpret_cast<const char*>(preamble), 5);
+  const uint8_t the_literal[] = { 252, 255, 111, 164, 10 };
+  input.append(reinterpret_cast<const char*>(the_literal), 5);
+  const uint8_t data[] = { 1, 2, 3, 4, 5 };
+  input.append(reinterpret_cast<const char*>(data), 5);
+  std::string uncompressed;
+  uncompressed.resize(input.size());
+  snappy::UncheckedByteArraySink sink(string_as_array(&uncompressed));
+  DataEndingAtUnreadablePage c(input);
+  snappy::ByteArraySource source(c.data(), c.size());
+  size_t length = snappy::UncompressAsMuchAsPossible(&source, &sink);
+  CHECK_EQ(5, length);
+  CHECK_LE(5, uncompressed.size());
+  CHECK_EQ(0, memcmp(data, uncompressed.c_str(), 5));
+}
+
 uint16_t MakeEntry(unsigned int extra, unsigned int len,
                    unsigned int copy_offset) {
   // Check that all of the fields fit within the allocated space
