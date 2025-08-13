@@ -62,6 +62,10 @@
 #include <tmmintrin.h>
 #endif
 
+#if SNAPPY_HAVE_RVV
+#include <riscv_vector.h>
+#endif
+
 #if SNAPPY_HAVE_BMI2
 // Please do not replace with <x86intrin.h>. or with headers that assume more
 // advanced SSE versions without checking with all the OWNERS.
@@ -252,6 +256,30 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       if (SNAPPY_PREDICT_TRUE(op >= op_limit)) return op_limit;
     }
     return IncrementalCopySlow(src, op, op_limit);
+#elif defined (SNAPPY_HAVE_RVV)
+    size_t bytes_to_copy = op_limit - op;
+    while (bytes_to_copy > 0) {
+
+    size_t vl = __riscv_vsetvl_e8m1(bytes_to_copy);
+
+    vuint8m1_t pattern_source = __riscv_vle8_v_u8m1(
+        reinterpret_cast<const uint8_t*>(src), pattern_size);
+    vuint8m1_t indices_sequential = __riscv_vid_v_u8m1(vl);
+    vuint8m1_t indices_repeating = __riscv_vremu_vx_u8m1(
+        indices_sequential, pattern_size, vl);
+
+    vuint8m1_t pattern_to_write = __riscv_vrgather_vv_u8m1(
+        pattern_source, indices_repeating, vl);
+
+    __riscv_vse8_v_u8m1(reinterpret_cast<uint8_t*>(op), pattern_to_write, vl);
+
+    op += vl;
+    bytes_to_copy -= vl;
+  }
+
+  return op_limit;
+
+
 #else  // !SNAPPY_HAVE_SSSE3
     // If plenty of buffer space remains, expand the pattern to at least 8
     // bytes. The way the following loop is written, we need 8 bytes of buffer
