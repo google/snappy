@@ -26,8 +26,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required(VERSION 3.1)
-project(Snappy VERSION 1.1.8 LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.10)
+project(Snappy VERSION 1.2.2 LANGUAGES C CXX)
 
 # C++ standard can be overridden when this is used as a sub-project.
 if(NOT CMAKE_CXX_STANDARD)
@@ -37,11 +37,63 @@ if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_EXTENSIONS OFF)
 endif(NOT CMAKE_CXX_STANDARD)
 
+# https://github.com/izenecloud/cmake/blob/master/SetCompilerWarningAll.cmake
+if(MSVC)
+  # Use the highest warning level for Visual Studio.
+  set(CMAKE_CXX_WARNING_LEVEL 4)
+  if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+    string(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  else(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+  endif(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+
+  # Disable C++ exceptions.
+  string(REGEX REPLACE "/EH[a-z]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHs-c-")
+  add_definitions(-D_HAS_EXCEPTIONS=0)
+
+  # Disable RTTI.
+  string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")
+else(MSVC)
+  # Use -Wall for clang and gcc.
+  if(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  endif(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
+
+  # Use -Wextra for clang and gcc.
+  if(NOT CMAKE_CXX_FLAGS MATCHES "-Wextra")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra")
+  endif(NOT CMAKE_CXX_FLAGS MATCHES "-Wextra")
+
+  # Use -Werror for clang only.
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    if(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+    endif(NOT CMAKE_CXX_FLAGS MATCHES "-Werror")
+  endif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+
+  # Disable sign comparison warnings. Matches upcoming Bazel setup.
+  if(NOT CMAKE_CXX_FLAGS MATCHES "-Wno-sign-compare")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-sign-compare")
+  endif(NOT CMAKE_CXX_FLAGS MATCHES "-Wno-sign-compare")
+
+  # Disable C++ exceptions.
+  string(REGEX REPLACE "-fexceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
+
+  # Disable RTTI.
+  string(REGEX REPLACE "-frtti" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
+endif(MSVC)
+
 # BUILD_SHARED_LIBS is a standard CMake variable, but we declare it here to make
 # it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries(DLLs)." OFF)
 
 option(SNAPPY_BUILD_TESTS "Build Snappy's own tests." ON)
+
+option(SNAPPY_BUILD_BENCHMARKS "Build Snappy's benchmarks" ON)
 
 option(SNAPPY_FUZZING_BUILD "Build Snappy for fuzzing." OFF)
 
@@ -57,8 +109,6 @@ include(TestBigEndian)
 test_big_endian(SNAPPY_IS_BIG_ENDIAN)
 
 include(CheckIncludeFile)
-check_include_file("byteswap.h" HAVE_BYTESWAP_H)
-check_include_file("sys/endian.h" HAVE_SYS_ENDIAN_H)
 check_include_file("sys/mman.h" HAVE_SYS_MMAN_H)
 check_include_file("sys/resource.h" HAVE_SYS_RESOURCE_H)
 check_include_file("sys/time.h" HAVE_SYS_TIME_H)
@@ -71,6 +121,7 @@ check_include_file("riscv_vector.h" HAVE_RISCV_INSTRINSIC_H)
 include(CheckLibraryExists)
 check_library_exists(z zlibVersion "" HAVE_LIBZ)
 check_library_exists(lzo2 lzo1x_1_15_compress "" HAVE_LIBLZO2)
+check_library_exists(lz4 LZ4_compress_default "" HAVE_LIBLZ4)
 
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("/arch:AVX" HAVE_VISUAL_STUDIO_ARCH_AVX)
@@ -101,6 +152,12 @@ elseif (SNAPPY_REQUIRE_RVV)
   endif(HAVE_CLANG_RVV)
 endif(SNAPPY_REQUIRE_AVX2)
 
+# Used by googletest.
+check_cxx_compiler_flag(-Wno-missing-field-initializers
+                        SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+check_cxx_compiler_flag(-Wno-implicit-int-float-conversion
+                        SNAPPY_HAVE_NO_IMPLICIT_INT_FLOAT_CONVERSION)
+
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles("
 int main() {
@@ -111,6 +168,19 @@ check_cxx_source_compiles("
 int main() {
   return __builtin_ctzll(0);
 }" HAVE_BUILTIN_CTZ)
+
+check_cxx_source_compiles("
+int main() {
+  __builtin_prefetch(0, 0, 3);
+  return 0;
+}" HAVE_BUILTIN_PREFETCH)
+
+check_cxx_source_compiles("
+__attribute__((always_inline)) int zero() { return 0; }
+
+int main() {
+  return zero();
+}" HAVE_ATTRIBUTE_ALWAYS_INLINE)
 
 check_cxx_source_compiles("
 #include <tmmintrin.h>
@@ -163,22 +233,37 @@ int main() {
 check_cxx_source_compiles("
 #include <immintrin.h>
 int main() {
+  return _mm_crc32_u32(0, 1);
+}" SNAPPY_HAVE_X86_CRC32)
+
+check_cxx_source_compiles("
+#include <arm_neon.h>
+#include <arm_acle.h>
+int main() {
+  return __crc32cw(0, 1);
+}" SNAPPY_HAVE_NEON_CRC32)
+
+check_cxx_source_compiles("
+#include <immintrin.h>
+int main() {
   return _bzhi_u32(0, 1);
 }" SNAPPY_HAVE_BMI2)
+
+check_cxx_source_compiles("
+#include <arm_neon.h>
+#include <stdint.h>
+int main() {
+  uint8_t val = 3, dup[8];
+  uint8x16_t v1 = vld1q_dup_u8(&val);
+  uint8x16_t v2 = vqtbl1q_u8(v1, v1);
+  vst1q_u8(dup, v1);
+  vst1q_u8(dup, v2);
+  return 0;
+}" SNAPPY_HAVE_NEON)
 
 include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)
-
-find_package(GTest QUIET)
-if(GTEST_FOUND)
-  set(HAVE_GTEST 1)
-endif(GTEST_FOUND)
-
-find_package(Gflags QUIET)
-if(GFLAGS_FOUND)
-  set(HAVE_GFLAGS 1)
-endif(GFLAGS_FOUND)
 
 configure_file(
   "cmake/config.h.in"
@@ -221,9 +306,7 @@ target_sources(snappy
     "snappy-stubs-internal.cc"
     "snappy.cc"
     "${PROJECT_BINARY_DIR}/config.h"
-
-  # Only CMake 3.3+ supports PUBLIC sources in targets exported by "install".
-  $<$<VERSION_GREATER:CMAKE_VERSION,3.2>:PUBLIC>
+  PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/snappy-c.h>
     $<INSTALL_INTERFACE:include/snappy-c.h>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/snappy-sinksource.h>
@@ -247,37 +330,99 @@ if(BUILD_SHARED_LIBS)
   set_target_properties(snappy PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif(BUILD_SHARED_LIBS)
 
+if(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
+  add_library(snappy_test_support "")
+  target_sources(snappy_test_support
+    PRIVATE
+      "snappy-test.cc"
+      "snappy-test.h"
+      "snappy_test_data.cc"
+      "snappy_test_data.h"
+      "${PROJECT_BINARY_DIR}/config.h"
+  )
+
+  # Test files include snappy-test.h, HAVE_CONFIG_H must be defined.
+  target_compile_definitions(snappy_test_support PUBLIC -DHAVE_CONFIG_H)
+  if(BUILD_SHARED_LIBS)
+    set_target_properties(snappy_test_support PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+  endif(BUILD_SHARED_LIBS)
+
+  target_link_libraries(snappy_test_support snappy)
+
+  if(HAVE_LIBZ)
+    target_link_libraries(snappy_test_support z)
+  endif(HAVE_LIBZ)
+  if(HAVE_LIBLZO2)
+    target_link_libraries(snappy_test_support lzo2)
+  endif(HAVE_LIBLZO2)
+  if(HAVE_LIBLZ4)
+    target_link_libraries(snappy_test_support lz4)
+  endif(HAVE_LIBLZ4)
+
+  target_include_directories(snappy_test_support
+    BEFORE PUBLIC
+      "${PROJECT_SOURCE_DIR}"
+  )
+endif(SNAPPY_BUILD_TESTS OR SNAPPY_BUILD_BENCHMARKS)
+
 if(SNAPPY_BUILD_TESTS)
   enable_testing()
+
+  # Prevent overriding the parent project's compiler/linker settings on Windows.
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+  set(install_gtest OFF)
+  set(install_gmock OFF)
+  set(build_gmock ON)
+
+  # This project is tested using GoogleTest.
+  add_subdirectory("third_party/googletest")
+
+  # GoogleTest triggers a missing field initializers warning.
+  if(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+    set_property(TARGET gtest
+        APPEND PROPERTY COMPILE_OPTIONS -Wno-missing-field-initializers)
+    set_property(TARGET gmock
+        APPEND PROPERTY COMPILE_OPTIONS -Wno-missing-field-initializers)
+  endif(SNAPPY_HAVE_NO_MISSING_FIELD_INITIALIZERS)
+
+  if(SNAPPY_HAVE_NO_IMPLICIT_INT_FLOAT_CONVERSION)
+    set_property(TARGET gtest
+        APPEND PROPERTY COMPILE_OPTIONS -Wno-implicit-int-float-conversion)
+  endif(SNAPPY_HAVE_NO_IMPLICIT_INT_FLOAT_CONVERSION)
 
   add_executable(snappy_unittest "")
   target_sources(snappy_unittest
     PRIVATE
       "snappy_unittest.cc"
-      "snappy-test.cc"
   )
-  target_compile_definitions(snappy_unittest PRIVATE -DHAVE_CONFIG_H)
-  target_link_libraries(snappy_unittest snappy ${GFLAGS_LIBRARIES})
-
-  if(HAVE_LIBZ)
-    target_link_libraries(snappy_unittest z)
-  endif(HAVE_LIBZ)
-  if(HAVE_LIBLZO2)
-    target_link_libraries(snappy_unittest lzo2)
-  endif(HAVE_LIBLZO2)
-
-  target_include_directories(snappy_unittest
-    BEFORE PRIVATE
-      "${PROJECT_SOURCE_DIR}"
-      "${GTEST_INCLUDE_DIRS}"
-      "${GFLAGS_INCLUDE_DIRS}"
-  )
+  target_link_libraries(snappy_unittest snappy_test_support gmock_main gtest)
 
   add_test(
     NAME snappy_unittest
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMAND "${PROJECT_BINARY_DIR}/snappy_unittest")
+
+  add_executable(snappy_test_tool "")
+  target_sources(snappy_test_tool
+    PRIVATE
+      "snappy_test_tool.cc"
+  )
+  target_link_libraries(snappy_test_tool snappy_test_support)
 endif(SNAPPY_BUILD_TESTS)
+
+if(SNAPPY_BUILD_BENCHMARKS)
+  add_executable(snappy_benchmark "")
+  target_sources(snappy_benchmark
+    PRIVATE
+      "snappy_benchmark.cc"
+  )
+  target_link_libraries(snappy_benchmark snappy_test_support benchmark_main)
+
+  # This project uses Google benchmark for benchmarking.
+  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+  set(BENCHMARK_ENABLE_EXCEPTIONS OFF CACHE BOOL "" FORCE)
+  add_subdirectory("third_party/benchmark")
+endif(SNAPPY_BUILD_BENCHMARKS)
 
 if(SNAPPY_FUZZING_BUILD)
   add_executable(snappy_compress_fuzzer "")

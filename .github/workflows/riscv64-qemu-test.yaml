@@ -1,0 +1,43 @@
+name: riscv64-qemu-test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env: 
+      RISCV_CROSSCOMPILE: "ON"
+      riscv_gnu_toolchain_download_path: https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2025.07.03/riscv64-glibc-ubuntu-24.04-gcc-nightly-2025.07.03-nightly.tar.xz
+      RISCV_PATH: /opt/riscv
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y --no-install-recommends \
+          qemu-user qemu-user-static \
+          build-essential \
+          cmake \
+          git
+        sudo mkdir -p $RISCV_PATH
+        wget ${riscv_gnu_toolchain_download_path} -O riscv-toolchain.tar.xz
+        sudo tar -xvf riscv-toolchain.tar.xz -C $RISCV_PATH --strip-components=1
+        sudo sed -i "s|libdir='/mnt/riscv/riscv64-unknown-linux-gnu/lib'|libdir='$RISCV_PATH/riscv64-unknown-linux-gnu/lib'|g" $RISCV_PATH/riscv64-unknown-linux-gnu/lib/libatomic.la
+
+    - name: Build and Run Unit Tests
+      run: |
+        export PATH=$RISCV_PATH/bin:$PATH
+        export LD_LIBRARY_PATH="/opt/riscv/lib:$LD_LIBRARY_PATH"
+        export QEMU_LD_PREFIX=$RISCV_PATH/sysroot
+        mkdir build && cd build
+        cmake -DCMAKE_BUILD_TYPE=Release ../
+        make -j$(nproc)
+        make test
+
+    - name: Run Benchmark
+      run: ./build/snappy_benchmark
+      working-directory: ./
