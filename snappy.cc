@@ -1288,42 +1288,43 @@ void MemCopy64(char* dst, const void* src, size_t size) {
     data = _mm256_lddqu_si256(static_cast<const __m256i *>(src) + 1);
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst) + 1, data);
   }
-#else
-#ifdef SNAPPY_HAVE_RVV
-uint8_t* dst_u8 = (uint8_t*)dst;
-const uint8_t* src_u8 = (const uint8_t*)src;
-if (src_u8 < dst_u8 && dst_u8 < src_u8 + size) {  //overlap bwd copy
-  size_t offset = size;
-  while (offset > 0) {
-    size_t vl = VSETVL_E8M1(offset);
-    offset -= vl;
-    vuint8m1_t vec = VLE8_V_U8M1(src_u8 + offset, vl);
-    VSE8_V_U8M1(dst_u8 + offset, vec, vl);
-  }
-} else {
-  size_t vl = VSETVL_E8M1(size);
-    if (vl < size) {  // if size >vl,use the max_vlen copy
-      size_t offset = 0;
-      while (offset < size) {
-        vl = VSETVL_E8M1(size - offset);
-        vuint8m1_t vec = VLE8_V_U8M1(src_u8 + offset, vl);  
-        VSE8_V_U8M1(dst_u8 + offset, vec, vl);
-        offset += vl;
-              }
-    } else {  // copy the leaft
-      vuint8m1_t vec = VLE8_V_U8M1(src_u8, vl);
-      VSE8_V_U8M1(dst_u8, vec, vl);
+  //  RVV acceleration available on RISC-V when compiled with -march=rv64gcv
+#elif defined(__riscv) & SNAPPY_HAVE_RVV
+  uint8_t* dst_u8 = (uint8_t*)dst;
+  const uint8_t* src_u8 = (const uint8_t*)src;
+   //overlap bwd copy
+  if (src_u8 < dst_u8 && dst_u8 < src_u8 + size) { 
+    size_t offset = size;
+    while (offset > 0) {
+      size_t vl = VSETVL_E8M1(offset);
+      offset -= vl;
+      vuint8m1_t vec = VLE8_V_U8M1(src_u8 + offset, vl);
+      VSE8_V_U8M1(dst_u8 + offset, vec, vl);
     }
-  }
+  } else {
+    size_t vl = VSETVL_E8M1(size);
+    // if size >vl,use the max_vlen copy
+      if (vl < size) {  
+        size_t offset = 0;
+        while (offset < size) {
+          vl = VSETVL_E8M1(size - offset);
+          vuint8m1_t vec = VLE8_V_U8M1(src_u8 + offset, vl);  
+          VSE8_V_U8M1(dst_u8 + offset, vec, vl);
+          offset += vl;
+                }
+      } else { 
+         // Copy the rest
+        vuint8m1_t vec = VLE8_V_U8M1(src_u8, vl);
+        VSE8_V_U8M1(dst_u8, vec, vl);
+      }
+    }
 #else
-std::memmove(dst, src, kShortMemCopy);
-  //Profiling shows that nearly all copies are short.
-if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
-  std::memmove(dst + kShortMemCopy,
-                static_cast<const uint8_t*>(src) + kShortMemCopy,
-                64 - kShortMemCopy);}
-
-#endif
+  std::memmove(dst, src, kShortMemCopy);
+    //Profiling shows that nearly all copies are short.
+  if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
+    std::memmove(dst + kShortMemCopy,
+                  static_cast<const uint8_t*>(src) + kShortMemCopy,
+                  64 - kShortMemCopy);}
 #endif
 }
 
