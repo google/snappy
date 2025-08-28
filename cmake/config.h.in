@@ -58,6 +58,12 @@
 /* Define to 1 if you target processors with NEON and have <arm_neon.h>. */
 #cmakedefine01 SNAPPY_HAVE_NEON
 
+/* Define to 1 if you target processors with RVV1.0 and have <riscv_vector.h>. */
+#cmakedefine01 SNAPPY_RVV_1
+
+/* Define to 1 if you target processors with RVV0.7 and have <riscv_vector.h>. */
+#cmakedefine01 SNAPPY_RVV_0_7
+
 /* Define to 1 if you have <arm_neon.h> and <arm_acle.h> and want to optimize
    compression speed by using __crc32cw from <arm_acle.h>. */
 #cmakedefine01 SNAPPY_HAVE_NEON_CRC32
