@@ -49,10 +49,21 @@
 #if SNAPPY_RVV_1 || SNAPPY_RVV_0_7
 #define SNAPPY_HAVE_RVV 1
 #include <riscv_vector.h>
+#else
+#define SNAPPY_HAVE_RVV 0
 #endif
 
+#ifdef SNAPPY_RVV_1
+#define VSETVL_E8M2 __riscv_vsetvl_e8m2
+#define VLE8_V_U8M2 __riscv_vle8_v_u8m2
+#define VSE8_V_U8M2 __riscv_vse8_v_u8m2
+#elif SNAPPY_RVV_0_7
+#define VSETVL_E8M2 vsetvl_e8m2
+#define VLE8_V_U8M2 vle8_v_u8m2
+#define VSE8_V_U8M2 vse8_v_u8m2
+#endif
 
-#if SNAPPY_HAVE_SSSE3 || SNAPPY_HAVE_NEON || SNAPPY_HAVE_RVV
+#if SNAPPY_HAVE_SSSE3 || SNAPPY_HAVE_NEON 
 #define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 1
 #else
 #define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 0
@@ -66,23 +77,8 @@ namespace internal {
 using V128 = __m128i;
 #elif SNAPPY_HAVE_NEON
 using V128 = uint8x16_t;
-#elif SNAPPY_HAVE_RVV
-using V128 = vuint8m1_t;
 #endif
-
-#ifdef SNAPPY_RVV_1
-#define VSETVL_E8M1 __riscv_vsetvl_e8m1
-#define VLE8_V_U8M1 __riscv_vle8_v_u8m1
-#define VSE8_V_U8M1 __riscv_vse8_v_u8m1
-#define VRGATHER_VV_U8M1 __riscv_vrgather_vv_u8m1
-#define VMV_V_X_U8M1 __riscv_vmv_v_x_u8m1
-#elif SNAPPY_RVV_0_7
-#define VSETVL_E8M1 vsetvl_e8m1
-#define VLE8_V_U8M1 vle8_v_u8m1
-#define VSE8_V_U8M1 vse8_v_u8m1
-#define VRGATHER_VV_U8M1 vrgather_vv_u8m1
-#define VMV_V_X_U8M1 vmv_v_x_u8m1
-#endif
+ 
 // Load 128 bits of integer data. `src` must be 16-byte aligned.
 inline V128 V128_Load(const V128* src);
 
@@ -132,31 +128,7 @@ inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
 
 inline V128 V128_DupChar(char c) { return vdupq_n_u8(c); }
 
-#elif SNAPPY_HAVE_RVV
-inline V128 V128_Load(const V128* src) {
-  size_t vl = VSETVL_E8M1(16); 
-  return VLE8_V_U8M1(reinterpret_cast<const uint8_t*>(src), vl);
-}
 
-inline V128 V128_LoadU(const V128* src) {
-  size_t vl = VSETVL_E8M1(16); 
-  return VLE8_V_U8M1(reinterpret_cast<const uint8_t*>(src), vl);
-}
-
-inline void V128_StoreU(V128* dst, V128 val) {
-  size_t vl = VSETVL_E8M1(16);
-  VSE8_V_U8M1(reinterpret_cast<uint8_t*>(dst), val, vl);
-}
-
-inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
-  size_t vl = VSETVL_E8M1(16);
-  return VRGATHER_VV_U8M1(input, shuffle_mask, vl);
-}
-
-inline V128 V128_DupChar(char c) {
-  size_t vl = VSETVL_E8M1(16);
-  return VMV_V_X_U8M1(static_cast<uint8_t>(c), vl);
-}
 #endif
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 

@@ -282,18 +282,6 @@ inline char* IncrementalCopySlow(const char* src, char* op,
 // calling MakePatternMaskBytes(0, 6, index_sequence<16>()) and
 // MakePatternMaskBytes(16, 6, index_sequence<16>()) respectively.
 
-// Selects the appropriate vector size based on the current architecture
-// vuint8m1_t, RISC-V vector type with fixed 128-bit size 
-// (sizeof not used due to variable-length vector register in RVV)
-#if defined(__SSE2__) || defined(SNAPPY_HAVE_SSSE3) 
-constexpr size_t kVectorSize = sizeof(V128); // __m128i
-#elif defined(__ARM_NEON) || defined(SNAPPY_HAVE_NEON) 
-constexpr size_t kVectorSize = sizeof(uint8x16_t); // uint8x16_t
-#elif defined(SNAPPY_HAVE_RVV) || defined(__riscv_vector)
-constexpr size_t kVectorSize = 16; // vuint8m1_t
-#else
-#error "Unsupported architecture. Please define __SSE2__, __ARM_NEON, or SNAPPY_HAVE_RVV/__riscv_vector."
-#endif
 
 template <size_t... indexes>
 inline constexpr std::array<char, sizeof...(indexes)> MakePatternMaskBytes(
@@ -342,12 +330,6 @@ static inline V128 LoadPattern(const char* src, const size_t pattern_size) {
                       generation_mask);
 }
 // vuint8m1_t cannot be used as an element of std::pair
-#if SNAPPY_HAVE_RVV
-#define LoadPatternAndReshuffleMask(src, pattern_size) \
-  V128 pattern = LoadPattern(src, pattern_size);\
-  V128 reshuffle_mask = V128_Load(reinterpret_cast<const V128*>(\
-      pattern_reshuffle_masks[pattern_size - 1].data()));
-#else
 
 // Suppress -Wignored-attributes warning for __m128i in x86 SSE2 environment
 // warning: ignoring attributes on template argument 'snappy::internal::V128' {aka '__vector(2) long long int'} [-Wignored-attributes]
@@ -355,7 +337,7 @@ static inline V128 LoadPattern(const char* src, const size_t pattern_size) {
 #ifdef __SSE2__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wignored-attributes"
-#endif
+
 
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 static inline std::pair<V128 /* pattern */, V128 /* reshuffle_mask */>
@@ -411,14 +393,10 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
         return true;
       }
       default: {
-        #if SNAPPY_HAVE_RVV
-        LoadPatternAndReshuffleMask(dst - offset, offset)
-        #else
         auto pattern_and_reshuffle_mask =
             LoadPatternAndReshuffleMask(dst - offset, offset);
         V128 pattern = pattern_and_reshuffle_mask.first;
         V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
-        #endif
         for (int i = 0; i < 4; i++) {
           V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
           pattern = V128_Shuffle(pattern, reshuffle_mask);
@@ -526,14 +504,10 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     // Typically, the op_limit is the gating factor so try to simplify the loop
     // based on that.
     if (SNAPPY_PREDICT_TRUE(op_limit <= buf_limit - 15)) {
-      #if SNAPPY_HAVE_RVV
-      LoadPatternAndReshuffleMask(src, pattern_size);
-      #else
       auto pattern_and_reshuffle_mask =
           LoadPatternAndReshuffleMask(src, pattern_size);
       V128 pattern = pattern_and_reshuffle_mask.first;
       V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
-      #endif
       // There is at least one, and at most four 16-byte blocks. Writing four
       // conditionals instead of a loop allows FDO to layout the code with
       // respect to the actual probabilities of each length.
@@ -556,14 +530,10 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     }
     char* const op_end = buf_limit - 15;
     if (SNAPPY_PREDICT_TRUE(op < op_end)) {
-      #if SNAPPY_HAVE_RVV
-      LoadPatternAndReshuffleMask(src, pattern_size);
-      #else
       auto pattern_and_reshuffle_mask =
           LoadPatternAndReshuffleMask(src, pattern_size);
       V128 pattern = pattern_and_reshuffle_mask.first;
       V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
-      #endif
       // This code path is relatively cold however so we save code size
       // by avoiding unrolling and vectorizing.
       //
@@ -1288,36 +1258,27 @@ void MemCopy64(char* dst, const void* src, size_t size) {
     data = _mm256_lddqu_si256(static_cast<const __m256i *>(src) + 1);
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst) + 1, data);
   }
-  //  RVV acceleration available on RISC-V when compiled with -march=rv64gcv
-#elif defined(__riscv) & SNAPPY_HAVE_RVV
-  uint8_t* dst_u8 = (uint8_t*)dst;
-  const uint8_t* src_u8 = (const uint8_t*)src;
-   //overlap bwd copy
-  if (src_u8 < dst_u8 && dst_u8 < src_u8 + size) { 
-    size_t offset = size;
-    while (offset > 0) {
-      size_t vl = VSETVL_E8M1(offset);
-      offset -= vl;
-      vuint8m1_t vec = VLE8_V_U8M1(src_u8 + offset, vl);
-      VSE8_V_U8M1(dst_u8 + offset, vec, vl);
-    }
-  } else {
-    size_t vl = VSETVL_E8M1(size);
-    // if size >vl,use the max_vlen copy
-      if (vl < size) {  
-        size_t offset = 0;
-        while (offset < size) {
-          vl = VSETVL_E8M1(size - offset);
-          vuint8m1_t vec = VLE8_V_U8M1(src_u8 + offset, vl);  
-          VSE8_V_U8M1(dst_u8 + offset, vec, vl);
-          offset += vl;
-                }
-      } else { 
-         // Copy the rest
-        vuint8m1_t vec = VLE8_V_U8M1(src_u8, vl);
-        VSE8_V_U8M1(dst_u8, vec, vl);
-      }
-    }
+  // RVV acceleration available on RISC-V when compiled with -march=rv64gcv
+#elif defined(__riscv) && SNAPPY_HAVE_RVV
+  // Cast pointers to the type we will operate on.
+  unsigned char* dst_ptr = (unsigned char*)dst;
+  const unsigned char* src_ptr = (const unsigned char*)src;
+  size_t remaining_bytes = size;
+  //Loop as long as there are bytes remaining to be copied.
+  while (remaining_bytes > 0) {
+    //Set vector configuration: e8 (8-bit elements), m2 (LMUL=2).
+    //Use e8m2 configuration to maximize throughput.
+  size_t vl = VSETVL_E8M2(remaining_bytes);
+    //Load data from the current source pointer.
+  vuint8m2_t vec = VLE8_V_U8M2(src_ptr, vl);
+    //Store data to the current destination pointer.
+  VSE8_V_U8M2(dst_ptr, vec, vl);
+    //Update pointers and the remaining count.
+  src_ptr += vl;
+  dst_ptr += vl;
+  remaining_bytes -= vl;
+  }
+
 #else
   std::memmove(dst, src, kShortMemCopy);
     //Profiling shows that nearly all copies are short.
