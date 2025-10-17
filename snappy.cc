@@ -1261,22 +1261,22 @@ void MemCopy64(char* dst, const void* src, size_t size) {
   // RVV acceleration available on RISC-V when compiled with -march=rv64gcv
 #elif defined(__riscv) && SNAPPY_HAVE_RVV
   // Cast pointers to the type we will operate on.
-  unsigned char* dst_ptr = (unsigned char*)dst;
-  const unsigned char* src_ptr = (const unsigned char*)src;
+  unsigned char* dst_ptr = reinterpret_cast<unsigned char*>(dst);
+  const unsigned char* src_ptr = reinterpret_cast<const unsigned char*>(src);
   size_t remaining_bytes = size;
-  //Loop as long as there are bytes remaining to be copied.
+  // Loop as long as there are bytes remaining to be copied.
   while (remaining_bytes > 0) {
-    //Set vector configuration: e8 (8-bit elements), m2 (LMUL=2).
-    //Use e8m2 configuration to maximize throughput.
-  size_t vl = VSETVL_E8M2(remaining_bytes);
-    //Load data from the current source pointer.
-  vuint8m2_t vec = VLE8_V_U8M2(src_ptr, vl);
-    //Store data to the current destination pointer.
-  VSE8_V_U8M2(dst_ptr, vec, vl);
-    //Update pointers and the remaining count.
-  src_ptr += vl;
-  dst_ptr += vl;
-  remaining_bytes -= vl;
+    // Set vector configuration: e8 (8-bit elements), m2 (LMUL=2).
+    // Use e8m2 configuration to maximize throughput.
+    size_t vl = VSETVL_E8M2(remaining_bytes);
+    // Load data from the current source pointer.
+    vuint8m2_t vec = VLE8_V_U8M2(src_ptr, vl);
+      // Store data to the current destination pointer.
+    VSE8_V_U8M2(dst_ptr, vec, vl);
+      // Update pointers and the remaining count.
+    src_ptr += vl;
+    dst_ptr += vl;
+    remaining_bytes -= vl;
   }
 
 #else
@@ -1284,8 +1284,8 @@ void MemCopy64(char* dst, const void* src, size_t size) {
     //Profiling shows that nearly all copies are short.
   if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
     std::memmove(dst + kShortMemCopy,
-                  static_cast<const uint8_t*>(src) + kShortMemCopy,
-                  64 - kShortMemCopy);}
+                 static_cast<const uint8_t*>(src) + kShortMemCopy,
+                 64 - kShortMemCopy);
 #endif
 }
 
