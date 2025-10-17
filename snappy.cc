@@ -329,16 +329,6 @@ static inline V128 LoadPattern(const char* src, const size_t pattern_size) {
   return V128_Shuffle(V128_LoadU(reinterpret_cast<const V128*>(src)),
                       generation_mask);
 }
-// vuint8m1_t cannot be used as an element of std::pair
-
-// Suppress -Wignored-attributes warning for __m128i in x86 SSE2 environment
-// warning: ignoring attributes on template argument 'snappy::internal::V128' {aka '__vector(2) long long int'} [-Wignored-attributes]
-// This occurs because __m128i has vector attributes (e.g., __attribute__((vector_size(16)))) that are ignored in template parameters.
-#ifdef __SSE2__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wignored-attributes"
-
-
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 static inline std::pair<V128 /* pattern */, V128 /* reshuffle_mask */>
 LoadPatternAndReshuffleMask(const char* src, const size_t pattern_size) {
@@ -354,12 +344,6 @@ LoadPatternAndReshuffleMask(const char* src, const size_t pattern_size) {
       pattern_reshuffle_masks[pattern_size - 1].data()));
   return {pattern, reshuffle_mask};
 }
-// Restore original diagnostic state in x86 SSE2 environment
-#ifdef __SSE2__
-#pragma GCC diagnostic pop
-#endif
-
-#endif
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
 // Fallback for when we need to copy while extending the pattern, for example
