@@ -1271,9 +1271,9 @@ void MemCopy64(char* dst, const void* src, size_t size) {
     size_t vl = VSETVL_E8M2(remaining_bytes);
     // Load data from the current source pointer.
     vuint8m2_t vec = VLE8_V_U8M2(src_ptr, vl);
-      // Store data to the current destination pointer.
+    // Store data to the current destination pointer.
     VSE8_V_U8M2(dst_ptr, vec, vl);
-      // Update pointers and the remaining count.
+    // Update pointers and the remaining count.
     src_ptr += vl;
     dst_ptr += vl;
     remaining_bytes -= vl;
@@ -1281,11 +1281,12 @@ void MemCopy64(char* dst, const void* src, size_t size) {
 
 #else
   std::memmove(dst, src, kShortMemCopy);
-    //Profiling shows that nearly all copies are short.
+  // Profiling shows that nearly all copies are short.
   if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
     std::memmove(dst + kShortMemCopy,
                  static_cast<const uint8_t*>(src) + kShortMemCopy,
                  64 - kShortMemCopy);
+  }
 #endif
 }
 
