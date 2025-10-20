@@ -1224,7 +1224,7 @@ inline bool Copy64BytesWithPatternExtension(ptrdiff_t dst, size_t offset) {
 void MemCopy64(char* dst, const void* src, size_t size) {
   // Always copy this many bytes.  If that's below size then copy the full 64.
   constexpr int kShortMemCopy = 32;
-
+  (void)kShortMemCopy;
   assert(size <= 64);
   assert(std::less_equal<const void*>()(static_cast<const char*>(src) + size,
                                         dst) ||
