@@ -216,6 +216,31 @@ int main() {
   return 0;
 }" SNAPPY_HAVE_NEON)
 
+#check RVV 1.0 need __riscv_ prefix
+check_cxx_source_compiles("
+  #include <riscv_vector.h>
+  #include <stdint.h>
+  #include <stddef.h>
+  int main() {
+    uint8_t val = 3, dup[8];
+    size_t vl = __riscv_vsetvl_e8m1(8);
+    vuint8m1_t v = __riscv_vmv_v_x_u8m1(val, vl);
+    return 0;
+  }" SNAPPY_RVV_1)
+
+
+#check RVV 0.7.1 not  __riscv_ prefix
+check_cxx_source_compiles("
+  #include <riscv_vector.h>
+  #include <stdint.h>
+  #include <stddef.h>
+  int main() {
+    uint8_t val = 3, dup[8];
+    size_t vl = vsetvl_e8m1(8);
+    vuint8m1_t v = vmv_v_x_u8m1(val, vl);
+    return 0;
+  }" SNAPPY_RVV_0_7)
+
 include(CheckSymbolExists)
 check_symbol_exists("mmap" "sys/mman.h" HAVE_FUNC_MMAP)
 check_symbol_exists("sysconf" "unistd.h" HAVE_FUNC_SYSCONF)

@@ -46,7 +46,24 @@
 #include <arm_neon.h>
 #endif
 
-#if SNAPPY_HAVE_SSSE3 || SNAPPY_HAVE_NEON
+#if SNAPPY_RVV_1 || SNAPPY_RVV_0_7
+#define SNAPPY_HAVE_RVV 1
+#include <riscv_vector.h>
+#else
+#define SNAPPY_HAVE_RVV 0
+#endif
+
+#ifdef SNAPPY_RVV_1
+#define VSETVL_E8M2 __riscv_vsetvl_e8m2
+#define VLE8_V_U8M2 __riscv_vle8_v_u8m2
+#define VSE8_V_U8M2 __riscv_vse8_v_u8m2
+#elif SNAPPY_RVV_0_7
+#define VSETVL_E8M2 vsetvl_e8m2
+#define VLE8_V_U8M2 vle8_v_u8m2
+#define VSE8_V_U8M2 vse8_v_u8m2
+#endif
+
+#if SNAPPY_HAVE_SSSE3 || SNAPPY_HAVE_NEON 
 #define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 1
 #else
 #define SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE 0
@@ -61,7 +78,7 @@ using V128 = __m128i;
 #elif SNAPPY_HAVE_NEON
 using V128 = uint8x16_t;
 #endif
-
+ 
 // Load 128 bits of integer data. `src` must be 16-byte aligned.
 inline V128 V128_Load(const V128* src);
 
@@ -110,6 +127,8 @@ inline V128 V128_Shuffle(V128 input, V128 shuffle_mask) {
 }
 
 inline V128 V128_DupChar(char c) { return vdupq_n_u8(c); }
+
+
 #endif
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
@@ -172,6 +191,7 @@ char* CompressFragment(const char* input,
 // loading from s2 + n.
 //
 // Separate implementation for 64-bit, little-endian cpus.
+// riscv and little-endian cpu choose this routinue can be done faster too.
 #if !SNAPPY_IS_BIG_ENDIAN && \
     (defined(__x86_64__) || defined(_M_X64) || defined(ARCH_PPC) || \
      defined(ARCH_ARM) || defined(__riscv))
