@@ -296,8 +296,9 @@ inline constexpr std::array<std::array<char, sizeof(V128)>,
                             sizeof...(pattern_sizes_minus_one)>
 MakePatternMaskBytesTable(int index_offset,
                           index_sequence<pattern_sizes_minus_one...>) {
-  return {MakePatternMaskBytes(index_offset, pattern_sizes_minus_one + 1,
-                               make_index_sequence<sizeof(V128)>())...};
+  return {
+      MakePatternMaskBytes(index_offset, pattern_sizes_minus_one + 1,
+                           make_index_sequence</*indexes=*/sizeof(V128)>())...};
 }
 // This is an array of shuffle control masks that can be used as the source
 // operand for PSHUFB to permute the contents of the destination XMM register
