@@ -155,10 +155,20 @@ int main() {
   return __builtin_expect(0, 1);
 }" HAVE_BUILTIN_EXPECT)
 
+# Check if the built-in __builtin_ctz (count trailing zeros) is available.
+# Require either a non-RISC-V target, or a RISC-V core that implements
+# the Zbb bit-manipulation extension where ctz is guaranteed.
 check_cxx_source_compiles("
-int main() {
-  return __builtin_ctzll(0);
-}" HAVE_BUILTIN_CTZ)
+#ifdef __riscv
+  #ifdef __riscv_zbb
+    int main() { return __builtin_ctzll(0); }
+  #else
+    #error \"ZBB not enabled in current config\"
+  #endif
+#else
+  int main() { return __builtin_ctzll(0); }
+#endif
+" HAVE_BUILTIN_CTZ)
 
 check_cxx_source_compiles("
 int main() {
