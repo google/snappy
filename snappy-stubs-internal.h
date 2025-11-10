@@ -393,7 +393,7 @@ inline int Bits::FindLSBSetNonZero(uint32_t n) {
 
 #endif  // End portable versions.
 
-// the Zbb bit-manipulation extension where ctz is guaranteed.
+// In RISC-V,  CLZ  is supported by instructions from the ZBB bit-manipulation extension.
 #if HAVE_BUILTIN_CTZ
 
 inline int Bits::FindLSBSetNonZero64(uint64_t n) {
