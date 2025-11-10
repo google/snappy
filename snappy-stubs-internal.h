@@ -304,7 +304,10 @@ class Bits {
   void operator=(const Bits&);
 };
 
-#if HAVE_BUILTIN_CTZ
+// Check if the built-in __builtin_ctz (count trailing zeros) is available.
+// Require either a non-RISC-V target, or a RISC-V core that implements
+// the Zbb bit-manipulation extension where ctz is guaranteed.
+#if HAVE_BUILTIN_CTZ && (!defined(__riscv) || defined(__riscv_zbb))
 
 inline int Bits::Log2FloorNonZero(uint32_t n) {
   assert(n != 0);
@@ -393,7 +396,10 @@ inline int Bits::FindLSBSetNonZero(uint32_t n) {
 
 #endif  // End portable versions.
 
-#if HAVE_BUILTIN_CTZ
+// Check if the built-in __builtin_ctz (count trailing zeros) is available.
+// Require either a non-RISC-V target, or a RISC-V core that implements
+// the Zbb bit-manipulation extension where ctz is guaranteed.
+#if HAVE_BUILTIN_CTZ && (!defined(__riscv) || defined(__riscv_zbb))
 
 inline int Bits::FindLSBSetNonZero64(uint64_t n) {
   assert(n != 0);
