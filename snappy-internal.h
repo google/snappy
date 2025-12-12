@@ -194,7 +194,7 @@ char* CompressFragment(const char* input,
 // riscv and little-endian cpu choose this routinue can be done faster too.
 #if !SNAPPY_IS_BIG_ENDIAN && \
     (defined(__x86_64__) || defined(_M_X64) || defined(ARCH_PPC) || \
-     defined(ARCH_ARM) || defined(__riscv))
+     defined(ARCH_ARM) || (defined(__riscv) && (__riscv_xlen == 64)))
 static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
                                                       const char* s2,
                                                       const char* s2_limit,
