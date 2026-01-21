@@ -767,8 +767,17 @@ WorkingMemory::~WorkingMemory() {
 uint16_t* WorkingMemory::GetHashTable(size_t fragment_size,
                                       int* table_size) const {
   const size_t htsize = CalculateTableSize(fragment_size);
-  memset(table_, 0, htsize * sizeof(*table_));
   *table_size = htsize;
+  #if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
+  assert(table_size % 16 == 0);
+  table_[0] = 0;
+  V128 pattern = V128_DupChar(table_[0]);
+  for(uint64_t i = 0; i < htsize * sizeof(*table_) / 16; i++ ) {
+    V128_StoreU(reinterpret_cast<V128*>(reinterpret_cast<char*>(table_) + 16 * i), pattern);
+  }
+  #else
+  memset(table_, 0, htsize * sizeof(*table_));
+  #endif
   return table_;
 }
 }  // end namespace internal
