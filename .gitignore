@@ -8,3 +8,12 @@ build/
 /bazel-*
 MODULE.bazel.lock
 out/
+
+# CMake generated files
+CMakeCache.txt
+cmake/
+CMakeFiles/
+Makefile
+cmake_install.cmake
+config.h
+/snappy-stubs-public.h
