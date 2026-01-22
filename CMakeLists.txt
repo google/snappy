@@ -101,6 +101,8 @@ option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
 
 option(SNAPPY_REQUIRE_AVX2 "Target processors with AVX2 support." OFF)
 
+option(SNAPPY_REQUIRE_BMI2 "Target processors with BMI2 support." ON)
+
 option(SNAPPY_INSTALL "Install Snappy's header and library" ON)
 
 include(TestBigEndian)
@@ -208,11 +210,15 @@ int main() {
   return __crc32cw(0, 1);
 }" SNAPPY_HAVE_NEON_CRC32)
 
-check_cxx_source_compiles("
-#include <immintrin.h>
-int main() {
-  return _bzhi_u32(0, 1);
-}" SNAPPY_HAVE_BMI2)
+if(SNAPPY_REQUIRE_BMI2)
+  check_cxx_source_compiles("
+  #include <immintrin.h>
+  int main() {
+    return _bzhi_u32(0, 1);
+  }" SNAPPY_HAVE_BMI2)
+else()
+  set(SNAPPY_HAVE_BMI2 FALSE)
+endif(SNAPPY_REQUIRE_BMI2)
 
 check_cxx_source_compiles("
 #include <arm_neon.h>
