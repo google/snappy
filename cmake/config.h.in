@@ -49,6 +49,9 @@
 /* Define to 1 if you target processors with SSSE3+ and have <tmmintrin.h>. */
 #cmakedefine01 SNAPPY_HAVE_SSSE3
 
+/* Define to 1 if you target processors with RVV and have <riscv_vector.h>. */
+#cmakedefine01 SNAPPY_HAVE_RVV
+
 /* Define to 1 if you target processors with SSE4.2 and have <crc32intrin.h>. */
 #cmakedefine01 SNAPPY_HAVE_X86_CRC32
 

@@ -101,6 +101,8 @@ option(SNAPPY_REQUIRE_AVX "Target processors with AVX support." OFF)
 
 option(SNAPPY_REQUIRE_AVX2 "Target processors with AVX2 support." OFF)
 
+option(SNAPPY_REQUIRE_RVV "Target processors with RVV support." OFF)
+
 option(SNAPPY_INSTALL "Install Snappy's header and library" ON)
 
 include(TestBigEndian)
@@ -113,6 +115,8 @@ check_include_file("sys/time.h" HAVE_SYS_TIME_H)
 check_include_file("sys/uio.h" HAVE_SYS_UIO_H)
 check_include_file("unistd.h" HAVE_UNISTD_H)
 check_include_file("windows.h" HAVE_WINDOWS_H)
+check_include_file("sse2rvv.h" HAVE_SSE2RISCV_INSTRINSIC_H)
+check_include_file("riscv_vector.h" HAVE_RISCV_INSTRINSIC_H)
 
 include(CheckLibraryExists)
 check_library_exists(z zlibVersion "" HAVE_LIBZ)
@@ -124,6 +128,7 @@ CHECK_CXX_COMPILER_FLAG("/arch:AVX" HAVE_VISUAL_STUDIO_ARCH_AVX)
 CHECK_CXX_COMPILER_FLAG("/arch:AVX2" HAVE_VISUAL_STUDIO_ARCH_AVX2)
 CHECK_CXX_COMPILER_FLAG("-mavx" HAVE_CLANG_MAVX)
 CHECK_CXX_COMPILER_FLAG("-mbmi2" HAVE_CLANG_MBMI2)
+CHECK_CXX_COMPILER_FLAG("-march=rv64gcv" HAVE_CLANG_RVV)
 if(SNAPPY_REQUIRE_AVX2)
   if(HAVE_VISUAL_STUDIO_ARCH_AVX2)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
@@ -141,6 +146,10 @@ elseif (SNAPPY_REQUIRE_AVX)
   if(HAVE_CLANG_MAVX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
   endif(HAVE_CLANG_MAVX)
+elseif (SNAPPY_REQUIRE_RVV)
+  if(HAVE_CLANG_RVV)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=rv64gcv")
+  endif(HAVE_CLANG_RVV)
 endif(SNAPPY_REQUIRE_AVX2)
 
 # Used by googletest.
@@ -194,6 +203,42 @@ int main() {
   _mm_storeu_si128(&dest, pattern);
   return 0;
 }" SNAPPY_HAVE_SSSE3)
+
+check_cxx_source_compiles("
+#include <riscv_vector.h>
+
+#define vreinterpretq_f64_m128i(x) \
+  __riscv_vreinterpret_v_i64m1_i32m1(__riscv_vreinterpret_v_f64m1_i64m1(x))
+#define vreinterpretq_m128i_i64(x) __riscv_vreinterpret_v_i32m1_i64m1(x)
+#define vreinterpretq_i64_m128i(x) __riscv_vreinterpret_v_i64m1_i32m1(x)
+#define vreinterpretq_m128i_i8(x) __riscv_vreinterpret_v_i32m1_i8m1(x)
+#define vreinterpretq_i8_m128i(x) __riscv_vreinterpret_v_i8m1_i32m1(x)
+
+int main() {
+  const vint32m1_t *src = 0;
+  vint32m1_t dest;
+  const vint32m1_t shuffle_mask = vreinterpretq_f64_m128i(
+      __riscv_vle64_v_f64m1((double const *)src, 2));
+
+  vint64m1_t addr = vreinterpretq_m128i_i64(*src);
+  vint64m1_t zeros = __riscv_vmv_v_x_i64m1(0, 2);
+
+  vint32m1_t a = vreinterpretq_i64_m128i(
+      __riscv_vslideup_vx_i64m1_tu(addr, zeros, 1, 2));
+
+  vint8m1_t _a = vreinterpretq_m128i_i8(a);
+  vint8m1_t _b = vreinterpretq_m128i_i8(shuffle_mask);
+  vbool8_t mask_lt_zero = __riscv_vmslt_vx_i8m1_b8(_b, 0, 16);
+  vuint8m1_t idxs =
+      __riscv_vreinterpret_v_i8m1_u8m1(__riscv_vand_vx_i8m1(_b, 0xf, 16));
+  vint8m1_t shuffle = __riscv_vrgather_vv_i8m1(_a, idxs, 16);
+      
+  const vint32m1_t pattern = vreinterpretq_i8_m128i(
+      __riscv_vmerge_vxm_i8m1(shuffle, 0, mask_lt_zero, 16));
+      
+  dest = pattern;
+  return 0;
+}" SNAPPY_HAVE_RVV)
 
 check_cxx_source_compiles("
 #include <immintrin.h>
