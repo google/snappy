@@ -26,9 +26,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
 package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
+
+exports_files([
+    "COPYING",
+    "COPYING.notestdata",
+])
 
 SNAPPY_VERSION = (1, 2, 2)
 
@@ -133,10 +143,10 @@ cc_test(
 )
 
 # Generate a config.h similar to what cmake would produce.
-genrule(
+write_file(
     name = "config_h",
-    outs = ["config.h"],
-    cmd = """cat <<EOF >$@
+    out = "config.h",
+    content = """\
 #define HAVE_STDDEF_H 1
 #define HAVE_STDINT_H 1
 #ifdef __has_builtin
@@ -193,19 +203,17 @@ genrule(
 #    define SNAPPY_IS_BIG_ENDIAN 1
 #  endif
 #endif
-EOF
-""",
+""".splitlines(),
 )
 
-genrule(
+expand_template(
     name = "snappy_stubs_public_h",
-    srcs = ["snappy-stubs-public.h.in"],
-    outs = ["snappy-stubs-public.h"],
-    # Assume sys/uio.h is available on non-Windows.
-    # Set the version numbers.
-    cmd = ("""sed -e 's/$${HAVE_SYS_UIO_H_01}/!_WIN32/g' \
-           -e 's/$${PROJECT_VERSION_MAJOR}/%d/g' \
-           -e 's/$${PROJECT_VERSION_MINOR}/%d/g' \
-           -e 's/$${PROJECT_VERSION_PATCH}/%d/g' \
-    $< >$@""" % SNAPPY_VERSION),
+    out = "snappy-stubs-public.h",
+    substitutions = {
+        "${HAVE_SYS_UIO_H_01}": "!_WIN32",
+        "${PROJECT_VERSION_MAJOR}": str(SNAPPY_VERSION[0]),
+        "${PROJECT_VERSION_MINOR}": str(SNAPPY_VERSION[1]),
+        "${PROJECT_VERSION_PATCH}": str(SNAPPY_VERSION[2]),
+    },
+    template = "snappy-stubs-public.h.in",
 )
