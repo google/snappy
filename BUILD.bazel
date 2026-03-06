@@ -62,8 +62,10 @@ cc_library(
     name = "snappy-stubs-internal",
     srcs = ["snappy-stubs-internal.cc"],
     hdrs = ["snappy-stubs-internal.h"],
-    deps = [
+    implementation_deps = [
         ":config",
+    ],
+    deps = [
         ":snappy-stubs-public",
     ],
 )
@@ -85,8 +87,10 @@ cc_library(
             "-Wno-sign-compare",
         ],
     }),
-    deps = [
+    implementation_deps = [
         ":config",
+    ],
+    deps = [
         ":snappy-stubs-internal",
         ":snappy-stubs-public",
     ],
