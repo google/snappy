@@ -81,7 +81,7 @@ BENCHMARK(BM_UFlat)->Apply(FilesAndLevels);
 
 struct SourceFiles {
   SourceFiles() {
-    for (int i = 0; i < kFiles; i++) {
+    for (int i = 0; i < kFiles; ++i) {
       std::string contents = ReadTestDataFile(kTestDataFiles[i].filename,
                                               kTestDataFiles[i].size_limit);
       max_size = std::max(max_size, contents.size());
@@ -101,7 +101,7 @@ void BM_UFlatMedley(benchmark::State& state) {
   std::vector<char> dst(source->max_size);
 
   for (auto s : state) {
-    for (int i = 0; i < SourceFiles::kFiles; i++) {
+    for (int i = 0; i < SourceFiles::kFiles; ++i) {
       CHECK(snappy::RawUncompress(source->zcontents[i].data(),
                                   source->zcontents[i].size(), dst.data()));
       benchmark::DoNotOptimize(dst);
@@ -109,7 +109,7 @@ void BM_UFlatMedley(benchmark::State& state) {
   }
 
   int64_t source_sizes = 0;
-  for (int i = 0; i < SourceFiles::kFiles; i++) {
+  for (int i = 0; i < SourceFiles::kFiles; ++i) {
     source_sizes += static_cast<int64_t>(source->sizes[i]);
   }
   state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *
@@ -145,14 +145,14 @@ void BM_UValidateMedley(benchmark::State& state) {
   static const SourceFiles* const source = new SourceFiles();
 
   for (auto s : state) {
-    for (int i = 0; i < SourceFiles::kFiles; i++) {
+    for (int i = 0; i < SourceFiles::kFiles; ++i) {
       CHECK(snappy::IsValidCompressedBuffer(source->zcontents[i].data(),
                                             source->zcontents[i].size()));
     }
   }
 
   int64_t source_sizes = 0;
-  for (int i = 0; i < SourceFiles::kFiles; i++) {
+  for (int i = 0; i < SourceFiles::kFiles; ++i) {
     source_sizes += static_cast<int64_t>(source->sizes[i]);
   }
   state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) *

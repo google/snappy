@@ -310,8 +310,8 @@ TEST(CorruptedTest, VerifyCorrupted) {
   // Mess around with the data. It's hard to simulate all possible
   // corruptions; this is just one example ...
   CHECK_GT(dest.size(), 3);
-  dest[1]--;
-  dest[3]++;
+  --dest[1];
+  ++dest[3];
   // this really ought to fail.
   CHECK(!IsValidCompressedBuffer(dest));
   CHECK(!Uncompress(dest, &uncmp));
@@ -947,7 +947,7 @@ TEST(Snappy, VerifyCharTable) {
   // Small LITERAL entries.  We store (len-1) in the top 6 bits.
   for (uint8_t len = 1; len <= 60; ++len) {
     dst[LITERAL | ((len - 1) << 2)] = MakeEntry(0, len, 0);
-    assigned++;
+    ++assigned;
   }
 
   // Large LITERAL entries.  We use 60..63 in the high 6 bits to
@@ -956,7 +956,7 @@ TEST(Snappy, VerifyCharTable) {
     // We set the length field in the lookup table to 1 because extra
     // bytes encode len-1.
     dst[LITERAL | ((extra_bytes + 59) << 2)] = MakeEntry(extra_bytes, 1, 0);
-    assigned++;
+    ++assigned;
   }
 
   // COPY_1_BYTE_OFFSET.
@@ -971,7 +971,7 @@ TEST(Snappy, VerifyCharTable) {
       uint8_t offset_high = static_cast<uint8_t>(offset >> 8);
       dst[COPY_1_BYTE_OFFSET | ((len - 4) << 2) | (offset_high << 5)] =
           MakeEntry(1, len, offset_high);
-      assigned++;
+      ++assigned;
     }
   }
 
@@ -979,14 +979,14 @@ TEST(Snappy, VerifyCharTable) {
   // Tag contains len-1 in top 6 bits, and offset in next two bytes.
   for (uint8_t len = 1; len <= 64; ++len) {
     dst[COPY_2_BYTE_OFFSET | ((len - 1) << 2)] = MakeEntry(2, len, 0);
-    assigned++;
+    ++assigned;
   }
 
   // COPY_4_BYTE_OFFSET.
   // Tag contents len-1 in top 6 bits, and offset in next four bytes.
   for (uint8_t len = 1; len <= 64; ++len) {
     dst[COPY_4_BYTE_OFFSET | ((len - 1) << 2)] = MakeEntry(4, len, 0);
-    assigned++;
+    ++assigned;
   }
 
   // Check that each entry was initialized exactly once.

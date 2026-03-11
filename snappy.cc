@@ -362,7 +362,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
         // TODO: Ideally we should memset, move back once the
         // codegen issues are fixed.
         V128 pattern = V128_DupChar(dst[-1]);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4; ++i) {
           V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
         }
         return true;
@@ -372,7 +372,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
       case 8:
       case 16: {
         V128 pattern = LoadPattern(dst - offset, offset);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4; ++i) {
           V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
         }
         return true;
@@ -382,7 +382,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
             LoadPatternAndReshuffleMask(dst - offset, offset);
         V128 pattern = pattern_and_reshuffle_mask.first;
         V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4; ++i) {
           V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
           pattern = V128_Shuffle(pattern, reshuffle_mask);
         }
@@ -395,15 +395,15 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
     if (SNAPPY_PREDICT_FALSE(offset == 0)) return false;
     // Extend the pattern to the first 16 bytes.
     // The simpler formulation of `dst[i - offset]` induces undefined behavior.
-    for (int i = 0; i < 16; i++) dst[i] = (dst - offset)[i];
+    for (int i = 0; i < 16; ++i) dst[i] = (dst - offset)[i];
     // Find a multiple of pattern >= 16.
     static std::array<uint8_t, 16> pattern_sizes = []() {
       std::array<uint8_t, 16> res;
-      for (int i = 1; i < 16; i++) res[i] = (16 / i + 1) * i;
+      for (int i = 1; i < 16; ++i) res[i] = (16 / i + 1) * i;
       return res;
     }();
     offset = pattern_sizes[offset];
-    for (int i = 1; i < 4; i++) {
+    for (int i = 1; i < 4; ++i) {
       std::memcpy(dst + i * 16, dst + i * 16 - offset, 16);
     }
     return true;
@@ -411,7 +411,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
   // Very rare.
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 4; ++i) {
     std::memcpy(dst + i * 16, dst + i * 16 - offset, 16);
   }
   return true;
@@ -982,7 +982,7 @@ char* CompressFragmentDoubleHash(const char* input, size_t input_size, char* op,
         assert(static_cast<uint32_t>(data) == LittleEndian::Load32(ip));
         uint16_t* table_entry2 = TableEntry8ByteMatch(table2, data, mask);
         uint32_t bytes_between_hash_lookups = skip >> 9;
-        skip++;
+        ++skip;
         const char* next_ip = ip + bytes_between_hash_lookups;
         if (SNAPPY_PREDICT_FALSE(next_ip > ip_limit)) {
           ip = next_emit;
@@ -1408,7 +1408,7 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
   op_limit_min_slop -= kSlopBytes;
   if (2 * (kSlopBytes + 1) < ip_limit - ip && op < op_limit_min_slop) {
     const uint8_t* const ip_limit_min_slop = ip_limit - 2 * kSlopBytes - 1;
-    ip++;
+    ++ip;
     // ip points just past the tag and we are touching at maximum kSlopBytes
     // in an iteration.
     size_t tag = ip[-1];
@@ -1427,7 +1427,7 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
       // leads to reduced mov's.
 
       SNAPPY_PREFETCH(ip + 128);
-      for (int i = 0; i < 2; i++) {
+      for (int i = 0; i < 2; ++i) {
         const uint8_t* old_ip = ip;
         assert(tag == ip[-1]);
         // For literals tag_type = 0, hence we will always obtain 0 from
@@ -1495,7 +1495,7 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
     } while (ip < ip_limit_min_slop &&
              static_cast<ptrdiff_t>(op + deferred_length) < op_limit_min_slop);
   exit:
-    ip--;
+    --ip;
     assert(ip <= ip_limit);
   }
   // If we deferred a copy then we can perform.  If we are up to date then we
@@ -1614,7 +1614,7 @@ class SnappyDecompressor {
         }
       }
       const uint8_t c = static_cast<uint8_t>(preload);
-      ip++;
+      ++ip;
 
       // Ratio of iterations that have LITERAL vs non-LITERAL for different
       // inputs.
@@ -1707,7 +1707,7 @@ constexpr uint32_t CalculateNeeded(uint8_t tag) {
 
 #if __cplusplus >= 201402L
 constexpr bool VerifyCalculateNeeded() {
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 1; ++i) {
     if (CalculateNeeded(i) != static_cast<uint32_t>((char_table[i] >> 11)) + 1)
       return false;
   }
@@ -2573,7 +2573,7 @@ bool SnappyScatteredWriter<Allocator>::SlowAppendFromSelf(size_t offset,
       op_ptr_ = op;
       return false;
     }
-    src++;
+    ++src;
   }
   op_ptr_ = op;
   return true;
