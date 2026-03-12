@@ -52,6 +52,10 @@
 #endif
 #endif  // !defined(SNAPPY_HAVE_X86_CRC32)
 
+#if SNAPPY_HAVE_RVV
+#include <riscv_vector.h>
+#endif
+
 #if !defined(SNAPPY_HAVE_NEON_CRC32)
 #if SNAPPY_HAVE_NEON && defined(__ARM_FEATURE_CRC32)
 #define SNAPPY_HAVE_NEON_CRC32 1
@@ -534,7 +538,27 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       } while (SNAPPY_PREDICT_TRUE(op < op_end));
     }
     return IncrementalCopySlow(op - pattern_size, op, op_limit);
-#else   // !SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
+#elif defined (SNAPPY_HAVE_RVV)
+    size_t bytes_to_copy = op_limit - op;
+    while (bytes_to_copy > 0) {
+      size_t vl = __riscv_vsetvl_e8m1(bytes_to_copy);
+      vuint8m1_t pattern_source = __riscv_vle8_v_u8m1(
+          reinterpret_cast<const uint8_t*>(src), pattern_size);
+      vuint8m1_t indices_sequential = __riscv_vid_v_u8m1(vl);
+      vuint8m1_t indices_repeating = __riscv_vremu_vx_u8m1(
+          indices_sequential, pattern_size, vl);
+
+      vuint8m1_t pattern_to_write = __riscv_vrgather_vv_u8m1(
+          pattern_source, indices_repeating, vl);
+
+      __riscv_vse8_v_u8m1(reinterpret_cast<uint8_t*>(op), pattern_to_write, vl);
+
+      op += vl;
+      bytes_to_copy -= vl;
+  }
+  return op_limit;
+
+#else 
     // If plenty of buffer space remains, expand the pattern to at least 8
     // bytes. The way the following loop is written, we need 8 bytes of buffer
     // space if pattern_size >= 4, 11 bytes if pattern_size is 1 or 3, and 10
