@@ -1318,6 +1318,27 @@ inline size_t AdvanceToNextTagARMOptimized(const uint8_t** ip_p, size_t* tag) {
 }
 
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline size_t AdvanceToNextTagRISCVOptimized(const uint8_t** ip_p,
+                                              size_t* tag) {
+  const uint8_t*& ip = *ip_p;
+  // RISC-V lacks conditional-move instructions, so a straightforward branch
+  // (similar to ARM) is preferred over the x86 cmov-based approach.
+  // The latency-critical data chain is:
+  // ip -> c = Load(ip) -> delta1 = (c & 3)        -> ip += delta1 or delta2
+  //                       delta2 = ((c >> 2) + 1)    ip++
+  const size_t tag_type = *tag & 3;
+  if (tag_type == 0) {
+    size_t next_literal_tag = (*tag >> 2) + 1;
+    *tag = ip[next_literal_tag];
+    ip += next_literal_tag + 1;
+  } else {
+    *tag = ip[tag_type];
+    ip += tag_type + 1;
+  }
+  return tag_type;
+}
+
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 inline size_t AdvanceToNextTagX86Optimized(const uint8_t** ip_p, size_t* tag) {
   const uint8_t*& ip = *ip_p;
   // This section is crucial for the throughput of the decompression loop.
@@ -1375,7 +1396,7 @@ inline uint32_t ExtractOffset(uint32_t val, size_t tag_type) {
          reinterpret_cast<const char*>(&kExtractMasksCombined) + 2 * tag_type,
          sizeof(result));
   return val & result;
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
   constexpr uint64_t kExtractMasksCombined = 0x0000FFFF00FF0000ull;
   return val & static_cast<uint32_t>(
       (kExtractMasksCombined >> (tag_type * 16)) & 0xFFFF);
@@ -1438,6 +1459,10 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         size_t tag_type = AdvanceToNextTagARMOptimized(&ip, &tag);
         // We never need more than 16 bits. Doing a Load16 allows the compiler
         // to elide the masking operation in ExtractOffset.
+        next = LittleEndian::Load16(old_ip);
+#elif defined(__riscv)
+        size_t tag_type = AdvanceToNextTagRISCVOptimized(&ip, &tag);
+        // RISC-V also benefits from 16-bit load like ARM.
         next = LittleEndian::Load16(old_ip);
 #else
         size_t tag_type = AdvanceToNextTagX86Optimized(&ip, &tag);
