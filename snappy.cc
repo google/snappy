@@ -1935,13 +1935,34 @@ class SnappyIOVecReader : public Source {
  private:
   // Advances to the next nonempty `iovec` and updates related variables.
   void Advance() {
+    // Interim NDEBUG-safe guards (the assert below is stripped in release builds).
+    int empty_walks = 0;
+    constexpr int kMaxEmptyWalks = 1024;
     do {
+      // Caller-inconsistent total_size: saturate instead of unsigned-underflowing.
+      if (total_size_remaining_ < curr_size_remaining_) {
+        curr_pos_ = nullptr;
+        curr_size_remaining_ = 0;
+        total_size_remaining_ = 0;
+        return;
+      }
       assert(total_size_remaining_ >= curr_size_remaining_);
       total_size_remaining_ -= curr_size_remaining_;
       if (total_size_remaining_ == 0) {
         curr_pos_ = nullptr;
         curr_size_remaining_ = 0;
         return;
+      }
+      // Bound zero-length iovec walks (avoid spinning past the array end).
+      if (curr_size_remaining_ == 0) {
+        if (++empty_walks > kMaxEmptyWalks) {
+          curr_pos_ = nullptr;
+          curr_size_remaining_ = 0;
+          total_size_remaining_ = 0;
+          return;
+        }
+      } else {
+        empty_walks = 0;
       }
       ++curr_iov_;
       curr_pos_ = reinterpret_cast<const char*>(curr_iov_->iov_base);
