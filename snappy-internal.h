@@ -360,6 +360,27 @@ static inline size_t FindMatchLengthPlain(const char* s1, const char* s2,
   assert(s2_limit >= s2);
   int matched = 0;
 
+#if defined(__riscv) && SNAPPY_HAVE_RVV
+#if SNAPPY_RVV_1
+  // RVV fast path: compare as many bytes as the hardware supports.
+  while (s2 <= s2_limit - 64) {
+    size_t vl = __riscv_vsetvl_e8m4(static_cast<size_t>(s2_limit - s2));
+    vuint8m4_t v1 = __riscv_vle8_v_u8m4(
+        reinterpret_cast<const uint8_t*>(s1 + matched), vl);
+    vuint8m4_t v2 = __riscv_vle8_v_u8m4(
+        reinterpret_cast<const uint8_t*>(s2), vl);
+    vbool2_t eq = __riscv_vmseq_vv_u8m4_b2(v1, v2, vl);
+    long first_mismatch = __riscv_vfirst_m_b2(__riscv_vmnot_m_b2(eq, vl), vl);
+    if (first_mismatch < 0) {
+      s2 += vl;
+      matched += vl;
+    } else {
+      return matched + first_mismatch;
+    }
+  }
+#endif
+#endif
+
   while (s2 <= s2_limit - 8 &&
          UNALIGNED_LOAD64(s2) == UNALIGNED_LOAD64(s1 + matched)) {
     s2 += 8;
