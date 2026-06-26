@@ -281,6 +281,30 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
   SNAPPY_PREFETCH(s1 + 64);
   SNAPPY_PREFETCH(s2 + 64);
 
+#if defined(__riscv) && SNAPPY_HAVE_RVV
+  // RISC-V Vector Extension (RVV) optimized version.
+  // Uses full hardware vector length without artificial 16-byte restriction.
+  // No scalar tail loop needed - RVV handles all lengths via vsetvl.
+  size_t len = s2_limit - s2;
+  const char* s1_current = s1 + matched;
+  
+  for (size_t vl; len > 0; len -= vl, s1_current += vl, s2 += vl, matched += vl) {
+    vl = __riscv_vsetvl_e8m1(len);
+    vuint8m1_t v1 = __riscv_vle8_v_u8m1(reinterpret_cast<const uint8_t*>(s1_current), vl);
+    vuint8m1_t v2 = __riscv_vle8_v_u8m1(reinterpret_cast<const uint8_t*>(s2), vl);
+    long idx = __riscv_vfirst(__riscv_vmsne(v1, v2, vl), vl);
+    if (idx >= 0) {
+      matched += static_cast<size_t>(idx);
+      s2 += idx;
+      if (s2 <= s2_limit - 8) {
+        *data = UNALIGNED_LOAD64(s2);
+      }
+      return std::pair<size_t, bool>(matched, matched < 8);
+    }
+  }
+  return std::pair<size_t, bool>(matched, matched < 8);
+#endif  // defined(__riscv) && SNAPPY_HAVE_RVV
+
   // Find out how long the match is. We loop over the data 64 bits at a
   // time until we find a 64-bit block that doesn't match; then we find
   // the first non-matching bit and use that to calculate the total
