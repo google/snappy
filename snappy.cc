@@ -1251,24 +1251,21 @@ void MemCopy64(char* dst, const void* src, size_t size) {
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst) + 1, data);
   }
   // RVV acceleration available on RISC-V when compiled with -march=rv64gcv
+  // RVV: mirror the AVX path — first 32 B, then another 32 B if size > 32.
+  // e8m1 may need two segments per 32 B when VLEN < 256 (e.g. vl=16 on VLEN=128).
 #elif defined(__riscv) && SNAPPY_HAVE_RVV
-  // Cast pointers to the type we will operate on.
-  unsigned char* dst_ptr = reinterpret_cast<unsigned char*>(dst);
-  const unsigned char* src_ptr = reinterpret_cast<const unsigned char*>(src);
-  size_t remaining_bytes = size;
-  // Loop as long as there are bytes remaining to be copied.
-  while (remaining_bytes > 0) {
-    // Set vector configuration: e8 (8-bit elements), m2 (LMUL=2).
-    // Use e8m2 configuration to maximize throughput.
-    size_t vl = VSETVL_E8M2(remaining_bytes);
-    // Load data from the current source pointer.
-    vuint8m2_t vec = VLE8_V_U8M2(src_ptr, vl);
-    // Store data to the current destination pointer.
-    VSE8_V_U8M2(dst_ptr, vec, vl);
-    // Update pointers and the remaining count.
-    src_ptr += vl;
-    dst_ptr += vl;
-    remaining_bytes -= vl;
+  assert(kShortMemCopy <= 32);
+  const size_t vl = VSETVL_E8M2(32);
+  unsigned char* d = reinterpret_cast<unsigned char*>(dst);
+  const unsigned char* s = reinterpret_cast<const unsigned char*>(src);
+  vuint8m2_t v0 = VLE8_V_U8M2(s, vl);
+  VSE8_V_U8M2(d, v0, vl);
+  // Profiling shows that nearly all copies are short.
+  if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
+    const unsigned char* s2 = s + kShortMemCopy;
+    unsigned char* d2 = d + kShortMemCopy;
+    vuint8m2_t v2 = VLE8_V_U8M2(s2, vl);
+    VSE8_V_U8M2(d2, v2, vl);
   }
 
 #else
