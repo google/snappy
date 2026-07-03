@@ -74,7 +74,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <limits>
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -195,11 +195,6 @@ inline uint16_t* TableEntry8ByteMatch(uint16_t* table, uint64_t bytes,
 }  // namespace
 
 size_t MaxCompressedLength(size_t source_bytes) {
-  // Avoid integer overflow that could cause undersized buffer allocations.
-  // Return std::numeric_limits<size_t>::max() to force a controlled allocation failure.
-  if (source_bytes > (std::numeric_limits<size_t>::max() - 32) / 7 * 6) {
-    return std::numeric_limits<size_t>::max();
-  }
   // Compressed data can be defined as:
   //    compressed := item* literal*
   //    item       := literal* copy
@@ -335,7 +330,6 @@ static inline V128 LoadPattern(const char* src, const size_t pattern_size) {
   return V128_Shuffle(V128_LoadU(reinterpret_cast<const V128*>(src)),
                       generation_mask);
 }
-
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 static inline std::pair<V128 /* pattern */, V128 /* reshuffle_mask */>
 LoadPatternAndReshuffleMask(const char* src, const size_t pattern_size) {
@@ -351,7 +345,6 @@ LoadPatternAndReshuffleMask(const char* src, const size_t pattern_size) {
       pattern_reshuffle_masks[pattern_size - 1].data()));
   return {pattern, reshuffle_mask};
 }
-
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
 // Fallback for when we need to copy while extending the pattern, for example
@@ -404,15 +397,26 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
     // The simpler formulation of `dst[i - offset]` induces undefined behavior.
     for (int i = 0; i < 16; i++) dst[i] = (dst - offset)[i];
     // Find a multiple of pattern >= 16.
-    static std::array<uint8_t, 16> pattern_sizes = []() {
-      std::array<uint8_t, 16> res;
-      for (int i = 1; i < 16; i++) res[i] = (16 / i + 1) * i;
-      return res;
-    }();
+    // Use plain C-style storage to keep this path simple for toolchains.
+    uint8_t pattern_sizes[16];
+    pattern_sizes[0] = 0;
+    for (int i = 1; i < 16; i++) pattern_sizes[i] = (16 / i + 1) * i;
     offset = pattern_sizes[offset];
+
+#if defined(__riscv) && SNAPPY_HAVE_RVV
+    // Copy 3 subsequent 16-byte blocks using RVV load/store.
+    // Use direct RVV intrinsics to avoid project-level macro dependency.
+    const size_t vl = VSETVL_E8M1(16);
+    for (int i = 1; i < 4; i++) {
+      vuint8m1_t vec = VLE8_V_U8M1(
+          reinterpret_cast<const uint8_t*>(dst + i * 16 - offset), vl);
+      VSE8_V_U8M1(reinterpret_cast<uint8_t*>(dst + i * 16), vec, vl);
+    }
+#else
     for (int i = 1; i < 4; i++) {
       std::memcpy(dst + i * 16, dst + i * 16 - offset, 16);
     }
+#endif
     return true;
   }
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
@@ -479,6 +483,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
   // Handle the uncommon case where pattern is less than 16 (or 8 in non-SSE)
   // bytes.
   if (pattern_size < big_pattern_size_lower_bound) {
+
 #if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
     // Load the first eight bytes into an 128-bit XMM register, then use PSHUFB
     // to permute the register's contents in-place into a repeating sequence of
@@ -541,7 +546,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
       } while (SNAPPY_PREDICT_TRUE(op < op_end));
     }
     return IncrementalCopySlow(op - pattern_size, op, op_limit);
-#else   // !SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
+#else   // !SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE && !(defined(__riscv) && SNAPPY_HAVE_RVV)
     // If plenty of buffer space remains, expand the pattern to at least 8
     // bytes. The way the following loop is written, we need 8 bytes of buffer
     // space if pattern_size >= 4, 11 bytes if pattern_size is 1 or 3, and 10
@@ -1201,8 +1206,9 @@ static inline uint32_t ExtractLowBytes(const uint32_t& v, int n) {
 #if SNAPPY_HAVE_BMI2
   return _bzhi_u32(v, 8 * n);
 #else
-  // This needs to be wider than uint32_t otherwise `mask << 32` will be
-  // undefined.
+  // Keep low (8*n) bits. Use 64-bit temps so (1ULL << 32) is defined when n==4.
+  // const uint64_t keep = (1ULL << (8 * n)) - 1ULL;
+  // return static_cast<uint32_t>(static_cast<uint64_t>(v) & keep);
   uint64_t mask = 0xffffffff;
   return v & ~(mask << (8 * n));
 #endif
@@ -1250,27 +1256,21 @@ void MemCopy64(char* dst, const void* src, size_t size) {
     data = _mm256_lddqu_si256(static_cast<const __m256i *>(src) + 1);
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst) + 1, data);
   }
-  // RVV acceleration available on RISC-V when compiled with -march=rv64gcv
+  // RVV: mirror the AVX path — first 32 B, then another 32 B if size > 32.
+  // e8m1 may need two segments per 32 B when VLEN < 256 (e.g. vl=16 on VLEN=128).
 #elif defined(__riscv) && SNAPPY_HAVE_RVV
-  // Cast pointers to the type we will operate on.
-  unsigned char* dst_ptr = reinterpret_cast<unsigned char*>(dst);
-  const unsigned char* src_ptr = reinterpret_cast<const unsigned char*>(src);
-  size_t remaining_bytes = size;
-  // Loop as long as there are bytes remaining to be copied.
-  while (remaining_bytes > 0) {
-    // Set vector configuration: e8 (8-bit elements), m2 (LMUL=2).
-    // Use e8m2 configuration to maximize throughput.
-    size_t vl = VSETVL_E8M2(remaining_bytes);
-    // Load data from the current source pointer.
-    vuint8m2_t vec = VLE8_V_U8M2(src_ptr, vl);
-    // Store data to the current destination pointer.
-    VSE8_V_U8M2(dst_ptr, vec, vl);
-    // Update pointers and the remaining count.
-    src_ptr += vl;
-    dst_ptr += vl;
-    remaining_bytes -= vl;
+  assert(kShortMemCopy <= 32);
+  const size_t vl = VSETVL_E8M2(32);
+  unsigned char* d = reinterpret_cast<unsigned char*>(dst);
+  const unsigned char* s = reinterpret_cast<const unsigned char*>(src);
+  vuint8m2_t v0 = VLE8_V_U8M2(s, vl);
+  VSE8_V_U8M2(d, v0, vl);
+  if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
+    const unsigned char* s2 = s + kShortMemCopy;
+    unsigned char* d2 = d + kShortMemCopy;
+    vuint8m2_t v2 = VLE8_V_U8M2(s2, vl);
+    VSE8_V_U8M2(d2, v2, vl);
   }
-
 #else
   std::memmove(dst, src, kShortMemCopy);
   // Profiling shows that nearly all copies are short.
@@ -1325,6 +1325,22 @@ inline size_t AdvanceToNextTagARMOptimized(const uint8_t** ip_p, size_t* tag) {
 }
 
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline size_t AdvanceToNextTagRVOptimized(const uint8_t** ip_p, size_t* tag) {
+  const uint8_t*& ip = *ip_p;
+  // Keep the arithmetic simple for generic RISC-V backends: derive both
+  // candidate advances, then pick one based on tag_type.
+  const size_t literal_len = *tag >> 2;
+  const size_t tag_type = *tag & 3;
+  const bool is_literal = (tag_type == 0);
+  const size_t copy_advance = tag_type + 1;
+  const size_t literal_advance = literal_len + 2;
+  const uint8_t* next_ip = is_literal ? (ip + literal_advance) : (ip + copy_advance);
+  *tag = is_literal ? ip[literal_advance - 1] : ip[copy_advance - 1];
+  ip = next_ip;
+  return tag_type;
+}
+
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
 inline size_t AdvanceToNextTagX86Optimized(const uint8_t** ip_p, size_t* tag) {
   const uint8_t*& ip = *ip_p;
   // This section is crucial for the throughput of the decompression loop.
@@ -1370,54 +1386,29 @@ inline size_t AdvanceToNextTagX86Optimized(const uint8_t** ip_p, size_t* tag) {
   return tag_type;
 }
 
-SNAPPY_ATTRIBUTE_ALWAYS_INLINE
-inline size_t AdvanceToNextTagRVOptimized(const uint8_t** ip_p, size_t* tag) {
-  const uint8_t*& ip = *ip_p;
-  // This section is crucial for the throughput of the decompression loop.
-  // The latency of an iteration is fundamentally constrained by the data chain on ip:
-  // ip -> c = *tag -> literal_len = c >> 2, tag_type = c & 3
-  //      -> literal_advance = literal_len + 2, copy_advance = tag_type + 1
-  //      -> next_ip = ip + literal_advance  OR  ip + copy_advance (literal vs copy)
-  //      -> *tag = byte at (next_ip - 1); ip = next_ip
-  //
-  // Base RISC-V has no x86-style cmov and no AArch64 csinc on the same shape; this
-  // computes both candidate advances and both load offsets, then selects with
-  // (is_literal ? ... : ...). With the Zicond extension (czero.eqz / czero.nez), those
-  // selections typically lower to branchless conditional-zero ops instead of a
-  // hard-to-predict literal/copy branch, which is why this form tends to win there.
-  const size_t literal_len = *tag >> 2;
-  const size_t tag_type = *tag & 3;
-  const bool is_literal = (tag_type == 0);
-  const size_t copy_advance = tag_type + 1;
-  const size_t literal_advance = literal_len + 2;
-  const uint8_t* next_ip = is_literal ? (ip + literal_advance) : (ip + copy_advance);
-  *tag = is_literal ? ip[literal_advance - 1] : ip[copy_advance - 1];
-  ip = next_ip;
-  return tag_type;
-}
-
 // Extract the offset for copy-1 and copy-2 returns 0 for literals or copy-4.
 inline uint32_t ExtractOffset(uint32_t val, size_t tag_type) {
-  // For Arm non-static storage works better. For x86 static storage is better.
+  // For x86 non-static storage works better. For ARM static storage is better.
   // TODO: Once the array is recognized as a register, improve the
   // readability for x86.
 #if defined(__x86_64__)
-  static constexpr uint64_t kExtractMasksCombined = 0x0000FFFF00FF0000ull;
+  constexpr uint64_t kExtractMasksCombined = 0x0000FFFF00FF0000ull;
   uint16_t result;
   memcpy(&result,
          reinterpret_cast<const char*>(&kExtractMasksCombined) + 2 * tag_type,
          sizeof(result));
   return val & result;
-  // For AArch64 and RISC-V, use a bit-twiddling trick to extract the mask from a
-  // single combined constant instead of a lookup table. The constant packs multiple
-  // 16-bit masks based on tag_type (see implementation below). The code calculates
-  // the shift amount from tag_type, right-shifts the constant to move the desired
-  // mask to the LSB position, then extracts it with & 0xFFFF. This branchless
-  // approach is often more performant on modern CPUs.
-#elif defined(__aarch64__) || (defined(__riscv) && (__riscv_xlen == 64))
+#elif defined(__aarch64__)
   constexpr uint64_t kExtractMasksCombined = 0x0000FFFF00FF0000ull;
   return val & static_cast<uint32_t>(
       (kExtractMasksCombined >> (tag_type * 16)) & 0xFFFF);
+#elif defined(__riscv)
+  // Avoid a table load in the hot path.
+  constexpr uint64_t kExtractMasksCombined = 0x0000FFFF00FF0000ull;
+  return val & static_cast<uint32_t>(
+      (kExtractMasksCombined >> (tag_type * 16)) & 0xFFFF);
+  //   uint32_t mask =(tag_type < 3) ? ((1u << (static_cast<unsigned>(tag_type) * 8u)) - 1u) : 0u;
+  // return val & mask;
 #else
   static constexpr uint32_t kExtractMasks[4] = {0, 0xFF, 0xFFFF, 0};
   return val & kExtractMasks[tag_type];
@@ -1435,7 +1426,10 @@ inline uint32_t ExtractOffset(uint32_t val, size_t tag_type) {
 // implementations based on CPU capability (BMI2 / perhaps 32 / 64 byte memcpy).
 template <typename T>
 std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
-    const uint8_t* ip, const uint8_t* ip_limit, ptrdiff_t op, T op_base,
+    const uint8_t* ip,
+     const uint8_t* ip_limit, 
+     ptrdiff_t op, 
+     T op_base,
     ptrdiff_t op_limit_min_slop) {
   // If deferred_src is invalid point it here.
   uint8_t safe_source[64];
@@ -1841,13 +1835,13 @@ static bool InternalUncompressAllTags(SnappyDecompressor* decompressor,
                                       Writer* writer, uint32_t compressed_len,
                                       uint32_t uncompressed_len) {
     int token = 0;
+  Report(token, "snappy_uncompress", compressed_len, uncompressed_len);
 
   writer->SetExpectedLength(uncompressed_len);
 
   // Process the entire input
   decompressor->DecompressAllTags(writer);
   writer->Flush();
-  Report(token, "snappy_uncompress", compressed_len, uncompressed_len);
   return (decompressor->eof() && writer->CheckLength());
 }
 
@@ -1862,9 +1856,11 @@ size_t Compress(Source* reader, Sink* writer) {
 
 size_t Compress(Source* reader, Sink* writer, CompressionOptions options) {
   assert(options.level == 1 || options.level == 2);
+  int token = 0;
   size_t written = 0;
   size_t N = reader->Available();
   assert(N <= 0xFFFFFFFFu);
+  const size_t uncompressed_size = N;
   char ulength[Varint::kMax32];
   char* p = Varint::Encode32(ulength, N);
   writer->Append(ulength, p - ulength);
@@ -1917,21 +1913,22 @@ size_t Compress(Source* reader, Sink* writer, CompressionOptions options) {
     // have room for us directly.
     char* dest = writer->GetAppendBuffer(max_output, wmem.GetScratchOutput());
     char* end = nullptr;
-      if (options.level == 1) {
-        end = internal::CompressFragment(fragment, fragment_size, dest, table,
-                                         table_size);
-      } else if (options.level == 2) {
-        end = internal::CompressFragmentDoubleHash(
-            fragment, fragment_size, dest, table, table_size >> 1,
-            table + (table_size >> 1), table_size >> 1);
-      }
-
+    if (options.level == 1) {
+      end = internal::CompressFragment(fragment, fragment_size, dest, table,
+                                       table_size);
+    } else if (options.level == 2) {
+      end = internal::CompressFragmentDoubleHash(
+          fragment, fragment_size, dest, table, table_size >> 1,
+          table + (table_size >> 1), table_size >> 1);
+    }
     writer->Append(dest, end - dest);
     written += (end - dest);
 
     N -= num_to_read;
     reader->Skip(pending_advance);
   }
+
+  Report(token, "snappy_compress", written, uncompressed_size);
   return written;
 }
 
@@ -2236,8 +2233,24 @@ class SnappyArrayWriter {
     char* op = *op_p;
     const size_t space_left = op_limit_ - op;
     if (space_left < len) return false;
+#if defined(__riscv) && SNAPPY_HAVE_RVV
+    // Cast pointers to the type we will operate on.
+    unsigned char* dst_ptr = reinterpret_cast<unsigned char*>(op);
+    const unsigned char* src_ptr = reinterpret_cast<const unsigned char*>(ip);
+    // Copy until all bytes are consumed.
+    // RVV "assembly interface": use e8m1 with direct RVV intrinsics.
+    while (len > 0) {
+      size_t vl = VSETVL_E8M4(len);
+      vuint8m4_t vec = VLE8_V_U8M4(src_ptr, vl);
+      VSE8_V_U8M4(dst_ptr, vec, vl);
+      src_ptr += vl;
+      dst_ptr += vl;
+      len -= vl;
+    }
+#else
     std::memcpy(op, ip, len);
-    *op_p = op + len;
+#endif
+    *op_p = reinterpret_cast<char*>(dst_ptr);
     return true;
   }
 
@@ -2265,14 +2278,26 @@ class SnappyArrayWriter {
     // Check if we try to append from before the start of the buffer.
     if (SNAPPY_PREDICT_FALSE(static_cast<size_t>(op - base_) < offset))
       return false;
-
     if (SNAPPY_PREDICT_FALSE((kSlopBytes < 64 && len > kSlopBytes) ||
                             op >= op_limit_min_slop_ || offset < len)) {
       if (op_end > op_limit_ || offset == 0) return false;
       *op_p = IncrementalCopy(op - offset, op, op_end, op_limit_);
       return true;
     }
+#if defined(__riscv) && SNAPPY_HAVE_RVV
+    // RVV implementation for the fixed 64-byte slop window.
+    // Preserve memmove semantics under overlap by choosing copy direction
+    // based on whether src=[op-offset, op-offset+64) overlaps dst=[op, op+64).
+    const uint8_t* s = reinterpret_cast<const uint8_t*>(op - offset);
+    uint8_t* d = reinterpret_cast<uint8_t*>(op);
+    const size_t vl = VSETVL_E8M4(kSlopBytes);
+      // Non-overlapping case: forward copy.
+      vuint8m4_t v0 = VLE8_V_U8M4(s, vl);
+      VSE8_V_U8M4(d, v0, vl);
+#else
     std::memmove(op, op - offset, kSlopBytes);
+#endif
+
     *op_p = op_end;
     return true;
   }
@@ -2705,3 +2730,4 @@ bool Uncompress(Source* compressed, Sink* uncompressed) {
 }
 
 }  // namespace snappy
+
