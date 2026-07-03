@@ -464,7 +464,7 @@ bool ZLib::UncompressChunkDone() {
   // Make sure we're at the end-of-compressed-data point.  This means
   // if we call inflate with Z_FINISH we won't consume any input or
   // write any output
-  Bytef dummyin, dummyout;
+  Bytef dummyin = 0, dummyout;
   uLongf dummylen = 0;
   if ( UncompressChunkOrAll(&dummyout, &dummylen, &dummyin, 0, Z_FINISH)
        != Z_OK ) {
