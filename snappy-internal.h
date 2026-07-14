@@ -243,10 +243,10 @@ static inline std::pair<size_t, bool> FindMatchLength(const char* s1,
       // *data = ConditionalMove(matched_bytes < 4, UNALIGNED_LOAD64(s2),
       //     UNALIGNED_LOAD64(s2 + 4) >> ((matched_bytes & 3) * 8);
       //
-      // Writen like above this is not a big win, the conditional move would be
+      // Written like above this is not a big win, the conditional move would be
       // a cmp followed by a cmov (2 cycles) followed by a shift (1 cycle).
       // However matched_bytes < 4 is equal to
-      // static_cast<uint32_t>(xorval) != 0. Writen that way, the conditional
+      // static_cast<uint32_t>(xorval) != 0. Written that way, the conditional
       // move (2 cycles) can execute in parallel with FindLSBSetNonZero64
       // (tzcnt), which takes 3 cycles.
       uint64_t xorval = a1 ^ a2;
