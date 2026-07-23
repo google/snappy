@@ -360,7 +360,7 @@ LoadPatternAndReshuffleMask(const char* src, const size_t pattern_size) {
 //
 // REQUIRES: [dst - offset, dst + 64) is a valid address range.
 SNAPPY_ATTRIBUTE_ALWAYS_INLINE
-static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
+static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset, size_t len) {
 #if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
   if (SNAPPY_PREDICT_TRUE(offset <= 16)) {
     switch (offset) {
@@ -370,7 +370,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
         // TODO: Ideally we should memset, move back once the
         // codegen issues are fixed.
         V128 pattern = V128_DupChar(dst[-1]);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4 && 16 * i < len; i++) {
           V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
         }
         return true;
@@ -380,7 +380,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
       case 8:
       case 16: {
         V128 pattern = LoadPattern(dst - offset, offset);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4 && 16 * i < len; i++) {
           V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
         }
         return true;
@@ -390,7 +390,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
             LoadPatternAndReshuffleMask(dst - offset, offset);
         V128 pattern = pattern_and_reshuffle_mask.first;
         V128 reshuffle_mask = pattern_and_reshuffle_mask.second;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4 && 16 * i < len; i++) {
           V128_StoreU(reinterpret_cast<V128*>(dst + 16 * i), pattern);
           pattern = V128_Shuffle(pattern, reshuffle_mask);
         }
@@ -403,7 +403,8 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
     if (SNAPPY_PREDICT_FALSE(offset == 0)) return false;
     // Extend the pattern to the first 16 bytes.
     // The simpler formulation of `dst[i - offset]` induces undefined behavior.
-    for (int i = 0; i < 16; i++) dst[i] = (dst - offset)[i];
+    for (int i = 0; i < 16 && i < len; i++) dst[i] = (dst - offset)[i];
+    if (len <= 16) return true;
     // Find a multiple of pattern >= 16.
     static std::array<uint8_t, 16> pattern_sizes = []() {
       std::array<uint8_t, 16> res;
@@ -411,7 +412,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
       return res;
     }();
     offset = pattern_sizes[offset];
-    for (int i = 1; i < 4; i++) {
+    for (int i = 1; i < 4 && i * 16 < len; i++) {
       std::memcpy(dst + i * 16, dst + i * 16 - offset, 16);
     }
     return true;
@@ -419,7 +420,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
 
   // Very rare.
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 4 && i * 16 < len; i++) {
     std::memcpy(dst + i * 16, dst + i * 16 - offset, 16);
   }
   return true;
@@ -430,6 +431,7 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
 // region of the buffer.
 inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
                              char* const buf_limit) {
+  if (op_limit > buf_limit) return op;
 #if SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
   constexpr int big_pattern_size_lower_bound = 16;
 #else
@@ -549,8 +551,8 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
     // bytes if pattern_size is 2.  Precisely encoding that is probably not
     // worthwhile; instead, invoke the slow path if we cannot write 11 bytes
     // (because 11 are required in the worst case).
-    if (SNAPPY_PREDICT_TRUE(op <= buf_limit - 11)) {
-      while (pattern_size < 8) {
+    if (SNAPPY_PREDICT_TRUE(op_limit <= buf_limit - 11)) {
+      while (pattern_size < 8 && op < op_limit) {
         UnalignedCopy64(src, op);
         op += pattern_size;
         pattern_size *= 2;
@@ -571,7 +573,7 @@ inline char* IncrementalCopy(const char* src, char* op, char* const op_limit,
   //
   // Typically, the op_limit is the gating factor so try to simplify the loop
   // based on that.
-  if (SNAPPY_PREDICT_TRUE(op_limit <= buf_limit - 15)) {
+  if (SNAPPY_PREDICT_TRUE(op_limit <= buf_limit)) {
     // There is at least one, and at most four 16-byte blocks. Writing four
     // conditionals instead of a loop allows FDO to layout the code with respect
     // to the actual probabilities of each length.
@@ -1219,9 +1221,10 @@ static inline bool LeftShiftOverflows(uint8_t value, uint32_t shift) {
   return (value & masks[shift]) != 0;
 }
 
-inline bool Copy64BytesWithPatternExtension(ptrdiff_t dst, size_t offset) {
+inline bool Copy64BytesWithPatternExtension(ptrdiff_t dst, size_t offset, size_t len) {
   // TODO: Switch to [[maybe_unused]] when we can assume C++17.
   (void)dst;
+  (void)len;
   return offset != 0;
 }
 
@@ -1244,10 +1247,12 @@ void MemCopy64(char* dst, const void* src, size_t size) {
   // TODO: Investigate wider copies on other platforms.
 #if defined(__x86_64__) && defined(__AVX__)
   assert(kShortMemCopy <= 32);
-  __m256i data = _mm256_lddqu_si256(static_cast<const __m256i *>(src));
-  _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst), data);
-  // Profiling shows that nearly all copies are short.
-  if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
+  if (size <= 32) {
+    __m256i data = _mm256_lddqu_si256(static_cast<const __m256i *>(src));
+    _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst), data);
+  } else {
+    __m256i data = _mm256_lddqu_si256(static_cast<const __m256i *>(src));
+    _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst), data);
     data = _mm256_lddqu_si256(static_cast<const __m256i *>(src) + 1);
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst) + 1, data);
   }
@@ -1273,13 +1278,7 @@ void MemCopy64(char* dst, const void* src, size_t size) {
   }
 
 #else
-  std::memmove(dst, src, kShortMemCopy);
-  // Profiling shows that nearly all copies are short.
-  if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
-    std::memmove(dst + kShortMemCopy,
-                 static_cast<const uint8_t*>(src) + kShortMemCopy,
-                 64 - kShortMemCopy);
-  }
+  std::memmove(dst, src, size);
 #endif
 }
 
@@ -1506,12 +1505,15 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
           std::ptrdiff_t delta = (op + deferred_length) + len_min_offset - len;
           // Guard against copies before the buffer start.
           // Execute any deferred MemCopy since we write to dst here.
+          if (SNAPPY_PREDICT_FALSE(op + deferred_length > op_limit_min_slop + kSlopBytes)) {
+            goto break_loop;
+          }
           MemCopy64(op_base + op, deferred_src, deferred_length);
           op += deferred_length;
           ClearDeferred(&deferred_src, &deferred_length, safe_source);
           if (SNAPPY_PREDICT_FALSE(delta < 0 ||
                                   !Copy64BytesWithPatternExtension(
-                                      op_base + op, len - len_min_offset))) {
+                                      op_base + op, len - len_min_offset, len))) {
             goto break_loop;
           }
           // We aren't deferring this copy so add length right away.
@@ -1523,6 +1525,9 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
           // Due to the spurious offset in literals have this will trigger
           // at the start of a block when op is still smaller than 256.
           if (tag_type != 0) goto break_loop;
+          if (SNAPPY_PREDICT_FALSE(op + deferred_length > op_limit_min_slop + kSlopBytes)) {
+            goto break_loop;
+          }
           MemCopy64(op_base + op, deferred_src, deferred_length);
           op += deferred_length;
           DeferMemCopy(&deferred_src, &deferred_length, old_ip, len);
@@ -1533,6 +1538,9 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
         // we need to copy from ip instead of from the stream.
         const void* from =
             tag_type ? reinterpret_cast<void*>(op_base + delta) : old_ip;
+        if (SNAPPY_PREDICT_FALSE(op + deferred_length > op_limit_min_slop + kSlopBytes)) {
+          goto break_loop;
+        }
         MemCopy64(op_base + op, deferred_src, deferred_length);
         op += deferred_length;
         DeferMemCopy(&deferred_src, &deferred_length, from, len);
@@ -1545,11 +1553,6 @@ std::pair<const uint8_t*, ptrdiff_t> DecompressBranchless(
   }
   // If we deferred a copy then we can perform.  If we are up to date then we
   // might not have enough slop bytes and could run past the end.
-  if (deferred_length) {
-    MemCopy64(op_base + op, deferred_src, deferred_length);
-    op += deferred_length;
-    ClearDeferred(&deferred_src, &deferred_length, safe_source);
-  }
   return {ip, op};
 }
 
@@ -2271,13 +2274,16 @@ class SnappyArrayWriter {
     if (SNAPPY_PREDICT_FALSE(static_cast<size_t>(op - base_) < offset))
       return false;
 
+    if (SNAPPY_PREDICT_FALSE(op_end > op_limit_)) {
+      return false;
+    }
     if (SNAPPY_PREDICT_FALSE((kSlopBytes < 64 && len > kSlopBytes) ||
                             op >= op_limit_min_slop_ || offset < len)) {
-      if (op_end > op_limit_ || offset == 0) return false;
+      if (offset == 0) return false;
       *op_p = IncrementalCopy(op - offset, op, op_end, op_limit_);
       return true;
     }
-    std::memmove(op, op - offset, kSlopBytes);
+    std::memmove(op, op - offset, len);
     *op_p = op_end;
     return true;
   }
@@ -2552,7 +2558,7 @@ class SnappyScatteredWriter {
     }
     // Fast path
     char* const op_end = op + len;
-    std::memmove(op, op - offset, kSlopBytes);
+    std::memmove(op, op - offset, len);
     *op_p = op_end;
     return true;
   }
