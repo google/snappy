@@ -647,6 +647,35 @@ TEST(Snappy, CompressionContextStaticWorkspace) {
   EXPECT_EQ(a, b);
 }
 
+TEST(Snappy, UnsupportedCompressionLevels) {
+  // CompressionOptions accepts any level, but only levels 1 and 2 are
+  // implemented. Unsupported levels must fall back to the default (level 1)
+  // compressor instead of producing an invalid result.
+  std::string input = "some data to compress, and then some more data";
+  input += input + input + input;
+
+  std::string baseline;
+  size_t baseline_len = snappy::Compress(input.data(), input.size(), &baseline,
+                                         CompressionOptions{1});
+  ASSERT_EQ(baseline_len, baseline.size());
+
+  for (int level = CompressionOptions::MaxCompressionLevel() + 1; level <= 9;
+       ++level) {
+    std::string compressed;
+    size_t compressed_len =
+        snappy::Compress(input.data(), input.size(), &compressed,
+                         CompressionOptions{level});
+    ASSERT_EQ(compressed_len, compressed.size());
+    EXPECT_EQ(baseline, compressed) << "level=" << level;
+
+    std::string uncompressed;
+    EXPECT_TRUE(snappy::Uncompress(compressed.data(), compressed.size(),
+                                   &uncompressed))
+        << "level=" << level;
+    EXPECT_EQ(input, uncompressed) << "level=" << level;
+  }
+}
+
 TEST(Snappy, FourByteOffset) {
   // The new compressor cannot generate four-byte offsets since
   // it chops up the input into 32KB pieces.  So we hand-emit the

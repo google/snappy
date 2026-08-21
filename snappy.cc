@@ -1886,7 +1886,9 @@ size_t Compress(Source* reader, Sink* writer) {
 static size_t InternalCompress(Source* reader, Sink* writer,
                                CompressionOptions options,
                                internal::WorkingMemory* wmem) {
-  assert(options.level == 1 || options.level == 2);
+  // Levels other than 1 and 2 are not implemented yet and are handled by the
+  // fallback below.
+  assert(options.level >= 1);
   size_t written = 0;
   size_t N = reader->Available();
   assert(N <= 0xFFFFFFFFu);
@@ -1939,15 +1941,18 @@ static size_t InternalCompress(Source* reader, Sink* writer,
     // Need a scratch buffer for the output, in case the byte sink doesn't
     // have room for us directly.
     char* dest = writer->GetAppendBuffer(max_output, wmem->GetScratchOutput());
-    char* end = nullptr;
-      if (options.level == 1) {
-        end = internal::CompressFragment(fragment, fragment_size, dest, table,
-                                         table_size);
-      } else if (options.level == 2) {
-        end = internal::CompressFragmentDoubleHash(
-            fragment, fragment_size, dest, table, table_size >> 1,
-            table + (table_size >> 1), table_size >> 1);
-      }
+    char* end;
+    if (options.level == 2) {
+      end = internal::CompressFragmentDoubleHash(
+          fragment, fragment_size, dest, table, table_size >> 1,
+          table + (table_size >> 1), table_size >> 1);
+    } else {
+      // Level 1 is the default, and levels above 2 are not implemented yet.
+      // CompressionOptions does not reject them, so fall back to the level-1
+      // compressor instead of leaving `end` uninitialized.
+      end = internal::CompressFragment(fragment, fragment_size, dest, table,
+                                       table_size);
+    }
 
     writer->Append(dest, end - dest);
     written += (end - dest);
