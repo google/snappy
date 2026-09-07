@@ -286,6 +286,9 @@ configure_file(
   "snappy-stubs-public.h.in"
   "${PROJECT_BINARY_DIR}/snappy-stubs-public.h")
 
+# Must be included before CMAKE_INSTALL_INCLUDEDIR is used.
+include(GNUInstallDirs)
+
 add_library(snappy "")
 target_sources(snappy
   PRIVATE
@@ -298,19 +301,19 @@ target_sources(snappy
     "${PROJECT_BINARY_DIR}/config.h"
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/snappy-c.h>
-    $<INSTALL_INTERFACE:include/snappy-c.h>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/snappy-c.h>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/snappy-sinksource.h>
-    $<INSTALL_INTERFACE:include/snappy-sinksource.h>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/snappy-sinksource.h>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/snappy.h>
-    $<INSTALL_INTERFACE:include/snappy.h>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/snappy.h>
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/snappy-stubs-public.h>
-    $<INSTALL_INTERFACE:include/snappy-stubs-public.h>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/snappy-stubs-public.h>
 )
 target_include_directories(snappy
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 set_target_properties(snappy
   PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
@@ -433,9 +436,6 @@ if(SNAPPY_FUZZING_BUILD)
     PROPERTIES LINK_FLAGS "-fsanitize=fuzzer"
   )
 endif(SNAPPY_FUZZING_BUILD)
-
-# Must be included before CMAKE_INSTALL_INCLUDEDIR is used.
-include(GNUInstallDirs)
 
 if(SNAPPY_INSTALL)
   install(TARGETS snappy
