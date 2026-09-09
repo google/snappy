@@ -77,11 +77,12 @@ namespace {
 class DataEndingAtUnreadablePage {
  public:
   explicit DataEndingAtUnreadablePage(const std::string& s) {
-    const size_t page_size = sysconf(_SC_PAGESIZE);
+    long page_size = sysconf(_SC_PAGESIZE);
+    page_size_ = (size_t)(page_size < 0 ? 4096 : page_size);
     const size_t size = s.size();
-    // Round up space for string to a multiple of page_size.
-    size_t space_for_string = (size + page_size - 1) & ~(page_size - 1);
-    alloc_size_ = space_for_string + page_size;
+    // Round up space for string to a multiple of page_size_.
+    size_t space_for_string = (size + page_size_ - 1) & ~(page_size_ - 1);
+    alloc_size_ = space_for_string + page_size_;
     mem_ = mmap(NULL, alloc_size_,
                 PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     CHECK_NE(MAP_FAILED, mem_);
@@ -91,13 +92,12 @@ class DataEndingAtUnreadablePage {
     data_ = dst;
     size_ = size;
     // Make guard page unreadable.
-    CHECK_EQ(0, mprotect(protected_page_, page_size, PROT_NONE));
+    CHECK_EQ(0, mprotect(protected_page_, page_size_, PROT_NONE));
   }
 
   ~DataEndingAtUnreadablePage() {
-    const size_t page_size = sysconf(_SC_PAGESIZE);
     // Undo the mprotect.
-    CHECK_EQ(0, mprotect(protected_page_, page_size, PROT_READ|PROT_WRITE));
+    CHECK_EQ(0, mprotect(protected_page_, page_size_, PROT_READ|PROT_WRITE));
     CHECK_EQ(0, munmap(mem_, alloc_size_));
   }
 
@@ -110,6 +110,7 @@ class DataEndingAtUnreadablePage {
   char* protected_page_;
   const char* data_;
   size_t size_;
+  size_t page_size_;
 };
 
 #else  // HAVE_FUNC_MMAP && HAVE_FUNC_SYSCONF
