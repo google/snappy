@@ -72,4 +72,50 @@
    first (like Motorola and SPARC, unlike Intel and VAX). */
 #cmakedefine01 SNAPPY_IS_BIG_ENDIAN
 
+#if defined(__APPLE__)
+/* Apple multi-architecture universal builds (x86_64, arm64, etc.)
+   Override configure-time single-architecture probes with slice-aware compiler macros. */
+#undef SNAPPY_HAVE_SSSE3
+#undef SNAPPY_HAVE_X86_CRC32
+#undef SNAPPY_HAVE_BMI2
+#undef SNAPPY_HAVE_NEON
+#undef SNAPPY_HAVE_NEON_CRC32
+
+#if defined(__arm64__) || defined(__aarch64__)
+#define SNAPPY_HAVE_NEON 1
+#if defined(__ARM_FEATURE_CRC32)
+#define SNAPPY_HAVE_NEON_CRC32 1
+#else
+#define SNAPPY_HAVE_NEON_CRC32 0
+#endif
+#define SNAPPY_HAVE_SSSE3 0
+#define SNAPPY_HAVE_X86_CRC32 0
+#define SNAPPY_HAVE_BMI2 0
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#define SNAPPY_HAVE_NEON 0
+#define SNAPPY_HAVE_NEON_CRC32 0
+#if defined(__SSSE3__)
+#define SNAPPY_HAVE_SSSE3 1
+#else
+#define SNAPPY_HAVE_SSSE3 0
+#endif
+#if defined(__SSE4_2__)
+#define SNAPPY_HAVE_X86_CRC32 1
+#else
+#define SNAPPY_HAVE_X86_CRC32 0
+#endif
+#if defined(__BMI2__)
+#define SNAPPY_HAVE_BMI2 1
+#else
+#define SNAPPY_HAVE_BMI2 0
+#endif
+#else
+#define SNAPPY_HAVE_NEON 0
+#define SNAPPY_HAVE_NEON_CRC32 0
+#define SNAPPY_HAVE_SSSE3 0
+#define SNAPPY_HAVE_X86_CRC32 0
+#define SNAPPY_HAVE_BMI2 0
+#endif
+#endif  /* defined(__APPLE__) */
+
 #endif  // THIRD_PARTY_SNAPPY_OPENSOURCE_CMAKE_CONFIG_H_
