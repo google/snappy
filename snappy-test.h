@@ -283,7 +283,7 @@ class ZLib {
   // Checks gzip footer information, as needed.  Mostly this just
   // makes sure the checksums match.  Whenever you call this, it
   // will assume the last 8 bytes from the previous UncompressChunk
-  // call are the footer.  Returns true iff everything looks ok.
+  // call are the footer.  Returns true if everything looks ok.
   bool UncompressChunkDone();
 
  private:

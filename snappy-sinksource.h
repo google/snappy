@@ -117,7 +117,7 @@ class Source {
   virtual size_t Available() const = 0;
 
   // Peek at the next flat region of the source.  Does not reposition
-  // the source.  The returned region is empty iff Available()==0.
+  // the source.  The returned region is empty if Available()==0.
   //
   // Returns a pointer to the beginning of the region and store its
   // length in *len.

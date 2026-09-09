@@ -458,7 +458,7 @@ int ZLib::UncompressAtMost(Bytef *dest, uLongf *destLen,
 // We make sure we've uncompressed everything, that is, the current
 // uncompress stream is at a compressed-buffer-EOF boundary.  In gzip
 // mode, we also check the gzip footer to make sure we pass the gzip
-// consistency checks.  We RETURN true iff both types of checks pass.
+// consistency checks.  We RETURN true if both types of checks pass.
 bool ZLib::UncompressChunkDone() {
   assert(!first_chunk_ && uncomp_init_);
   // Make sure we're at the end-of-compressed-data point.  This means
