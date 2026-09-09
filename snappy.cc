@@ -1246,7 +1246,8 @@ inline bool Copy64BytesWithPatternExtension(ptrdiff_t dst, size_t offset) {
 // 64.  More than size bytes, but never exceeding 64, might be copied if doing
 // so gives better performance.  [src, src + size) must not overlap with
 // [dst, dst + size), but [src, src + 64) may overlap with [dst, dst + 64).
-void MemCopy64(char* dst, const void* src, size_t size) {
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline void MemCopy64(char* dst, const void* src, size_t size) {
   // Always copy this many bytes.  If that's below size then copy the full 64.
   constexpr int kShortMemCopy = 32;
   (void)kShortMemCopy;
@@ -1300,20 +1301,23 @@ void MemCopy64(char* dst, const void* src, size_t size) {
 #endif
 }
 
-void MemCopy64(ptrdiff_t dst, const void* src, size_t size) {
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline void MemCopy64(ptrdiff_t dst, const void* src, size_t size) {
   // TODO: Switch to [[maybe_unused]] when we can assume C++17.
   (void)dst;
   (void)src;
   (void)size;
 }
 
-void ClearDeferred(const void** deferred_src, size_t* deferred_length,
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline void ClearDeferred(const void** deferred_src, size_t* deferred_length,
                    uint8_t* safe_source) {
   *deferred_src = safe_source;
   *deferred_length = 0;
 }
 
-void DeferMemCopy(const void** deferred_src, size_t* deferred_length,
+SNAPPY_ATTRIBUTE_ALWAYS_INLINE
+inline void DeferMemCopy(const void** deferred_src, size_t* deferred_length,
                   const void* src, size_t length) {
   *deferred_src = src;
   *deferred_length = length;
