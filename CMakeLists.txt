@@ -183,6 +183,8 @@ int main() {
   return zero();
 }" HAVE_ATTRIBUTE_ALWAYS_INLINE)
 
+if(NOT MSVC)
+
 check_cxx_source_compiles("
 #include <tmmintrin.h>
 
@@ -225,6 +227,8 @@ int main() {
   vst1q_u8(dup, v2);
   return 0;
 }" SNAPPY_HAVE_NEON)
+
+endif(NOT MSVC)
 
 #check RVV 1.0 need __riscv_ prefix
 check_cxx_source_compiles("
