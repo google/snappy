@@ -75,6 +75,10 @@ mkdir build
 cd build && cmake ../ && make
 ```
 
+MSVC users must manually set `SNAPPY_HAVE_SSSE3`, `SNAPPY_HAVE_X86_CRC32`,
+`SNAPPY_HAVE_BMI2`, `SNAPPY_HAVE_NEON_CRC32`, and `SNAPPY_HAVE_NEON` due to
+MSVC's incorrect architecture detection, if using pre-`/arch:AVX2`.
+
 Usage
 =====
 
