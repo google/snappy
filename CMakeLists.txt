@@ -27,6 +27,11 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required(VERSION 3.10)
+
+if(POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif()
+
 project(Snappy VERSION 1.2.2 LANGUAGES C CXX)
 
 # C++ standard can be overridden when this is used as a sub-project.
@@ -55,6 +60,21 @@ if(MSVC)
   # Disable RTTI.
   string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")
+
+  # Support static MSVC runtime when building static library.
+  option(SNAPPY_MSVC_STATIC_RUNTIME "Link to static MSVC runtime (/MT or /MTd)" OFF)
+  if(SNAPPY_MSVC_STATIC_RUNTIME)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    foreach(flag_var
+        CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+        CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+        CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+      if(${flag_var} MATCHES "/MD")
+        string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+      endif()
+    endforeach()
+  endif()
 else(MSVC)
   # Use -Wall for clang and gcc.
   if(NOT CMAKE_CXX_FLAGS MATCHES "-Wall")
