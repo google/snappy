@@ -288,7 +288,7 @@ class Bits {
   // Return floor(log2(n)) for positive integer n.
   static int Log2FloorNonZero(uint32_t n);
 
-  // Return floor(log2(n)) for positive integer n.  Returns -1 iff n == 0.
+  // Return floor(log2(n)) for positive integer n.  Returns -1 if n == 0.
   static int Log2Floor(uint32_t n);
 
   // Return the first set least / most significant bit, 0-indexed.  Returns an
