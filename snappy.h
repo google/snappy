@@ -69,7 +69,7 @@ class WorkingMemory;
     int level = DefaultCompressionLevel();
 
       constexpr CompressionOptions() = default;
-      constexpr CompressionOptions(int compression_level)
+      constexpr explicit CompressionOptions(int compression_level)
           : level(compression_level) {}
 
     static constexpr int MinCompressionLevel() { return 1; }
