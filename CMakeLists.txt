@@ -32,7 +32,7 @@ if(POLICY CMP0091)
   cmake_policy(SET CMP0091 NEW)
 endif()
 
-project(Snappy VERSION 1.2.2 LANGUAGES C CXX)
+project(Snappy VERSION 1.3.1 LANGUAGES C CXX)
 
 # C++ standard can be overridden when this is used as a sub-project.
 if(NOT CMAKE_CXX_STANDARD)
