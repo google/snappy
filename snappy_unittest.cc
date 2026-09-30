@@ -43,6 +43,7 @@
 #include "snappy-internal.h"
 #include "snappy-sinksource.h"
 #include "snappy.h"
+#include "snappy-c.h"
 #include "snappy_test_data.h"
 
 SNAPPY_FLAG(bool, snappy_dump_decompression_table, false,
@@ -1240,6 +1241,74 @@ TEST(Snappy, TestBenchmarkFiles) {
     Verify(ReadTestDataFile(kTestDataFiles[i].filename,
                             kTestDataFiles[i].size_limit));
   }
+}
+
+TEST(Snappy, NullPointerAndBoundsGuards) {
+  char comp_buf[64];
+  size_t comp_len = sizeof(comp_buf);
+  char uncomp_buf[64];
+  size_t uncomp_len = sizeof(uncomp_buf);
+
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_compress(nullptr, 10, comp_buf, &comp_len));
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_compress("test", 4, nullptr, &comp_len));
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_compress("test", 4, comp_buf, nullptr));
+
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_compress_with_level(nullptr, 10, 1, comp_buf, &comp_len));
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_compress_with_level("test", 4, 1, nullptr, &comp_len));
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_compress_with_level("test", 4, 1, comp_buf, nullptr));
+
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_uncompress(nullptr, 10, uncomp_buf, &uncomp_len));
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_uncompress(comp_buf, 10, nullptr, &uncomp_len));
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_uncompress(comp_buf, 10, uncomp_buf, nullptr));
+
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_uncompressed_length(nullptr, 10, &uncomp_len));
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_uncompressed_length(comp_buf, 10, nullptr));
+  EXPECT_EQ(SNAPPY_INVALID_INPUT,
+            snappy_validate_compressed_buffer(nullptr, 10));
+
+  size_t out_len = 0;
+  uint32_t u32_len = 0;
+  EXPECT_FALSE(GetUncompressedLength(nullptr, 10, &out_len));
+  EXPECT_FALSE(GetUncompressedLength("test", 4, nullptr));
+  EXPECT_FALSE(GetUncompressedLength(static_cast<Source*>(nullptr), &u32_len));
+  EXPECT_FALSE(RawUncompress(static_cast<Source*>(nullptr), uncomp_buf));
+  EXPECT_FALSE(RawUncompress("test", 4, nullptr));
+  EXPECT_FALSE(RawUncompress(nullptr, 10, uncomp_buf));
+
+  std::string out_str;
+  EXPECT_FALSE(Uncompress(nullptr, 10, &out_str));
+  EXPECT_FALSE(Uncompress("test", 4, nullptr));
+  EXPECT_FALSE(Uncompress(static_cast<Source*>(nullptr),
+                          static_cast<Sink*>(nullptr)));
+  EXPECT_EQ(0u, UncompressAsMuchAsPossible(nullptr, nullptr));
+  EXPECT_EQ(0u, Compress(static_cast<Source*>(nullptr),
+                         static_cast<Sink*>(nullptr)));
+
+  RawCompress(nullptr, 10, comp_buf, &out_len);
+  EXPECT_EQ(0u, out_len);
+  RawCompress("test", 4, nullptr, &out_len);
+  EXPECT_EQ(0u, out_len);
+  RawCompress("test", 4, comp_buf, nullptr);
+
+  ByteArraySource null_src(nullptr, 100);
+  EXPECT_EQ(0u, null_src.Available());
+
+  const char data[] = "12345";
+  ByteArraySource src(data, 5);
+  EXPECT_EQ(5u, src.Available());
+  src.Skip(100);
+  EXPECT_EQ(0u, src.Available());
 }
 
 }  // namespace

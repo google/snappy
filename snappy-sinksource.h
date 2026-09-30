@@ -145,7 +145,7 @@ class Source {
 // A Source implementation that yields the contents of a flat array
 class ByteArraySource : public Source {
  public:
-  ByteArraySource(const char* p, size_t n) : ptr_(p), left_(n) { }
+  ByteArraySource(const char* p, size_t n) : ptr_(p), left_(p ? n : 0) { }
   ~ByteArraySource() override;
   size_t Available() const override;
   const char* Peek(size_t* len) override;

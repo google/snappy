@@ -51,7 +51,9 @@ char* Sink::GetAppendBufferVariable(
   (void)min_size;
   (void)desired_size_hint;
 
-  *allocated_size = scratch_size;
+  if (allocated_size) {
+    *allocated_size = scratch_size;
+  }
   return scratch;
 }
 
@@ -60,7 +62,9 @@ void Sink::AppendAndTakeOwnership(
     void (*deleter)(void*, const char*, size_t),
     void *deleter_arg) {
   Append(bytes, n);
-  (*deleter)(deleter_arg, bytes, n);
+  if (deleter) {
+    (*deleter)(deleter_arg, bytes, n);
+  }
 }
 
 ByteArraySource::~ByteArraySource() = default;
@@ -68,11 +72,12 @@ ByteArraySource::~ByteArraySource() = default;
 size_t ByteArraySource::Available() const { return left_; }
 
 const char* ByteArraySource::Peek(size_t* len) {
-  *len = left_;
+  if (len) *len = left_;
   return ptr_;
 }
 
 void ByteArraySource::Skip(size_t n) {
+  if (n > left_) n = left_;
   left_ -= n;
   ptr_ += n;
 }
@@ -82,7 +87,9 @@ UncheckedByteArraySink::~UncheckedByteArraySink() { }
 void UncheckedByteArraySink::Append(const char* data, size_t n) {
   // Do no copying if the caller filled in the result of GetAppendBuffer()
   if (data != dest_) {
-    std::memcpy(dest_, data, n);
+    if (n > 0 && data && dest_) {
+      std::memcpy(dest_, data, n);
+    }
   }
   dest_ += n;
 }
@@ -100,8 +107,12 @@ void UncheckedByteArraySink::AppendAndTakeOwnership(
     void (*deleter)(void*, const char*, size_t),
     void *deleter_arg) {
   if (bytes != dest_) {
-    std::memcpy(dest_, bytes, n);
-    (*deleter)(deleter_arg, bytes, n);
+    if (n > 0 && bytes && dest_) {
+      std::memcpy(dest_, bytes, n);
+    }
+    if (deleter) {
+      (*deleter)(deleter_arg, bytes, n);
+    }
   }
   dest_ += n;
 }
@@ -114,7 +125,9 @@ char* UncheckedByteArraySink::GetAppendBufferVariable(
   (void)scratch;
   (void)scratch_size;
 
-  *allocated_size = desired_size_hint;
+  if (allocated_size) {
+    *allocated_size = desired_size_hint;
+  }
   return dest_;
 }
 

@@ -35,6 +35,9 @@ snappy_status snappy_compress(const char* input,
                               size_t input_length,
                               char* compressed,
                               size_t *compressed_length) {
+  if (!compressed_length || !compressed || (!input && input_length > 0)) {
+    return SNAPPY_INVALID_INPUT;
+  }
   if (*compressed_length < snappy_max_compressed_length(input_length)) {
     return SNAPPY_BUFFER_TOO_SMALL;
   }
@@ -49,6 +52,9 @@ snappy_status snappy_compress_with_level(const char* input, size_t input_length,
                                          int compression_level,
                                          char* compressed,
                                          size_t* compressed_length) {
+  if (!compressed_length || !compressed || (!input && input_length > 0)) {
+    return SNAPPY_INVALID_INPUT;
+  }
   if (*compressed_length < snappy_max_compressed_length(input_length)) {
     return SNAPPY_BUFFER_TOO_SMALL;
   }
@@ -68,6 +74,10 @@ snappy_status snappy_uncompress(const char* compressed,
                                 size_t compressed_length,
                                 char* uncompressed,
                                 size_t* uncompressed_length) {
+  if (!uncompressed_length || !uncompressed ||
+      (!compressed && compressed_length > 0)) {
+    return SNAPPY_INVALID_INPUT;
+  }
   size_t real_uncompressed_length;
   if (!snappy::GetUncompressedLength(compressed,
                                      compressed_length,
@@ -91,6 +101,9 @@ size_t snappy_max_compressed_length(size_t source_length) {
 snappy_status snappy_uncompressed_length(const char *compressed,
                                          size_t compressed_length,
                                          size_t *result) {
+  if (!result || (!compressed && compressed_length > 0)) {
+    return SNAPPY_INVALID_INPUT;
+  }
   if (snappy::GetUncompressedLength(compressed,
                                     compressed_length,
                                     result)) {
@@ -102,6 +115,9 @@ snappy_status snappy_uncompressed_length(const char *compressed,
 
 snappy_status snappy_validate_compressed_buffer(const char *compressed,
                                                 size_t compressed_length) {
+  if (!compressed && compressed_length > 0) {
+    return SNAPPY_INVALID_INPUT;
+  }
   if (snappy::IsValidCompressedBuffer(compressed, compressed_length)) {
     return SNAPPY_OK;
   } else {

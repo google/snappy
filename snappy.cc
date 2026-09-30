@@ -729,6 +729,7 @@ static inline char* EmitCopy(char* op, size_t offset, size_t len) {
 }
 
 bool GetUncompressedLength(const char* start, size_t n, size_t* result) {
+  if (!result || (!start && n > 0)) return false;
   uint32_t v = 0;
   const char* limit = start + n;
   if (Varint::Parse32WithLimit(start, limit, &v) != NULL) {
@@ -1874,6 +1875,7 @@ static bool InternalUncompressAllTags(SnappyDecompressor* decompressor,
 }
 
 bool GetUncompressedLength(Source* source, uint32_t* result) {
+  if (!source || !result) return false;
   SnappyDecompressor decompressor(source);
   return decompressor.ReadUncompressedLength(result);
 }
@@ -1885,6 +1887,7 @@ size_t Compress(Source* reader, Sink* writer) {
 static size_t InternalCompress(Source* reader, Sink* writer,
                                CompressionOptions options,
                                internal::WorkingMemory* wmem) {
+  if (!reader || !writer || !wmem) return 0;
   assert(options.level == 1 || options.level == 2);
   size_t written = 0;
   size_t N = reader->Available();
@@ -1961,14 +1964,14 @@ static size_t InternalCompress(Source* reader, Sink* writer,
 }
 
 size_t Compress(Source* reader, Sink* writer, CompressionOptions options) {
+  if (!reader || !writer) return 0;
   internal::WorkingMemory wmem(reader->Available());
   return InternalCompress(reader, writer, options, &wmem);
 }
 
 size_t Compress(Source* reader, Sink* writer, CompressionOptions options,
                 CompressionContext* ctx) {
-  assert(ctx != nullptr);
-  assert(ctx->working_memory_ != nullptr);
+  if (!reader || !writer || !ctx || !ctx->working_memory_) return 0;
   return InternalCompress(reader, writer, options, ctx->working_memory_);
 }
 
@@ -2373,17 +2376,20 @@ class SnappyArrayWriter {
 
 bool RawUncompress(const char* compressed, size_t compressed_length,
                    char* uncompressed) {
+  if (!uncompressed || (!compressed && compressed_length > 0)) return false;
   ByteArraySource reader(compressed, compressed_length);
   return RawUncompress(&reader, uncompressed);
 }
 
 bool RawUncompress(Source* compressed, char* uncompressed) {
+  if (!compressed || !uncompressed) return false;
   SnappyArrayWriter output(uncompressed);
   return InternalUncompress(compressed, &output);
 }
 
 bool Uncompress(const char* compressed, size_t compressed_length,
                 std::string* uncompressed) {
+  if (!uncompressed || (!compressed && compressed_length > 0)) return false;
   size_t ulength;
   if (!GetUncompressedLength(compressed, compressed_length, &ulength)) {
     return false;
@@ -2442,12 +2448,14 @@ class SnappyDecompressionValidator {
 };
 
 bool IsValidCompressedBuffer(const char* compressed, size_t compressed_length) {
+  if (!compressed && compressed_length > 0) return false;
   ByteArraySource reader(compressed, compressed_length);
   SnappyDecompressionValidator writer;
   return InternalUncompress(&reader, &writer);
 }
 
 bool IsValidCompressed(Source* compressed) {
+  if (!compressed) return false;
   SnappyDecompressionValidator writer;
   return InternalUncompress(compressed, &writer);
 }
@@ -2460,6 +2468,11 @@ void RawCompress(const char* input, size_t input_length, char* compressed,
 
 void RawCompress(const char* input, size_t input_length, char* compressed,
                  size_t* compressed_length, CompressionOptions options) {
+  if (!compressed_length) return;
+  if (!compressed || (!input && input_length > 0)) {
+    *compressed_length = 0;
+    return;
+  }
   ByteArraySource reader(input, input_length);
   UncheckedByteArraySink writer(compressed);
   Compress(&reader, &writer, options);
@@ -2477,6 +2490,11 @@ void RawCompressFromIOVec(const struct iovec* iov, size_t uncompressed_length,
 void RawCompressFromIOVec(const struct iovec* iov, size_t uncompressed_length,
                           char* compressed, size_t* compressed_length,
                           CompressionOptions options) {
+  if (!compressed_length) return;
+  if (!compressed || (!iov && uncompressed_length > 0)) {
+    *compressed_length = 0;
+    return;
+  }
   SnappyIOVecReader reader(iov, uncompressed_length);
   UncheckedByteArraySink writer(compressed);
   Compress(&reader, &writer, options);
@@ -2488,6 +2506,11 @@ void RawCompressFromIOVec(const struct iovec* iov, size_t uncompressed_length,
 void RawCompress(const char* input, size_t input_length, char* compressed,
                  size_t* compressed_length, CompressionOptions options,
                  CompressionContext* ctx) {
+  if (!compressed_length) return;
+  if (!compressed || (!input && input_length > 0)) {
+    *compressed_length = 0;
+    return;
+  }
   ByteArraySource reader(input, input_length);
   UncheckedByteArraySink writer(compressed);
   Compress(&reader, &writer, options, ctx);
@@ -2503,10 +2526,11 @@ size_t Compress(const char* input, size_t input_length,
 
 size_t Compress(const char* input, size_t input_length, std::string* compressed,
                 CompressionOptions options) {
+  if (!compressed || (!input && input_length > 0)) return 0;
   // Pre-grow the buffer to the max length of the compressed output
   STLStringResizeUninitialized(compressed, MaxCompressedLength(input_length));
 
-  size_t compressed_length;
+  size_t compressed_length = 0;
   RawCompress(input, input_length, string_as_array(compressed),
               &compressed_length, options);
   compressed->erase(compressed_length);
@@ -2767,6 +2791,7 @@ class SnappySinkAllocator {
 };
 
 size_t UncompressAsMuchAsPossible(Source* compressed, Sink* uncompressed) {
+  if (!compressed || !uncompressed) return 0;
   SnappySinkAllocator allocator(uncompressed);
   SnappyScatteredWriter<SnappySinkAllocator> writer(allocator);
   InternalUncompress(compressed, &writer);
@@ -2774,6 +2799,7 @@ size_t UncompressAsMuchAsPossible(Source* compressed, Sink* uncompressed) {
 }
 
 bool Uncompress(Source* compressed, Sink* uncompressed) {
+  if (!compressed || !uncompressed) return false;
   // Read the uncompressed length from the front of the compressed input
   SnappyDecompressor decompressor(compressed);
   uint32_t uncompressed_len = 0;
