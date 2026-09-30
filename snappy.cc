@@ -1773,7 +1773,7 @@ constexpr uint32_t CalculateNeeded(uint8_t tag) {
 
 #if __cplusplus >= 201402L
 constexpr bool VerifyCalculateNeeded() {
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < 256; i++) {
     if (CalculateNeeded(i) != static_cast<uint32_t>((char_table[i] >> 11)) + 1)
       return false;
   }
