@@ -1691,10 +1691,11 @@ class SnappyDecompressor {
       // pb              24%        76%
       // bin             24%        76%
       if (SNAPPY_PREDICT_FALSE((c & 0x3) == LITERAL)) {
-        size_t literal_length = (c >> 2) + 1u;
-        if (writer->TryFastAppend(ip, ip_limit_ - ip, literal_length, &op)) {
+        uint64_t literal_length = (c >> 2) + 1u;
+        if (writer->TryFastAppend(ip, ip_limit_ - ip,
+                                  static_cast<size_t>(literal_length), &op)) {
           assert(literal_length < 61);
-          ip += literal_length;
+          ip += static_cast<size_t>(literal_length);
           // NOTE: There is no MAYBE_REFILL() here, as TryFastAppend()
           // will not return true unless there's already at least five spare
           // bytes in addition to the literal.
@@ -1703,14 +1704,16 @@ class SnappyDecompressor {
         }
         if (SNAPPY_PREDICT_FALSE(literal_length >= 61)) {
           // Long literal.
-          const size_t literal_length_length = literal_length - 60;
+          const size_t literal_length_length =
+              static_cast<size_t>(literal_length - 60);
           // NOTE: literal_length might be equal 2^32 (i.e. ExtractLowBytes
           // returns 0xFFFFFFFF); this is implicitly invalid stream (since
           // uncompressed length is capped with 0xFFFFFFFF); for performance we
           // do not check for this case here.
           literal_length =
-              ExtractLowBytes(LittleEndian::Load32(ip), literal_length_length) +
-              size_t{1};
+              static_cast<uint64_t>(ExtractLowBytes(LittleEndian::Load32(ip),
+                                                    literal_length_length)) +
+              uint64_t{1};
           ip += literal_length_length;
         }
 
@@ -1727,8 +1730,10 @@ class SnappyDecompressor {
           ip_limit_ = ip + avail;
           ResetLimit(ip);
         }
-        if (!writer->Append(ip, literal_length, &op)) goto exit;
-        ip += literal_length;
+        if (!writer->Append(ip, static_cast<size_t>(literal_length), &op)) {
+          goto exit;
+        }
+        ip += static_cast<size_t>(literal_length);
         MAYBE_REFILL();
       } else {
         if (SNAPPY_PREDICT_FALSE((c & 3) == COPY_4_BYTE_OFFSET)) {
