@@ -280,6 +280,21 @@ configure_file(
   "${PROJECT_BINARY_DIR}/config.h"
 )
 
+include(GNUInstallDirs)
+set(PKG_CONFIG_PREFIX ${CMAKE_INSTALL_PREFIX})
+if(IS_ABSOLUTE ${CMAKE_INSTALL_LIBDIR})
+    set(PKG_CONFIG_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+    set(PKG_CONFIG_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+    set(INSTALL_PKGCONFIG_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig" CACHE PATH "Installation directory for pkgconfig (.pc) files")
+else()
+    set(PKG_CONFIG_LIBDIR "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
+    set(PKG_CONFIG_INCLUDEDIR "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
+    set(INSTALL_PKGCONFIG_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/pkgconfig" CACHE PATH "Installation directory for pkgconfig (.pc) files")
+endif(IS_ABSOLUTE ${CMAKE_INSTALL_LIBDIR})
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/snappy.pc.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/snappy.pc")
+
 # We don't want to define HAVE_ macros in public headers. Instead, we use
 # CMake's variable substitution with 0/1 variables, which will be seen by the
 # preprocessor as constants.
@@ -494,4 +509,7 @@ if(SNAPPY_INSTALL)
       "${PROJECT_BINARY_DIR}/cmake/${PROJECT_NAME}ConfigVersion.cmake"
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
   )
+
+  install(FILES ${PROJECT_BINARY_DIR}/snappy.pc
+          DESTINATION ${INSTALL_PKGCONFIG_DIR})
 endif(SNAPPY_INSTALL)
