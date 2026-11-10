@@ -57,6 +57,12 @@
 #define VSETVL_E8M2 __riscv_vsetvl_e8m2
 #define VLE8_V_U8M2 __riscv_vle8_v_u8m2
 #define VSE8_V_U8M2 __riscv_vse8_v_u8m2
+#define VSETVL_E8M1 __riscv_vsetvl_e8m1
+#define VLE8_V_U8M1 __riscv_vle8_v_u8m1
+#define VSE8_V_U8M1 __riscv_vse8_v_u8m1
+#define VSETVL_E8M4 __riscv_vsetvl_e8m4
+#define VLE8_V_U8M4 __riscv_vle8_v_u8m4
+#define VSE8_V_U8M4 __riscv_vse8_v_u8m4
 #endif
 
 #if SNAPPY_HAVE_SSSE3 || SNAPPY_HAVE_NEON
