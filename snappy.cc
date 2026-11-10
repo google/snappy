@@ -411,9 +411,20 @@ static inline bool Copy64BytesWithPatternExtension(char* dst, size_t offset) {
       return res;
     }();
     offset = pattern_sizes[offset];
+#if defined(__riscv) && SNAPPY_HAVE_RVV
+    // Copy 3 subsequent 16-byte blocks using RVV load/store.
+    // Use direct RVV intrinsics to avoid project-level macro dependency.
+    const size_t vl = VSETVL_E8M1(16);
+    for (int i = 1; i < 4; i++) {
+      vuint8m1_t vec = VLE8_V_U8M1(
+          reinterpret_cast<const uint8_t*>(dst + i * 16 - offset), vl);
+      VSE8_V_U8M1(reinterpret_cast<uint8_t*>(dst + i * 16), vec, vl);
+    }
+#else
     for (int i = 1; i < 4; i++) {
       std::memcpy(dst + i * 16, dst + i * 16 - offset, 16);
     }
+#endif
     return true;
   }
 #endif  // SNAPPY_HAVE_VECTOR_BYTE_SHUFFLE
@@ -1268,27 +1279,21 @@ void MemCopy64(char* dst, const void* src, size_t size) {
     data = _mm256_lddqu_si256(static_cast<const __m256i *>(src) + 1);
     _mm256_storeu_si256(reinterpret_cast<__m256i *>(dst) + 1, data);
   }
-  // RVV acceleration available on RISC-V when compiled with -march=rv64gcv
+  // RVV: mirror the AVX path — first 32 B, then another 32 B if size > 32.
+  // e8m1 may need two segments per 32 B when VLEN < 256 (e.g. vl=16 on VLEN=128).
 #elif defined(__riscv) && SNAPPY_HAVE_RVV
-  // Cast pointers to the type we will operate on.
-  unsigned char* dst_ptr = reinterpret_cast<unsigned char*>(dst);
-  const unsigned char* src_ptr = reinterpret_cast<const unsigned char*>(src);
-  size_t remaining_bytes = size;
-  // Loop as long as there are bytes remaining to be copied.
-  while (remaining_bytes > 0) {
-    // Set vector configuration: e8 (8-bit elements), m2 (LMUL=2).
-    // Use e8m2 configuration to maximize throughput.
-    size_t vl = VSETVL_E8M2(remaining_bytes);
-    // Load data from the current source pointer.
-    vuint8m2_t vec = VLE8_V_U8M2(src_ptr, vl);
-    // Store data to the current destination pointer.
-    VSE8_V_U8M2(dst_ptr, vec, vl);
-    // Update pointers and the remaining count.
-    src_ptr += vl;
-    dst_ptr += vl;
-    remaining_bytes -= vl;
+  assert(kShortMemCopy <= 32);
+  const size_t vl = VSETVL_E8M2(32);
+  unsigned char* d = reinterpret_cast<unsigned char*>(dst);
+  const unsigned char* s = reinterpret_cast<const unsigned char*>(src);
+  vuint8m2_t v0 = VLE8_V_U8M2(s, vl);
+  VSE8_V_U8M2(d, v0, vl);
+  if (SNAPPY_PREDICT_FALSE(size > kShortMemCopy)) {
+    const unsigned char* s2 = s + kShortMemCopy;
+    unsigned char* d2 = d + kShortMemCopy;
+    vuint8m2_t v2 = VLE8_V_U8M2(s2, vl);
+    VSE8_V_U8M2(d2, v2, vl);
   }
-
 #else
   std::memmove(dst, src, kShortMemCopy);
   // Profiling shows that nearly all copies are short.
@@ -2329,7 +2334,23 @@ class SnappyArrayWriter {
     char* op = *op_p;
     const size_t space_left = op_limit_ - op;
     if (space_left < len) return false;
+#if defined(__riscv) && SNAPPY_HAVE_RVV
+    // Cast pointers to the type we will operate on.
+    unsigned char* dst_ptr = reinterpret_cast<unsigned char*>(op);
+    const unsigned char* src_ptr = reinterpret_cast<const unsigned char*>(ip);
+    // Copy until all bytes are consumed.
+    // RVV "assembly interface": use e8m1 with direct RVV intrinsics.
+    while (len > 0) {
+      size_t vl = VSETVL_E8M4(len);
+      vuint8m4_t vec = VLE8_V_U8M4(src_ptr, vl);
+      VSE8_V_U8M4(dst_ptr, vec, vl);
+      src_ptr += vl;
+      dst_ptr += vl;
+      len -= vl;
+    }
+#else
     std::memcpy(op, ip, len);
+#endif
     *op_p = op + len;
     return true;
   }
@@ -2365,7 +2386,19 @@ class SnappyArrayWriter {
       *op_p = IncrementalCopy(op - offset, op, op_end, op_limit_);
       return true;
     }
+#if defined(__riscv) && SNAPPY_HAVE_RVV
+    // RVV implementation for the fixed 64-byte slop window.
+    // Preserve memmove semantics under overlap by choosing copy direction
+    // based on whether src=[op-offset, op-offset+64) overlaps dst=[op, op+64).
+    const uint8_t* s = reinterpret_cast<const uint8_t*>(op - offset);
+    uint8_t* d = reinterpret_cast<uint8_t*>(op);
+    const size_t vl = VSETVL_E8M4(kSlopBytes);
+      // Non-overlapping case: forward copy.
+      vuint8m4_t v0 = VLE8_V_U8M4(s, vl);
+      VSE8_V_U8M4(d, v0, vl);
+#else
     std::memmove(op, op - offset, kSlopBytes);
+#endif
     *op_p = op_end;
     return true;
   }
