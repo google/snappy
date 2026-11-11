@@ -27,6 +27,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <stddef.h>
+#include <algorithm>
 #include <cstring>
 
 #include "snappy-sinksource.h"
@@ -110,11 +111,10 @@ char* UncheckedByteArraySink::GetAppendBufferVariable(
       size_t min_size, size_t desired_size_hint, char* scratch,
       size_t scratch_size, size_t* allocated_size) {
   // TODO: Switch to [[maybe_unused]] when we can assume C++17.
-  (void)min_size;
   (void)scratch;
   (void)scratch_size;
 
-  *allocated_size = desired_size_hint;
+  *allocated_size = std::max(min_size, desired_size_hint);
   return dest_;
 }
 
