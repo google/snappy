@@ -423,6 +423,24 @@ void AppendCopy(std::string* dst, int offset, int length) {
   }
 }
 
+TEST(Snappy, UncheckedSinkMinimumAppendBuffer) {
+  for (size_t hint : {size_t{0}, size_t{2}, size_t{4}, size_t{8}}) {
+    char output[8];
+    char scratch[4];
+    size_t allocated_size = 0;
+    UncheckedByteArraySink sink(output);
+    char* buffer = sink.GetAppendBufferVariable(
+        sizeof(scratch), hint, scratch, sizeof(scratch), &allocated_size);
+    EXPECT_EQ(output, buffer);
+    EXPECT_GE(allocated_size, sizeof(scratch));
+    EXPECT_GE(allocated_size, hint);
+    std::memcpy(buffer, "test", sizeof(scratch));
+    sink.Append(buffer, sizeof(scratch));
+    EXPECT_EQ(output + sizeof(scratch), sink.CurrentDestination());
+    EXPECT_EQ("test", std::string(output, sizeof(scratch)));
+  }
+}
+
 TEST(Snappy, SimpleTests) {
   Verify("");
   Verify("a");
