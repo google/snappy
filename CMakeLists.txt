@@ -305,6 +305,9 @@ endif (SNAPPY_FUZZING_BUILD)
 configure_file(
   "snappy-stubs-public.h.in"
   "${PROJECT_BINARY_DIR}/snappy-stubs-public.h")
+configure_file(
+  "snappy-version.h.in"
+  "${PROJECT_BINARY_DIR}/snappy-version.h")
 
 # Must be included before CMAKE_INSTALL_INCLUDEDIR is used.
 include(GNUInstallDirs)
@@ -328,6 +331,8 @@ target_sources(snappy
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/snappy.h>
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/snappy-stubs-public.h>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/snappy-stubs-public.h>
+    $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/snappy-version.h>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/snappy-version.h>
 )
 target_include_directories(snappy
   PUBLIC
@@ -407,8 +412,11 @@ if(SNAPPY_BUILD_TESTS)
   target_sources(snappy_unittest
     PRIVATE
       "snappy_unittest.cc"
+      "snappy_c_version_test.c"
   )
   target_link_libraries(snappy_unittest snappy_test_support gmock_main gtest)
+  set_target_properties(snappy_unittest PROPERTIES
+    C_STANDARD 90 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
 
   add_test(
     NAME snappy_unittest
@@ -470,6 +478,7 @@ if(SNAPPY_INSTALL)
       "snappy-sinksource.h"
       "snappy.h"
       "${PROJECT_BINARY_DIR}/snappy-stubs-public.h"
+      "${PROJECT_BINARY_DIR}/snappy-version.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   )
 
