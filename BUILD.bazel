@@ -54,8 +54,14 @@ cc_library(
 )
 
 cc_library(
+    name = "snappy-version",
+    hdrs = [":snappy-version.h"],
+)
+
+cc_library(
     name = "snappy-stubs-public",
     hdrs = [":snappy-stubs-public.h"],
+    deps = [":snappy-version"],
 )
 
 cc_library(
@@ -100,7 +106,10 @@ cc_library(
     name = "snappy-c",
     srcs = ["snappy-c.cc"],
     hdrs = ["snappy-c.h"],
-    deps = [":snappy"],
+    deps = [
+        ":snappy",
+        ":snappy-version",
+    ],
 )
 
 filegroup(
@@ -137,10 +146,12 @@ cc_test(
     name = "snappy_unittest",
     srcs = [
         "snappy_unittest.cc",
+        "snappy_c_version_test.c",
     ],
     data = [":testdata"],
     deps = [
         ":snappy",
+        ":snappy-c",
         ":snappy-test",
         "@com_google_googletest//:gtest_main",
     ],
@@ -215,9 +226,17 @@ expand_template(
     out = "snappy-stubs-public.h",
     substitutions = {
         "${HAVE_SYS_UIO_H_01}": "!_WIN32",
+    },
+    template = "snappy-stubs-public.h.in",
+)
+
+expand_template(
+    name = "snappy_version_h",
+    out = "snappy-version.h",
+    substitutions = {
         "${PROJECT_VERSION_MAJOR}": str(SNAPPY_VERSION[0]),
         "${PROJECT_VERSION_MINOR}": str(SNAPPY_VERSION[1]),
         "${PROJECT_VERSION_PATCH}": str(SNAPPY_VERSION[2]),
     },
-    template = "snappy-stubs-public.h.in",
+    template = "snappy-version.h.in",
 )

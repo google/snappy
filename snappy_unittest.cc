@@ -48,9 +48,20 @@
 SNAPPY_FLAG(bool, snappy_dump_decompression_table, false,
             "If true, we print the decompression table during tests.");
 
+extern "C" void snappy_test_c_version(int version[4]);
+
 namespace snappy {
 
 namespace {
+
+TEST(Snappy, CHeaderVersion) {
+  int version[4];
+  snappy_test_c_version(version);
+  EXPECT_EQ(SNAPPY_MAJOR, version[0]);
+  EXPECT_EQ(SNAPPY_MINOR, version[1]);
+  EXPECT_EQ(SNAPPY_PATCHLEVEL, version[2]);
+  EXPECT_EQ(SNAPPY_VERSION, version[3]);
+}
 
 #if HAVE_FUNC_MMAP && HAVE_FUNC_SYSCONF
 

@@ -33,6 +33,9 @@
 #ifndef THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_C_H_
 #define THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_C_H_
 
+/* Provides SNAPPY_MAJOR, SNAPPY_MINOR, SNAPPY_PATCHLEVEL and SNAPPY_VERSION. */
+#include "snappy-version.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
